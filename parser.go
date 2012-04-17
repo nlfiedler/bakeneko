@@ -14,7 +14,6 @@ package liswat
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -218,11 +217,11 @@ func atof(text string) (float64, *LispError) {
 	}
 	v, err := strconv.ParseFloat(text, 64)
 	if err != nil {
-		if err == os.EINVAL {
+		if err == strconv.ErrSyntax {
 			// the lexer messed up if this happens
 			return 0.0, NewLispError(EINVALNUM, text)
 		}
-		if err == os.ERANGE {
+		if err == strconv.ErrRange {
 			return 0.0, NewLispError(ENUMRANGE, text)
 		}
 	}
@@ -260,11 +259,11 @@ func atoi(text string) (int64, *LispError) {
 	}
 	v, err := strconv.ParseInt(text, base, 64)
 	if err != nil {
-		if err == os.EINVAL {
+		if err == strconv.ErrSyntax {
 			// the lexer messed up if this happens
 			return 0, NewLispError(EINVALNUM, text)
 		}
-		if err == os.ERANGE {
+		if err == strconv.ErrRange {
 			return 0, NewLispError(ENUMRANGE, text)
 		}
 	}
