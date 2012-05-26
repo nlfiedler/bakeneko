@@ -147,7 +147,19 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 			}
 		}
 		return nil, NewLispError(ELEXER, "unexpected EOF after open paren")
-		// TODO: case tokenStartVector:
+	case tokenStartVector:
+		slice := make([]interface{}, 0, 16)
+		for t = range c {
+			if t.typ == tokenCloseParen {
+				return slice, nil
+			}
+			val, err := parserRead(t, c)
+			if err != nil {
+				return nil, err
+			}
+			slice = append(slice, val)
+		}
+		return nil, NewLispError(ELEXER, "unexpected EOF after open paren")
 	case tokenCloseParen:
 		return nil, NewLispError(ESYNTAX, "unexpected )")
 	case tokenString:

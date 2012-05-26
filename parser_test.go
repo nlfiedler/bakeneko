@@ -135,6 +135,27 @@ func TestParseQuotes(t *testing.T) {
 	verifyParseMap(mapping, t)
 }
 
+func TestParseVector(t *testing.T) {
+	input := "#(1 2 3)"
+	result, err := parseExpr(input)
+	if err != nil {
+		msg := fmt.Sprintf("failed to parse expression '%s', %s", input, err)
+		t.Errorf(msg)
+	} else {
+		if slice, ok := result.([]interface{}); ok {
+			if len(slice) == 3 {
+				if slice[0] != int64(1) && slice[1] != int64(2) && slice[2] != int64(3) {
+					t.Errorf("expected 1, 2, 3 in slice, but got %s", slice)
+				}
+			} else {
+				t.Errorf("expected slice of length three but got %d", len(slice))
+			}
+		} else {
+			t.Errorf("expected slice but got %T", result)
+		}
+	}
+}
+
 func TestParseExprNumbers(t *testing.T) {
 	mapping := make(map[string]string)
 	mapping["1.2345"] = "1.2345"
