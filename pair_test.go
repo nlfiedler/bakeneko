@@ -12,7 +12,7 @@ import (
 )
 
 func TestPairNil(t *testing.T) {
-	var p *Pair
+	var p *pair = nil
 	if p.Len() != 0 {
 		t.Errorf("nil Pair.Len() should be 0")
 	}
@@ -254,7 +254,7 @@ func TestCdr(t *testing.T) {
 	}
 	bar := Symbol("bar")
 	p.Append(bar)
-	if r, ok := Cdr(p).(*Pair); ok {
+	if r, ok := Cdr(p).(Pair); ok {
 		if r.First() != bar {
 			t.Errorf("first element of Cdr() incorrect")
 		}
@@ -351,7 +351,7 @@ func TestNestedList(t *testing.T) {
 		t.Errorf("expected 'foo', but got '%s'", p.First())
 	}
 	l := p.Second()
-	if sp, ispair := l.(*Pair); ispair {
+	if sp, ispair := l.(Pair); ispair {
 		if sp.Len() != 2 {
 			t.Errorf("expected 2, but got %d", sp.Len())
 		}

@@ -73,21 +73,21 @@ func (e *Environment) Set(sym Symbol, val interface{}) *LispError {
 
 // Callable represents a procedure that can be invoked. It has an
 // environment in which the procedure was defined.
-type Callable struct {
-	body   *Pair       // procedure definition
-	params *Pair       // parameter list
+type Callable struct { // TODO: change to interface
+	body   Pair        // procedure definition
+	params Pair        // parameter list
 	env    Environment // defining environment
 }
 
 // NewCallable constructs a new Callable with the given definition,
 // defining environment, and parameters.
-func NewCallable(body *Pair, env Environment, params *Pair) *Callable {
+func NewCallable(body Pair, env Environment, params Pair) *Callable {
 	return &Callable{body, params, env}
 }
 
 // Call invokes the given callable using the parameter values.
 // Its environment is the one in which the procedure was defined.
-func (c *Callable) Call(values *Pair) (interface{}, *LispError) {
+func (c *Callable) Call(values Pair) (interface{}, *LispError) {
 	// TODO: implement Callable.Call()
 	return nil, nil
 }

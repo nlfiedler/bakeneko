@@ -18,6 +18,8 @@ import (
 	"strings"
 )
 
+const endOfStreamMsg = "unexpected end of lexer stream"
+
 // Symbol represents a variable or procedure name in a Scheme
 // expression. It is essentially a string but is treated differently.
 type Symbol string
@@ -105,7 +107,7 @@ func parseExpr(expr string) (interface{}, *LispError) {
 	c := lex("parseExpr", expr)
 	t, ok := <-c
 	if !ok {
-		return nil, NewLispError(ELEXER, "unexpected end of lexer stream")
+		return nil, NewLispError(ELEXER, endOfStreamMsg)
 	}
 	if t.typ == tokenEOF {
 		return eofObject, nil
@@ -117,7 +119,7 @@ func parseExpr(expr string) (interface{}, *LispError) {
 func parseNext(c chan token) (interface{}, *LispError) {
 	t, ok := <-c
 	if !ok {
-		return nil, NewLispError(ELEXER, "unexpected end of lexer stream")
+		return nil, NewLispError(ELEXER, endOfStreamMsg)
 	}
 	return parserRead(t, c)
 }
@@ -131,22 +133,7 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 	case tokenEOF:
 		return nil, NewLispError(ELEXER, "unexpected EOF in list")
 	case tokenOpenParen:
-		var list *Pair = nil
-		for t = range c {
-			if t.typ == tokenCloseParen {
-				return list, nil
-			}
-			val, err := parserRead(t, c)
-			if err != nil {
-				return nil, err
-			}
-			if list == nil {
-				list = NewPair(val)
-			} else {
-				list.Append(val)
-			}
-		}
-		return nil, NewLispError(ELEXER, "unexpected EOF after open paren")
+		return parseNextPair(c)
 	case tokenStartVector:
 		slice := make([]interface{}, 0, 16)
 		for t = range c {
@@ -161,7 +148,7 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 		}
 		return nil, NewLispError(ELEXER, "unexpected EOF after open paren")
 	case tokenCloseParen:
-		return nil, NewLispError(ESYNTAX, "unexpected )")
+		return nil, NewLispError(ESYNTAX, "unexpected ')'")
 	case tokenString:
 		// TODO: decode string escapes; could use strconv.Unquote(string)
 		return t.contents(), nil
@@ -208,6 +195,60 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 	case tokenIdentifier:
 		// TODO: lowercase all incoming symbol names?
 		return Symbol(t.val), nil
+	}
+	panic("unreachable code")
+}
+
+// parseNextPair reads a token from the channel and calls parserReadPair. This
+// function assumes that the previous token was an open parenthesis.
+func parseNextPair(c chan token) (interface{}, *LispError) {
+	t, ok := <-c
+	if !ok {
+		return nil, NewLispError(ELEXER, endOfStreamMsg)
+	}
+	return parserReadPair(t, c)
+}
+
+// parserReadPair expects to read the contents of a list, whether a proper
+// list (one with '.' separating elements) or otherwise. This function assumes
+// that the previous token was an open parenthesis.
+func parserReadPair(t token, c chan token) (interface{}, *LispError) {
+	// TODO: consider making this and parserRead() non-recursive
+	if t.typ == tokenCloseParen {
+		return emptyList, nil
+	}
+	// read the first element in the list
+	car_obj, err := parserRead(t, c)
+	if err != nil {
+		return nil, err
+	}
+	// check if the next token is a dot
+	t, ok := <-c
+	if !ok {
+		return nil, NewLispError(ELEXER, endOfStreamMsg)
+	}
+	if t.typ == tokenIdentifier && t.val == "." {
+		// read an improper list
+		// skip over the dot and start parsing the next element
+		cdr_obj, err := parseNext(c)
+		if err != nil {
+			return nil, err
+		}
+		t, ok = <-c
+		if !ok {
+			return nil, NewLispError(ELEXER, endOfStreamMsg)
+		}
+		if t.typ != tokenCloseParen {
+			return nil, NewLispError(ELEXER, "expected ')', but got " + t.val)
+		}
+		return Cons(car_obj, cdr_obj), nil
+	} else {
+		// read a proper list
+		cdr_obj, err := parserReadPair(t, c)
+		if err != nil {
+			return nil, err
+		}
+		return Cons(car_obj, cdr_obj), nil
 	}
 	panic("unreachable code")
 }
@@ -365,7 +406,7 @@ func newParserError(err int, elem interface{}, msg string) *LispError {
 
 // expandListSafely calls expand() on each element of the given list and
 // returns any error that occurs.
-func expandListSafely(list *Pair, toplevel bool) (val *Pair, err *LispError) {
+func expandListSafely(list Pair, toplevel bool) (val Pair, err *LispError) {
 	expandWithPanic := func(x interface{}) interface{} {
 		val, err := expand(x, toplevel)
 		if err != nil {
@@ -389,7 +430,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 	if x == nil {
 		return nil, NewLispError(ESYNTAX, "empty input")
 	}
-	pair, ispair := x.(*Pair)
+	pair, ispair := x.(Pair)
 	if !ispair {
 		return x, nil
 	}
@@ -432,7 +473,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 			}
 			v := pair.Second()
 			body := Cdr(Cdr(pair))
-			if list, islist := v.(*Pair); islist && list.Len() > 0 {
+			if list, islist := v.(Pair); islist && list.Len() > 0 {
 				// (define (f args) body) => (define f (lambda (args) body))
 				f, args := list.First(), list.Rest()
 				lambda := NewList(lambdaSym, args)
@@ -485,7 +526,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 			}
 			vars := pair.Second()
 			body := Cxr("cddr", pair)
-			vlist, islist := vars.(*Pair)
+			vlist, islist := vars.(Pair)
 			_, issym := vars.(Symbol)
 			if islist && vlist.Len() > 0 {
 				var thing interface{} = vlist
@@ -500,7 +541,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 			} else if !issym {
 				return nil, newParserError(ESYNTAX, pair, "lambda arguments must be a list or a symbol")
 			}
-			if blist, islist := body.(*Pair); islist {
+			if blist, islist := body.(Pair); islist {
 				if blist.Len() == 1 {
 					body = blist.First()
 				} else {
@@ -524,7 +565,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 
 		} else if macro, ok := macroTable[sym]; ok {
 			// (m arg...)
-			if pair, ispair := pair.Rest().(*Pair); !ispair {
+			if pair, ispair := pair.Rest().(Pair); !ispair {
 				pair = NewPair(pair)
 			}
 			result, err := macro.Call(pair)
@@ -543,7 +584,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 func expandQuasiquote(x interface{}) (interface{}, *LispError) {
 	// Expand `x => 'x; `,x => x; `(,@x y) => (append x y)
 	// TODO: this is not Scheme compliant and needs to be rewritten
-	pair, ispair := x.(*Pair)
+	pair, ispair := x.(Pair)
 	if !ispair || pair.Len() == 0 {
 		return NewList(quoteSym, x), nil
 	}
@@ -558,7 +599,7 @@ func expandQuasiquote(x interface{}) (interface{}, *LispError) {
 		}
 		return pair.Second(), nil
 	}
-	if npair, ispair := token.(*Pair); ispair && npair.Len() > 0 {
+	if npair, ispair := token.(Pair); ispair && npair.Len() > 0 {
 		if sym, issym := npair.First().(Symbol); issym && sym == unquotesplicingSym {
 			if npair.Len() != 2 {
 				return nil, newParserError(ESYNTAX, pair, "unquote splicing requires 1 argument")

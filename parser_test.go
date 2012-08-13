@@ -23,7 +23,7 @@ func verifyExpandMap(mapping map[string]string, t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to parse %q: %s", input, err)
 		}
-		_, ok := x.(*Pair)
+		_, ok := x.(Pair)
 		if !ok {
 			t.Fatalf("parser returned non-pair for %q", input)
 		}
@@ -31,7 +31,7 @@ func verifyExpandMap(mapping map[string]string, t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to expand %q: %s", input, err)
 		}
-		_, ok = x.(*Pair)
+		_, ok = x.(Pair)
 		if !ok {
 			t.Fatalf("expand returned non-pair for %q: %T", input, x)
 		}
@@ -90,9 +90,14 @@ func TestParseExprSingletonList(t *testing.T) {
 }
 
 func TestParseExprList(t *testing.T) {
-	input := "(foo  bar    baz)"
-	expected := "(foo bar baz)"
-	verifyParse(input, expected, t)
+	mapping := make(map[string]string)
+	// Input/Output tested with MIT/GNU Scheme
+	mapping["(foo  bar    baz)"] = "(foo bar baz)"
+	mapping["(0 . 1)"] = "(0 . 1)"
+	mapping["(0 1)"] = "(0 1)"
+	mapping["(0 . (1 . ()))"] = "(0 1)"
+	mapping["(0 . (1 . 2))"] = "(0 1 . 2)"
+	verifyParseMap(mapping, t)
 }
 
 func TestParseExprNestedList(t *testing.T) {
