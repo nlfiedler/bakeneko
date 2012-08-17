@@ -150,7 +150,6 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 	case tokenCloseParen:
 		return nil, NewLispError(ESYNTAX, "unexpected ')'")
 	case tokenString:
-		// TODO: decode string escapes; could use strconv.Unquote(string)
 		return t.contents(), nil
 	case tokenInteger:
 		return atoi(t.val)
@@ -193,8 +192,7 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 		}
 		return NewList(quote, pair), nil
 	case tokenIdentifier:
-		// TODO: lowercase all incoming symbol names?
-		return Symbol(t.val), nil
+		return Symbol(strings.ToLower(t.val)), nil
 	}
 	panic("unreachable code")
 }
@@ -583,7 +581,6 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 // expandQuasiquote processes the quotes, expanding the quoted elements.
 func expandQuasiquote(x interface{}) (interface{}, *LispError) {
 	// Expand `x => 'x; `,x => x; `(,@x y) => (append x y)
-	// TODO: this is not Scheme compliant and needs to be rewritten
 	pair, ispair := x.(Pair)
 	if !ispair || pair.Len() == 0 {
 		return NewList(quoteSym, x), nil
