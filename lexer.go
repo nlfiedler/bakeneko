@@ -172,12 +172,14 @@ func (l *lexer) ignore() {
 // backup steps back one rune. Can be called only once per call to next.
 func (l *lexer) backup() {
 	l.pos -= l.width
+	l.width = 0
 }
 
 // rewind moves the current position back to the start of the current
 // token.
 func (l *lexer) rewind() {
 	l.pos = l.start
+	l.width = 0
 }
 
 // peek returns but does not consume the next rune in the input.
