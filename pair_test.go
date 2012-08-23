@@ -263,6 +263,38 @@ func TestCdr(t *testing.T) {
 	}
 }
 
+func verifyCxrSingle(t *testing.T, funk, expected string, p Pair) {
+	x := Cxr(funk, p)
+	if x == nil {
+		t.Errorf("received nil unexpectedly for %s of %s", funk, p)
+	} else {
+		s := stringify(x)
+		if s != expected {
+			t.Errorf("expected %s for %s but got %s", expected, funk, s)
+		}
+	}
+}
+
+func verifyCxr(t *testing.T, expected map[string]string, p Pair) {
+	for k, v := range expected {
+		verifyCxrSingle(t, k, v, p)
+	}
+}
+
+func verifyCxrTree(t *testing.T, expected map[string]string, input string) {
+	for k, v := range expected {
+		result, err := parseExpr(input)
+		if err != nil {
+			t.Error(err)
+		}
+		tree, ok := result.(Pair)
+		if !ok {
+			t.Error("result is not a tree!")
+		}
+		verifyCxrSingle(t, k, v, tree)
+	}
+}
+
 func TestCxr(t *testing.T) {
 	p := NewPair(Symbol("a"))
 	p.Append(Symbol("b"))
@@ -279,21 +311,24 @@ func TestCxr(t *testing.T) {
 	expected["cadr"] = "b"
 	expected["caddr"] = "c"
 	expected["cadddr"] = "d"
-	// TODO: for the rest, need a nested structure
-	// expected["caar"] = "b"
-	// expected["caaar"] = "c"
-	// expected["caaaar"] = "d"
-	for k, v := range expected {
-		x := Cxr(k, p)
-		if x == nil {
-			t.Errorf("received nil unexpectedly for %s of %s", k, p)
-		} else {
-			s := stringify(x)
-			if s != v {
-				t.Errorf("expected %s for %s but got %s", v, k, s)
-			}
-		}
-	}
+	verifyCxr(t, expected, p)
+	// The rest of the tests are not exactly thorough but writing a good
+	// test is apparently too difficult for me. Already spent too much
+	// time on this.
+	expected = make(map[string]string)
+	expected["caar"] = "#\\a"
+	expected["cdar"] = "(#\\b #\\c . #\\d)"
+	expected["cadar"] = "#\\b"
+	expected["cddar"] = "(#\\c . #\\d)"
+	expected["caddar"] = "#\\c"
+	expected["cdddar"] = "#\\d"
+	verifyCxrTree(t, expected, "((#\\a #\\b #\\c . #\\d) . #\\e)")
+	expected = make(map[string]string)
+	expected["caaar"] = "(#\\a (#\\b (#\\c . #\\d)))"
+	expected["caaaar"] = "#\\a"
+	expected["cdaar"] = "#\\e"
+	expected["cdaaar"] = "((#\\b (#\\c . #\\d)))"
+	verifyCxrTree(t, expected, "((((#\\a (#\\b (#\\c . #\\d))) . #\\e) . #\\f) . #\\g)")
 }
 
 func TestPairMap(t *testing.T) {
