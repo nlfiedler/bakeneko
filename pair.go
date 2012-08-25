@@ -14,17 +14,30 @@ import (
 // be assembled to form arbitrary tree structures, or more commonly, linked
 // lists.
 type Pair interface {
+	// First returns the car of the pair.
 	First() interface{}
+	// Second returns the first non-Pair thing in cdr.
 	Second() interface{}
+	// Third returns the second non-Pair thing in cdr.
 	Third() interface{}
+	// Rest returns the cdr of the Pair.
 	Rest() interface{}
+	// Len returns the number of things in the list composed of Pairs.
 	Len() int
+	// String returns the string representation of the pair.
 	String() string
+	// Reverse returns the chain of Pairs in reverse order.
 	Reverse() Pair
+	// Map calls function for each thing in the chained pairs.
 	Map(f func(interface{}) interface{}) Pair
+	// Append adds the given thing to the end of the chained pairs.
 	Append(a interface{})
+	// Join finds the first available slot in the chained Pairs
+	// and attaches the given thing there.
 	Join(a interface{})
+	// setFirst replaces the car of the pair with a.
 	setFirst(a interface{})
+	// setRest replaces the cdr of the pair with a.
 	setRest(a interface{})
 }
 
