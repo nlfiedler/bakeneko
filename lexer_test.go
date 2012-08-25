@@ -216,6 +216,8 @@ func TestLexerBadCharacter(t *testing.T) {
 	input["#\\abc"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
 	input["#\\0"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
 	input["#\\a1"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
+	input["#\\nw"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
+	input["#\\sa"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
 	verifyLexerErrors(t, input)
 }
 
