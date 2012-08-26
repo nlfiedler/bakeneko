@@ -7,22 +7,33 @@
 package liswat
 
 import (
+	"errors"
 	"syscall"
 )
 
 // Error constants
 const (
-	_         = iota
-	EOK       // no error
-	ESYNTAX   // syntax error (e.g. unexpected close parenthesis)
-	EVARUNDEF // variable not defined
-	EBADTYPE  // found wrong type of value (e.g. not a procedure when one was expected)
-	EINVALNUM // invalid numeric expression
-	ENUMRANGE // numeric value out of supported range
-	ELEXER    // lexer tokenization failed
-	ESUPPORT  // feature unsupported
+	_          = iota
+	EOK        // no error
+	ESYNTAX    // syntax error (e.g. unexpected close parenthesis)
+	EVARUNDEF  // variable not defined
+	EBADTYPE   // found wrong type of value (e.g. not a procedure when one was expected)
+	EINVALNUM  // invalid numeric expression
+	ENUMRANGE  // numeric value out of supported range
+	ELEXER     // lexer tokenization failed
+	ESUPPORT   // feature unsupported
+	EARGUMENTS // illegal or wrong number of arguments
 )
 
+// OutOfBounds indicates an index into a string or vector is outside of the
+// bounds of that object (e.g. negative or greater than the length).
+var OutOfBounds = errors.New("liswat: index out of bounds")
+
+// NameNotSymbol indicates that a (parameter) name was expected to be a Symbol
+// but was in fact something else. This generally indicates as parser error.
+var NameNotSymbol = errors.New("liswat: name was not a symbol")
+
+// TODO: read http://golang.org/doc/go_faq.html#nil_error and change all this
 // LispError is used to provide information on the type of error that
 // occurred while parsing or evaluating the Lisp script. It implements
 // the error interface.
