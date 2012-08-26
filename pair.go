@@ -41,6 +41,9 @@ type Pair interface {
 	setRest(a interface{})
 }
 
+// TODO: read http://golang.org/doc/articles/laws_of_reflection.html
+// TODO: read http://golang.org/doc/go_faq.html#nil_error
+// TODO: change use of nil and interface references as described in the articles
 // pair is a simple implementation of a Pair.
 type pair struct {
 	first interface{} // the car of the pair
