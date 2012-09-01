@@ -214,7 +214,7 @@ func TestExpand(t *testing.T) {
 	mapping[`(set! foo (if #t (quote bar)))`] = `(set! foo (if #t (quote bar) ()))`
 	mapping[`(define (f args) body)`] = `(define f (lambda (args) body))`
 	mapping["(define-macro foo (lambda args (if #t (quote bar))))"] =
-		"(define-macro foo (lambda args (if #t (quote bar) ())))"
+		"(define-macro foo (lambda (args) (if #t (quote bar) ())))"
 	mapping[`(begin (if #t (display "foo")))`] = `(begin (if #t (display "foo") ()))`
 	mapping[`(lambda (x) e1)`] = `(lambda (x) e1)`
 	mapping[`(lambda (x) e1 e2)`] = `(lambda (x) (begin e1 e2))`

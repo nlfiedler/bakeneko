@@ -341,7 +341,7 @@ func TestPairMap(t *testing.T) {
 	p.Append(baz)
 	p.Append(qux)
 	f := func(a interface{}) interface{} {
-		return fmt.Sprintf("%s", a)
+		return NewString(fmt.Sprint(a))
 	}
 	newp := p.Map(f)
 	if newp.String() != `("foo" "bar" "baz" "qux")` {

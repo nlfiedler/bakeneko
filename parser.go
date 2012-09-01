@@ -20,10 +20,6 @@ import (
 
 const endOfStreamMsg = "unexpected end of lexer stream"
 
-// Symbol represents a variable or procedure name in a Scheme
-// expression. It is essentially a string but is treated differently.
-type Symbol string
-
 var eofObject = Symbol("#<eof-object>")
 var beginSym = Symbol("begin")
 var defineSym = Symbol("define")
@@ -38,22 +34,9 @@ var unquotesplicingSym = Symbol("unquote-splicing")
 var appendSym = Symbol("append")
 var consSym = Symbol("cons")
 
-// Character represents a single character (e.g. '#\\a' or '#\\space') in Scheme.
-type Character rune
-
-// String returns the Scheme representation of the character.
-func (c Character) String() string {
-	if c == ' ' {
-		return "#\\space"
-	} else if c == '\n' {
-		return "#\\newline"
-	}
-	return fmt.Sprintf("#\\%c", c)
-}
-
 // macroTable stores the globally defined macros, mapping instances of
-// Symbol to instances of Callable.
-var macroTable = make(map[Symbol]*Callable)
+// Symbol to instances of Closure.
+var macroTable = make(map[Symbol]Closure)
 
 // stringify takes a tree of elements and converts it to a string in
 // Scheme format (e.g. true is "#t", lists are "(...)", etc).
@@ -81,22 +64,12 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 			buf.Truncate(buf.Len() - 1)
 		}
 		buf.WriteString(")")
-	case bool:
-		if i {
-			buf.WriteString("#t")
-		} else {
-			buf.WriteString("#f")
-		}
-	case Symbol:
-		buf.WriteString(string(i))
-	case string:
-		fmt.Fprintf(buf, "\"%s\"", i)
-	case complex64, complex128:
+	case complex64, complex128: // TODO: convert to Atom, handle this there
 		// print the complex number without parens
 		str := fmt.Sprintf("%v", i)
 		buf.WriteString(str[1 : len(str)-1])
 	default:
-		// this also handles Pair
+		// this handles Atom and Pair
 		fmt.Fprintf(buf, "%v", i)
 	}
 }
@@ -112,6 +85,8 @@ func parseExpr(expr string) (interface{}, *LispError) {
 	if t.typ == tokenEOF {
 		return eofObject, nil
 	}
+	// TODO: need to loop until we reach the end of the stream
+	//     * append everything to a Pair chain and return that
 	return parserRead(t, c)
 }
 
@@ -150,28 +125,23 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 	case tokenCloseParen:
 		return nil, NewLispError(ESYNTAX, "unexpected ')'")
 	case tokenString:
-		return t.contents(), nil
+		return NewString(t.contents()), nil
 	case tokenInteger:
-		return atoi(t.val)
+		return atoi(t.val) // TODO: add new Number atom type
 	case tokenFloat:
-		return atof(t.val)
+		return atof(t.val) // TODO: add new Number atom type
 	case tokenComplex:
-		return atoc(t.val)
+		return atoc(t.val) // TODO: add new Number atom type
 	case tokenRational:
-		return ator(t.val)
+		return ator(t.val) // TODO: add new Number atom type
 	case tokenBoolean:
-		if t.val == "#t" || t.val == "#T" {
-			return true, nil
-		} else {
-			// lexer already validated that it is #f or #F
-			return false, nil
-		}
+		return NewBoolean(t.val), nil
 	case tokenCharacter:
 		if len(t.val) > 3 {
 			// lexer probably messed up
 			return nil, NewLispError(ESYNTAX, "unrecognized character: "+t.val)
 		}
-		return Character(t.val[2]), nil
+		return NewCharacter(t.val), nil
 	case tokenQuote:
 		var quote Symbol
 		switch t.val {
@@ -237,7 +207,7 @@ func parserReadPair(t token, c chan token) (interface{}, *LispError) {
 			return nil, NewLispError(ELEXER, endOfStreamMsg)
 		}
 		if t.typ != tokenCloseParen {
-			return nil, NewLispError(ELEXER, "expected ')', but got " + t.val)
+			return nil, NewLispError(ELEXER, "expected ')', but got "+t.val)
 		}
 		return Cons(car_obj, cdr_obj), nil
 	} else {
@@ -476,6 +446,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 				f, args := list.First(), list.Rest()
 				lambda := NewList(lambdaSym, args)
 				lambda.Join(body)
+				// TODO: should be NewClosure?
 				pair = NewList(sym, f, lambda)
 				return expandListSafely(pair, false)
 			} else {
@@ -497,13 +468,13 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 					if err != nil {
 						return nil, err
 					}
-					callable, isproc := proc.(*Callable)
+					closure, isproc := proc.(Closure)
 					if !isproc {
 						return nil, newParserError(EBADTYPE, pair,
 							"macro must be a procedure")
 					}
 					// (define-syntax v proc)
-					macroTable[sym2] = callable
+					macroTable[sym2] = closure
 					return nil, nil
 				}
 				result := NewList(defineSym, sym2, val)
@@ -536,7 +507,9 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 					}
 					thing = Cdr(thing)
 				}
-			} else if !issym {
+			} else if issym {
+				vlist = NewPair(vars)
+			} else {
 				return nil, newParserError(ESYNTAX, pair, "lambda arguments must be a list or a symbol")
 			}
 			if blist, islist := body.(Pair); islist {
@@ -552,7 +525,8 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 			if err != nil {
 				return nil, err
 			}
-			return NewList(lambdaSym, vars, body), nil
+			// TODO: should be NewClosure?
+			return NewList(lambdaSym, vlist, body), nil
 
 		} else if sym == quasiquoteSym {
 			// `x => expand quasiquote of x
@@ -566,7 +540,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 			if pair, ispair := pair.Rest().(Pair); !ispair {
 				pair = NewPair(pair)
 			}
-			result, err := macro.Call(pair)
+			result, err := macro.Invoke(pair)
 			if err != nil {
 				return nil, err
 			}
