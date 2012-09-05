@@ -30,8 +30,10 @@ type Pair interface {
 	Reverse() Pair
 	// Map calls function for each thing in the chained pairs.
 	Map(f func(interface{}) interface{}) Pair
-	// Append adds the given thing to the end of the chained pairs.
-	Append(a interface{})
+	// Append adds the given item to the pair, forming a list. The element
+	// to which the new value was added is returned, allowing the caller
+	// to chain one append operation onto the next to form a chain.
+	Append(a interface{}) Pair
 	// Join finds the first available slot in the chained Pairs
 	// and attaches the given thing there.
 	Join(a interface{})
@@ -140,21 +142,28 @@ func (p *pair) setRest(a interface{}) {
 	}
 }
 
-// Append adds the given item to the pair, forming a list.
-func (p *pair) Append(a interface{}) {
+// Append adds the given item to the pair, forming a list. The element to
+// which the new value was added is returned, allowing the caller to chain one
+// append operation onto the next to form a chain.
+func (p *pair) Append(a interface{}) Pair {
 	var r Pair = p
 	// find the end of the list and append there
 	for r != nil {
 		if r.Rest() == emptyList {
-			r.setRest(Cons(a, r.Rest()))
+			newr := Cons(a, r.Rest())
+			r.setRest(newr)
+			r = newr
 			break
 		} else if rr, ok := r.Rest().(Pair); ok {
 			r = rr
 		} else {
-			r.setRest(Cons(r.Rest(), a))
+			newr := Cons(r.Rest(), a)
+			r.setRest(newr)
+			r = newr
 			break
 		}
 	}
+	return r
 }
 
 // Join connects the given object to this pair, forming one list.
@@ -378,7 +387,8 @@ func (e EmptyList) Map(f func(interface{}) interface{}) Pair {
 }
 
 // Append does nothing on an empty list. EmptyList is empty.
-func (e EmptyList) Append(a interface{}) {
+func (e EmptyList) Append(a interface{}) Pair {
+	return emptyList
 }
 
 // Join does nothing on an empty list. EmptyList is empty.

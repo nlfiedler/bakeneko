@@ -74,9 +74,35 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 	}
 }
 
+// parse parses a Scheme program and returns the result, which will be a Pair
+// consisting of program elements (i.e. function calls).
+func parse(expr string) (Pair, *LispError) {
+	c := lex("parseExpr", expr)
+	var results Pair = emptyList
+	var tail Pair = emptyList
+	for {
+		t, ok := <-c
+		if !ok || t.typ == tokenEOF {
+			return results, nil
+		}
+		elem, err := parserRead(t, c)
+		if err != nil {
+			return nil, err
+		}
+		if results == emptyList {
+			results = NewPair(elem)
+			tail = results
+		} else {
+			tail = tail.Append(elem)
+		}
+	}
+	panic("unreachable code")
+}
+
 // parseExpr parses a Lisp expression and returns the result, which may
 // be a string, number, symbol, or a list of expressions.
 func parseExpr(expr string) (interface{}, *LispError) {
+	// XXX: except for tests, this function isn't useful anymore
 	c := lex("parseExpr", expr)
 	t, ok := <-c
 	if !ok {
@@ -85,8 +111,6 @@ func parseExpr(expr string) (interface{}, *LispError) {
 	if t.typ == tokenEOF {
 		return eofObject, nil
 	}
-	// TODO: need to loop until we reach the end of the stream
-	//     * append everything to a Pair chain and return that
 	return parserRead(t, c)
 }
 

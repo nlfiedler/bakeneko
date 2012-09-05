@@ -243,3 +243,51 @@ func TestExpandErrors(t *testing.T) {
 	input[`(lambda "foo" bar)`] = expectedExpandError{"lambda arguments must be a list or a symbol", "lambda takes symbol args"}
 	verifyExpandError(t, input)
 }
+
+func TestParse(t *testing.T) {
+	input := `; this binds x to 5 and yields  10
+(let ((x 5)) (* x 2))
+; this bind x to 10, z to 5 and yields 50.
+(let ((x 10) (z 5)) (* x z))
+`
+	result, err := parse(input)
+	if err != nil {
+		t.Errorf("failed to parse program: %v", err)
+	} else {
+		if result.Len() != 2 {
+			t.Error("expected two program elements")
+		}
+		part1 := result.First()
+		if let1, ok := part1.(Pair); ok {
+			if let1.Len() != 3 {
+				t.Error("first let needs three parts")
+			}
+			part1sub1 := let1.Second()
+			if let1args, ok := part1sub1.(Pair); ok {
+				if let1args.Len() != 1 {
+					t.Error("first let subpart 1 length must be 1")
+				}
+			} else {
+				t.Error("first let subpart 1 not a pair")
+			}
+		} else {
+			t.Error("first let not a pair")
+		}
+		part2 := result.Second()
+		if let2, ok := part2.(Pair); ok {
+			if let2.Len() != 3 {
+				t.Error("second let needs three parts")
+			}
+			part2sub1 := let2.Second()
+			if let2args, ok := part2sub1.(Pair); ok {
+				if let2args.Len() != 2 {
+					t.Error("second let subpart 1 length must be 2")
+				}
+			} else {
+				t.Error("second let subpart 1 not a pair")
+			}
+		} else {
+			t.Error("second let not a pair")
+		}
+	}
+}

@@ -184,7 +184,7 @@ func TestConsMultiple(t *testing.T) {
 	}
 }
 
-func TestConsAppend(t *testing.T) {
+func TestAppend(t *testing.T) {
 	foo := Symbol("foo")
 	bar := Symbol("bar")
 	baz := Symbol("baz")
@@ -193,6 +193,47 @@ func TestConsAppend(t *testing.T) {
 	p.Append(bar)
 	p.Append(baz)
 	p.Append(qux)
+	// TODO: test chained append operations
+	if p.Len() != 4 {
+		t.Errorf("expected 4, but got %d", p.Len())
+	}
+	if p.First() != foo {
+		t.Errorf("expected 'foo', but got '%s'", p.First())
+	}
+	if p.Second() != bar {
+		t.Errorf("expected 'bar', but got '%s'", p.Second())
+	}
+	if p.Third() != baz {
+		t.Errorf("expected 'baz', but got '%s'", p.Third())
+	}
+	if p.String() != "(foo bar baz qux)" {
+		t.Errorf("expected (foo bar baz qux) but got '%s'", p.String())
+	}
+	p = p.Reverse()
+	if p.Len() != 4 {
+		t.Errorf("expected 4, but got %d", p.Len())
+	}
+	if p.First() != qux {
+		t.Errorf("expected 'qux', but got '%s'", p.First())
+	}
+	if p.Second() != baz {
+		t.Errorf("expected 'baz', but got '%s'", p.Second())
+	}
+	if p.Third() != bar {
+		t.Errorf("expected 'bar', but got '%s'", p.Third())
+	}
+	if p.String() != "(qux baz bar . foo)" {
+		t.Errorf("expected (qux baz bar . foo) but got '%s'", p.String())
+	}
+}
+
+func TestAppendChain(t *testing.T) {
+	foo := Symbol("foo")
+	bar := Symbol("bar")
+	baz := Symbol("baz")
+	qux := Symbol("qux")
+	p := NewPair(foo)
+	p.Append(bar).Append(baz).Append(qux)
 	if p.Len() != 4 {
 		t.Errorf("expected 4, but got %d", p.Len())
 	}
