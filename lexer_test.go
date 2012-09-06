@@ -23,13 +23,6 @@ type expectedLexerError struct {
 	msg string // explanation of error condition
 }
 
-// drainLexerChannel reads from the given channel until it closes.
-func drainLexerChannel(c chan token) {
-	for _ = range c {
-		// read until channel is closed
-	}
-}
-
 // verifyLexerResults calls lex() and checks that the resulting tokens
 // match the expected results.
 func verifyLexerResults(t *testing.T, input string, expected []expectedLexerResult) {
@@ -46,7 +39,7 @@ func verifyLexerResults(t *testing.T, input string, expected []expectedLexerResu
 			t.Errorf("expected '%s', got '%s' (token %d, type %d)", e.val, tok.val, i, e.typ)
 		}
 	}
-	drainLexerChannel(c)
+	drainLexer(c)
 }
 
 // verifyLexerResultsMap calls lex() for each key in the map and checks
@@ -64,7 +57,7 @@ func verifyLexerResultsMap(t *testing.T, expected map[string]tokenType) {
 		if tok.val != input {
 			t.Errorf("expected '%s', got '%s' (type %d)", input, tok.val, tipe)
 		}
-		drainLexerChannel(c)
+		drainLexer(c)
 	}
 }
 
@@ -83,7 +76,7 @@ func verifyLexerErrors(t *testing.T, input map[string]expectedLexerError) {
 		if len(e.err) > 0 && !strings.Contains(tok.val, e.err) {
 			t.Errorf("expected '%s' but got '%s'(%d) for input '%s'", e.err, tok.val, tok.typ, i)
 		}
-		drainLexerChannel(c)
+		drainLexer(c)
 	}
 }
 

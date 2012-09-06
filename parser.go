@@ -108,6 +108,7 @@ func parseExpr(expr string) (interface{}, *LispError) {
 	if !ok {
 		return nil, NewLispError(ELEXER, endOfStreamMsg)
 	}
+	defer drainLexer(c)
 	if t.typ == tokenEOF {
 		return eofObject, nil
 	}
