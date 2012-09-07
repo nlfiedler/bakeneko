@@ -18,7 +18,7 @@ import (
 	"strings"
 )
 
-const endOfStreamMsg = "unexpected end of lexer stream"
+var endOfStreamMsg = "unexpectedly reached end of expression"
 
 var eofObject = Symbol("#<eof-object>")
 var beginSym = Symbol("begin")
@@ -76,7 +76,7 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 
 // parse parses a Scheme program and returns the result, which will be a Pair
 // consisting of program elements (i.e. function calls).
-func parse(expr string) (Pair, *LispError) {
+func parse(expr string) (Pair, LispError) {
 	c := lex("parseExpr", expr)
 	var results Pair = emptyList
 	var tail Pair = emptyList
@@ -101,12 +101,12 @@ func parse(expr string) (Pair, *LispError) {
 
 // parseExpr parses a Lisp expression and returns the result, which may
 // be a string, number, symbol, or a list of expressions.
-func parseExpr(expr string) (interface{}, *LispError) {
+func parseExpr(expr string) (interface{}, LispError) {
 	// XXX: except for tests, this function isn't useful anymore
 	c := lex("parseExpr", expr)
 	t, ok := <-c
 	if !ok {
-		return nil, NewLispError(ELEXER, endOfStreamMsg)
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	}
 	defer drainLexer(c)
 	if t.typ == tokenEOF {
@@ -116,22 +116,22 @@ func parseExpr(expr string) (interface{}, *LispError) {
 }
 
 // parseNext reads a complete expression from the channel of tokens.
-func parseNext(c chan token) (interface{}, *LispError) {
+func parseNext(c chan token) (interface{}, LispError) {
 	t, ok := <-c
 	if !ok {
-		return nil, NewLispError(ELEXER, endOfStreamMsg)
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	}
 	return parserRead(t, c)
 }
 
 // parserRead reads a complete expression from the channel of tokens,
 // starting with the initial token value provided.
-func parserRead(t token, c chan token) (interface{}, *LispError) {
+func parserRead(t token, c chan token) (interface{}, LispError) {
 	switch t.typ {
 	case tokenError:
-		return nil, NewLispError(ELEXER, t.val)
+		return nil, NewLispError(ESYNTAX, t.val)
 	case tokenEOF:
-		return nil, NewLispError(ELEXER, "unexpected EOF in list")
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	case tokenOpenParen:
 		return parseNextPair(c)
 	case tokenStartVector:
@@ -146,7 +146,7 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 			}
 			slice = append(slice, val)
 		}
-		return nil, NewLispError(ELEXER, "unexpected EOF after open paren")
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	case tokenCloseParen:
 		return nil, NewLispError(ESYNTAX, "unexpected ')'")
 	case tokenString:
@@ -164,7 +164,7 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 	case tokenCharacter:
 		if len(t.val) > 3 {
 			// lexer probably messed up
-			return nil, NewLispError(ESYNTAX, "unrecognized character: "+t.val)
+			return nil, NewLispErrorf(ESYNTAX, "unrecognized character: %s", t.val)
 		}
 		return NewCharacter(t.val), nil
 	case tokenQuote:
@@ -179,7 +179,7 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 		case ",@":
 			quote = unquotesplicingSym
 		default:
-			return nil, NewLispError(ESYNTAX, "unrecognized quote: "+t.val)
+			return nil, NewLispErrorf(ESYNTAX, "unrecognized quote symbol: %s", t.val)
 		}
 		pair, err := parseNext(c)
 		if err != nil {
@@ -194,10 +194,10 @@ func parserRead(t token, c chan token) (interface{}, *LispError) {
 
 // parseNextPair reads a token from the channel and calls parserReadPair. This
 // function assumes that the previous token was an open parenthesis.
-func parseNextPair(c chan token) (interface{}, *LispError) {
+func parseNextPair(c chan token) (interface{}, LispError) {
 	t, ok := <-c
 	if !ok {
-		return nil, NewLispError(ELEXER, endOfStreamMsg)
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	}
 	return parserReadPair(t, c)
 }
@@ -205,7 +205,7 @@ func parseNextPair(c chan token) (interface{}, *LispError) {
 // parserReadPair expects to read the contents of a list, whether a proper
 // list (one with '.' separating elements) or otherwise. This function assumes
 // that the previous token was an open parenthesis.
-func parserReadPair(t token, c chan token) (interface{}, *LispError) {
+func parserReadPair(t token, c chan token) (interface{}, LispError) {
 	// TODO: consider making this and parserRead() non-recursive
 	if t.typ == tokenCloseParen {
 		return emptyList, nil
@@ -218,7 +218,7 @@ func parserReadPair(t token, c chan token) (interface{}, *LispError) {
 	// check if the next token is a dot
 	t, ok := <-c
 	if !ok {
-		return nil, NewLispError(ELEXER, endOfStreamMsg)
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	}
 	if t.typ == tokenIdentifier && t.val == "." {
 		// read an improper list
@@ -229,10 +229,10 @@ func parserReadPair(t token, c chan token) (interface{}, *LispError) {
 		}
 		t, ok = <-c
 		if !ok {
-			return nil, NewLispError(ELEXER, endOfStreamMsg)
+			return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 		}
 		if t.typ != tokenCloseParen {
-			return nil, NewLispError(ELEXER, "expected ')', but got "+t.val)
+			return nil, NewLispErrorf(ESYNTAX, "expected ')', but got %s", t.val)
 		}
 		return Cons(car_obj, cdr_obj), nil
 	} else {
@@ -248,27 +248,27 @@ func parserReadPair(t token, c chan token) (interface{}, *LispError) {
 
 // atof attempts to coerce the given text into a floating point value,
 // returning an error if unsuccessful.
-func atof(text string) (float64, *LispError) {
+func atof(text string) (float64, LispError) {
 	if len(text) > 2 && text[0] == '#' {
 		// handle #e and #i prefixes for exactness
 		switch text[1] {
 		case 'e', 'E':
-			return 0.0, NewLispError(ESUPPORT, "exactness prefix unsupported: "+text)
+			return 0.0, NewLispErrorf(ESUPPORT, "exactness prefix unsupported: %s", text)
 		case 'i', 'I':
-			return 0.0, NewLispError(ESUPPORT, "exactness prefix unsupported: "+text)
+			return 0.0, NewLispErrorf(ESUPPORT, "exactness prefix unsupported: %s", text)
 		default:
 			// the lexer messed up if this happens
-			return 0.0, NewLispError(EINVALNUM, text)
+			return 0.0, NewLispError(ESYNTAX, text)
 		}
 	}
 	v, err := strconv.ParseFloat(text, 64)
 	if err != nil {
 		if err == strconv.ErrSyntax {
 			// the lexer messed up if this happens
-			return 0.0, NewLispError(EINVALNUM, text)
+			return 0.0, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
 		}
 		if err == strconv.ErrRange {
-			return 0.0, NewLispError(ENUMRANGE, text)
+			return 0.0, NewLispErrorf(ESYNTAX, "number out of range: %s", text)
 		}
 	}
 	return v, nil
@@ -276,7 +276,7 @@ func atof(text string) (float64, *LispError) {
 
 // atoi attempts to coerce the given text into an integer value,
 // returning an error if unsuccessful.
-func atoi(text string) (int64, *LispError) {
+func atoi(text string) (int64, LispError) {
 	// assume base 10 numbers, unless otherwise specified
 	base := 10
 	if len(text) > 2 {
@@ -297,7 +297,7 @@ func atoi(text string) (int64, *LispError) {
 				// ignored, all integers are exact
 			default:
 				// the lexer messed up if this happens
-				return 0, NewLispError(EINVALNUM, text)
+				return 0, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
 			}
 			idx++
 		}
@@ -307,10 +307,10 @@ func atoi(text string) (int64, *LispError) {
 	if err != nil {
 		if err == strconv.ErrSyntax {
 			// the lexer messed up if this happens
-			return 0, NewLispError(EINVALNUM, text)
+			return 0, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
 		}
 		if err == strconv.ErrRange {
-			return 0, NewLispError(ENUMRANGE, text)
+			return 0, NewLispErrorf(ESYNTAX, "number out of range: %s", text)
 		}
 	}
 	return v, nil
@@ -318,7 +318,7 @@ func atoi(text string) (int64, *LispError) {
 
 // atoc attempts to coerce the given text into a complex numeric value,
 // returning an error if unsuccessful.
-func atoc(text string) (interface{}, *LispError) {
+func atoc(text string) (interface{}, LispError) {
 	if split := strings.IndexRune(text, '@'); split > 0 {
 		// <real R> @ <real R>
 		reel, err := atof(text[:split])
@@ -338,12 +338,12 @@ func atoc(text string) (interface{}, *LispError) {
 		split := strings.IndexAny(text, "+-")
 		if split == -1 {
 			// there must be a sign, otherwise lexer messed up
-			return nil, NewLispError(EINVALNUM, text)
+			return nil, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
 		} else if split == 0 {
 			// see if there is a second sign
 			split = strings.IndexAny(text[1:], "+-") + 1
 		}
-		var err *LispError
+		var err LispError
 		var reel float64
 		if split > 0 {
 			reel, err = atof(text[:split])
@@ -372,7 +372,7 @@ func atoc(text string) (interface{}, *LispError) {
 
 // ator attempts to coerce the given text into a rational numeric value,
 // returning an error if unsuccessful.
-func ator(text string) (interface{}, *LispError) {
+func ator(text string) (interface{}, LispError) {
 	if split := strings.IndexRune(text, '/'); split > 0 {
 		num, err := atoi(text[:split])
 		if err != nil {
@@ -385,21 +385,21 @@ func ator(text string) (interface{}, *LispError) {
 		return float64(num) / float64(denom), nil
 	} else {
 		// lexer messed up if this happens
-		return nil, NewLispError(ESYNTAX, "invalid rational number: "+text)
+		return nil, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
 	}
 	panic("unreachable code")
 }
 
 // newParserError returns a LispError of the given type, for the
 // selected parser token, with the clarifying message.
-func newParserError(err int, elem interface{}, msg string) *LispError {
+func newParserError(err ErrorCode, elem interface{}, msg string) LispError {
 	str := stringify(elem)
 	return NewLispError(err, msg+": "+str)
 }
 
 // expandListSafely calls expand() on each element of the given list and
 // returns any error that occurs.
-func expandListSafely(list Pair, toplevel bool) (val Pair, err *LispError) {
+func expandListSafely(list Pair, toplevel bool) (val Pair, err LispError) {
 	expandWithPanic := func(x interface{}) interface{} {
 		val, err := expand(x, toplevel)
 		if err != nil {
@@ -410,7 +410,7 @@ func expandListSafely(list Pair, toplevel bool) (val Pair, err *LispError) {
 	defer func() {
 		if e := recover(); e != nil {
 			val = nil
-			err = e.(*LispError)
+			err = e.(LispError)
 		}
 	}()
 	return list.Map(expandWithPanic), nil
@@ -419,7 +419,7 @@ func expandListSafely(list Pair, toplevel bool) (val Pair, err *LispError) {
 // Walk the tree of parser tokens, making optimizations and obvious
 // fixes to enable easier interpretation, possibly signaling a syntax
 // error if appropriate.
-func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
+func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 	if x == nil {
 		return nil, NewLispError(ESYNTAX, "empty input")
 	}
@@ -495,7 +495,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 					}
 					closure, isproc := proc.(Closure)
 					if !isproc {
-						return nil, newParserError(EBADTYPE, pair,
+						return nil, newParserError(EARGUMENT, pair,
 							"macro must be a procedure")
 					}
 					// (define-syntax v proc)
@@ -578,7 +578,7 @@ func expand(x interface{}, toplevel bool) (interface{}, *LispError) {
 }
 
 // expandQuasiquote processes the quotes, expanding the quoted elements.
-func expandQuasiquote(x interface{}) (interface{}, *LispError) {
+func expandQuasiquote(x interface{}) (interface{}, LispError) {
 	// Expand `x => 'x; `,x => x; `(,@x y) => (append x y)
 	pair, ispair := x.(Pair)
 	if !ispair || pair.Len() == 0 {

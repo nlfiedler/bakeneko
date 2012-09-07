@@ -8,51 +8,90 @@ package liswat
 
 import (
 	"errors"
-	"syscall"
+	"fmt"
 )
+
+var OutOfBounds = errors.New("liswat: index out of bounds")
+
+// ErrorCode indicates the error status of the Scheme evaluation, with EOK
+// representing no error.
+type ErrorCode int
 
 // Error constants
 const (
-	_          = iota
-	EOK        // no error
-	ESYNTAX    // syntax error (e.g. unexpected close parenthesis)
-	EVARUNDEF  // variable not defined
-	EBADTYPE   // found wrong type of value (e.g. not a procedure when one was expected)
-	EINVALNUM  // invalid numeric expression
-	ENUMRANGE  // numeric value out of supported range
-	ELEXER     // lexer tokenization failed
-	ESUPPORT   // feature unsupported
-	EARGUMENTS // illegal or wrong number of arguments
+	EOK       ErrorCode = iota // no error
+	EARGUMENT                  // e.g. illegal, missing
+	ECOMMAND                   // e.g. undefined, unsupported, unknown
+	ESUPPORT                   // feature unsupported
+	ESYNTAX                    // e.g. invalid number syntax
+	ESYMBOL                    // e.g. undefined
 )
 
-// OutOfBounds indicates an index into a string or vector is outside of the
-// bounds of that object (e.g. negative or greater than the length).
-var OutOfBounds = errors.New("liswat: index out of bounds")
+// LispError is used to provide information on the type of error that occurred
+// while parsing or evaluating the Lisp script. It implements the error
+// interface.
+type LispError interface {
+	error
+	// ErrorCode returns the error code associated with this result.
+	ErrorCode() ErrorCode
+	// ErrorMessage returns the error message associated with this result.
+	ErrorMessage() string
+	// Ok indicates if the result is a non-error, indicating that
+	// the result is suitable for consumption.
+	Ok() bool
+	// String returns a human readable error message.
+	String() string
+}
 
-// NameNotSymbol indicates that a (parameter) name was expected to be a Symbol
-// but was in fact something else. This generally indicates as parser error.
-var NameNotSymbol = errors.New("liswat: name was not a symbol")
-
-// TODO: read http://golang.org/doc/go_faq.html#nil_error and change all this
-// LispError is used to provide information on the type of error that
-// occurred while parsing or evaluating the Lisp script. It implements
-// the error interface.
-type LispError struct {
-	Errno   syscall.Errno
-	Message string
+// lispError is an implemention of the LispError interface.
+type lispError struct {
+	ecode  ErrorCode
+	errmsg string
 }
 
 // NewLispError creates a new LispError based on the given values.
-func NewLispError(err int, msg string) *LispError {
-	return &LispError{syscall.Errno(err), msg}
+func NewLispError(err ErrorCode, msg string) LispError {
+	return &lispError{err, msg}
 }
 
-// String returns the string representation of the error.
-func (e *LispError) String() string {
-	return e.Message
+// NewLispErrorf creates a new LispError, formatting the message according
+// to the given format and optional arguments.
+func NewLispErrorf(err ErrorCode, form string, args ...interface{}) LispError {
+	detail := fmt.Sprintf(form, args...)
+	return NewLispError(err, detail)
 }
 
-// Error returns the string representation of the error.
-func (e *LispError) Error() string {
-	return e.Message
+// Returns the error portion of this result in string form.
+func (e *lispError) Error() string {
+	return e.String()
+}
+
+// Error returns the error code, or EOK if undefined.
+func (e *lispError) ErrorCode() ErrorCode {
+	if e != nil {
+		return e.ecode
+	}
+	return EOK
+}
+
+// ErrorMessage returns the error message, if any.
+func (e *lispError) ErrorMessage() string {
+	if e != nil {
+		return e.errmsg
+	}
+	return ""
+}
+
+// Ok returns true if the error code is EOK, false otherwise.
+func (e *lispError) Ok() bool {
+	return e == nil || e.ecode == EOK
+}
+
+// String returns a human readable form of the result.
+func (e *lispError) String() string {
+	if e == nil || e.Ok() {
+		return "(no error)"
+	}
+	// Would be nice to print code as text
+	return fmt.Sprintf("ERR-%04d: %s", int(e.ecode), e.errmsg)
 }

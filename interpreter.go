@@ -33,10 +33,10 @@ type Environment interface {
 	Define(sym Symbol, val interface{})
 	// Set assigns the value to the symbol in this environment, but only
 	// if there is a previously defined value for that symbol.
-	Set(sym Symbol, val interface{}) *LispError
+	Set(sym Symbol, val interface{}) LispError
 	// Eval evaluates the given thing in the context of this environment.
 	// Typically expr is the result of parsing an expression.
-	Eval(expr interface{}) (interface{}, *LispError)
+	Eval(expr interface{}) (interface{}, LispError)
 	// Parent returns the parent environment for this environment, or nil
 	// if this is the global environment.
 	Parent() Environment
@@ -94,13 +94,13 @@ func (e *environment) Define(sym Symbol, val interface{}) {
 // Set assigns a value to the given symbol, if and only if that symbol
 // has a value already associated with it. If the symbol does not appear
 // in this environment, the parent will be consulted.
-func (e *environment) Set(sym Symbol, val interface{}) *LispError {
+func (e *environment) Set(sym Symbol, val interface{}) LispError {
 	_, ok := e.vars[sym]
 	if !ok {
 		if e.parent != nil {
 			return e.parent.Set(sym, val)
 		}
-		return NewLispError(EVARUNDEF, string(sym)+" undefined")
+		return NewLispErrorf(ESYMBOL, "symbol '%v' not yet defined", val)
 	} else {
 		e.vars[sym] = val
 	}
@@ -130,7 +130,7 @@ func NewLambda(body, params Pair) *Lambda {
 type Closure interface {
 	// Invoke this closure with the given arguments and return the result,
 	// along with any error.
-	Invoke(values Pair) (interface{}, *LispError)
+	Invoke(values Pair) (interface{}, LispError)
 }
 
 // closure is an implementation of the Closure interface. It consists of a
@@ -150,11 +150,11 @@ func NewClosure(body Pair, env Environment, params Pair) Closure {
 // Invoke evaluates this closure using the parameter values. Its environment
 // is the one in which the procedure was defined, and it will be evaluated in
 // a new environment in which the parameters are bound to the given values.
-func (c *closure) Invoke(values Pair) (interface{}, *LispError) {
+func (c *closure) Invoke(values Pair) (interface{}, LispError) {
 	// TODO: support arbitrary numbers of arguments (e.g. (list 1 2 3 ...))
 	if c.params.Len() != values.Len() {
 		str := c.params.String()
-		return nil, NewLispError(EARGUMENTS, "wrong number of arguments for "+str)
+		return nil, NewLispErrorf(EARGUMENT, "wrong number of arguments for %v", str)
 	}
 	env := NewEnvironment(c.env)
 	// map the symbols in c.params to given values, storing in env
@@ -165,7 +165,7 @@ func (c *closure) Invoke(values Pair) (interface{}, *LispError) {
 		sym, ok := name.(Symbol)
 		if !ok {
 			// parser should have handled this already
-			panic(NameNotSymbol)
+			return nil, NewLispErrorf(EARGUMENT, "name %s is not a symbol", name)
 		}
 		value := Car(valuse)
 		env.Define(sym, value)
@@ -177,7 +177,7 @@ func (c *closure) Invoke(values Pair) (interface{}, *LispError) {
 
 // Interpret parses the given Scheme expression, evaluates each of the top-
 // level elements, returning the result.
-func Interpret(prog string) (interface{}, *LispError) {
+func Interpret(prog string) (interface{}, LispError) {
 	// TODO: parse the program into a Pair chain
 	// TODO: construct the "halt" continuation which awaits the program result
 	// TODO: the result of the halt continuation is returned to the caller
@@ -212,7 +212,7 @@ type continuation struct {
 
 // step moves execution forward until this continuation is exhausted, at which
 // point the result of the last element is returned.
-func (c *continuation) step() (result interface{}, err *LispError) {
+func (c *continuation) step() (result interface{}, err LispError) {
 	// while there is something to evaluate...
 	for c.curr != nil && c.curr.Len() > 0 {
 		// evaluate it and see what happened
@@ -236,12 +236,12 @@ func (c *continuation) step() (result interface{}, err *LispError) {
 
 // Eval evaluates the given s-expression in the global context and returns
 // the result. This is used primarily for defining macros in the parser.
-func Eval(expr interface{}) (interface{}, *LispError) {
+func Eval(expr interface{}) (interface{}, LispError) {
 	return globalEnv.Eval(expr)
 }
 
 // eval evaluates the given s-expression using a specific environment.
-func (e *environment) Eval(expr interface{}) (interface{}, *LispError) {
+func (e *environment) Eval(expr interface{}) (interface{}, LispError) {
 	// TODO: implement Eval
 	// This is essentially the "step" function in a CESK machine.
 	// TODO: needs the continuation, no?
