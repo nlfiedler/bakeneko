@@ -43,9 +43,6 @@ type Pair interface {
 	setRest(a interface{})
 }
 
-// TODO: read http://golang.org/doc/articles/laws_of_reflection.html
-// TODO: read http://golang.org/doc/go_faq.html#nil_error
-// TODO: change use of nil and interface references as described in the articles
 // pair is a simple implementation of a Pair.
 type pair struct {
 	first interface{} // the car of the pair
@@ -54,7 +51,7 @@ type pair struct {
 
 // NewPair returns an instance of Pair to hold the single element a.
 func NewPair(a interface{}) Pair {
-	return &pair{a, emptyList}
+	return &pair{a, theEmptyList}
 }
 
 // NewList constructs a list of pairs from the given inputs.
@@ -62,7 +59,7 @@ func NewList(a ...interface{}) Pair {
 	var head *pair = nil
 	var prev *pair = nil
 	for _, v := range a {
-		next := &pair{v, emptyList}
+		next := &pair{v, theEmptyList}
 		if head == nil {
 			head = next
 		} else {
@@ -82,12 +79,12 @@ func Cons(a, b interface{}) Pair {
 // List constructs a proper list to hold a and b such that a and b are in
 // distinct instances of Pair, with the empty list marking the end.
 func List(a, b interface{}) Pair {
-	return &pair{a, &pair{b, emptyList}}
+	return &pair{a, &pair{b, theEmptyList}}
 }
 
 // Car returns the first element in a list.
 func Car(a interface{}) interface{} {
-	if a == emptyList {
+	if a == theEmptyList {
 		return nil
 	} else if p, ok := a.(Pair); ok {
 		return p.First()
@@ -99,10 +96,10 @@ func Car(a interface{}) interface{} {
 
 // Cdr returns the second element in a list.
 func Cdr(a interface{}) interface{} {
-	if a == emptyList {
+	if a == theEmptyList {
 		return nil
 	} else if p, ok := a.(Pair); ok {
-		if p.Rest() == emptyList {
+		if p.Rest() == theEmptyList {
 			return nil
 		}
 		return p.Rest()
@@ -149,7 +146,7 @@ func (p *pair) Append(a interface{}) Pair {
 	var r Pair = p
 	// find the end of the list and append there
 	for r != nil {
-		if r.Rest() == emptyList {
+		if r.Rest() == theEmptyList {
 			newr := Cons(a, r.Rest())
 			r.setRest(newr)
 			r = newr
@@ -173,7 +170,7 @@ func (p *pair) Join(a interface{}) {
 	var r Pair = p
 	// find the end of the list and attach there
 	for r != nil {
-		if r.Rest() == emptyList {
+		if r.Rest() == theEmptyList {
 			r.setRest(a)
 			break
 		} else if rr, ok := r.Rest().(Pair); ok {
@@ -205,7 +202,7 @@ func (p *pair) Rest() interface{} {
 // such item.
 func (p *pair) Second() interface{} {
 	if p != nil {
-		if p.rest == emptyList {
+		if p.rest == theEmptyList {
 			return nil
 		} else if r, ok := p.rest.(Pair); ok {
 			return r.First()
@@ -220,7 +217,7 @@ func (p *pair) Second() interface{} {
 func (p *pair) Third() interface{} {
 	if p != nil {
 		if r1, ok := p.rest.(Pair); ok {
-			if r1.Rest() == emptyList {
+			if r1.Rest() == theEmptyList {
 				return nil
 			} else if r2, ok := r1.Rest().(Pair); ok {
 				return r2.First()
@@ -242,14 +239,14 @@ func (p *pair) Reverse() Pair {
 	var pp Pair = p
 	for p != nil {
 		if result == nil {
-			result = &pair{pp.First(), emptyList}
+			result = &pair{pp.First(), theEmptyList}
 		} else {
 			result = &pair{pp.First(), result}
 			if penultimate == nil {
 				penultimate = result
 			}
 		}
-		if pp.Rest() == emptyList {
+		if pp.Rest() == theEmptyList {
 			p = nil
 		} else if r, ok := pp.Rest().(Pair); ok {
 			pp = r
@@ -263,7 +260,7 @@ func (p *pair) Reverse() Pair {
 		if r, ok := penultimate.rest.(Pair); ok {
 			penultimate.rest = r.First()
 		}
-	} else if result != nil && result.rest != emptyList {
+	} else if result != nil && result.rest != theEmptyList {
 		// special case of a single Pair
 		if r, ok := result.rest.(Pair); ok {
 			result.rest = r.First()
@@ -279,7 +276,7 @@ func (p *pair) Len() int {
 	var r Pair = p
 	for p != nil {
 		length++
-		if r.Rest() == emptyList {
+		if r.Rest() == theEmptyList {
 			p = nil
 		} else if rr, ok := r.Rest().(Pair); ok {
 			r = rr
@@ -299,8 +296,8 @@ func (p *pair) Map(f func(interface{}) interface{}) Pair {
 	var r Pair = p
 	for p != nil {
 		q := f(r.First())
-		var s interface{} = emptyList
-		if r.Rest() == emptyList {
+		var s interface{} = theEmptyList
+		if r.Rest() == theEmptyList {
 			p = nil
 		} else if rr, ok := r.Rest().(Pair); ok {
 			r = rr
@@ -326,7 +323,7 @@ func (p *pair) String() string {
 	var r Pair = p
 	for p != nil {
 		stringifyBuffer(r.First(), buf)
-		if r.Rest() == emptyList {
+		if r.Rest() == theEmptyList {
 			p = nil
 		} else if rr, ok := r.Rest().(Pair); ok {
 			buf.WriteString(" ")
@@ -378,17 +375,17 @@ func (e EmptyList) Third() interface{} {
 
 // Reverse always returns the empty list.
 func (e EmptyList) Reverse() Pair {
-	return emptyList
+	return theEmptyList
 }
 
 // Map always returns the empty list without calling the function.
 func (e EmptyList) Map(f func(interface{}) interface{}) Pair {
-	return emptyList
+	return theEmptyList
 }
 
 // Append does nothing on an empty list. EmptyList is empty.
 func (e EmptyList) Append(a interface{}) Pair {
-	return emptyList
+	return theEmptyList
 }
 
 // Join does nothing on an empty list. EmptyList is empty.
@@ -403,6 +400,6 @@ func (e EmptyList) setFirst(a interface{}) {
 func (e EmptyList) setRest(a interface{}) {
 }
 
-// emptyList represents an empty list and may be used as a place holder
+// theEmptyList represents an empty list and may be used as a place holder
 // in expressions that require a certain number of values.
-var emptyList EmptyList = EmptyList(0)
+var theEmptyList EmptyList = EmptyList(0)

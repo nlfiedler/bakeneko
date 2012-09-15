@@ -56,6 +56,11 @@ func (b Boolean) String() string {
 	return "#f"
 }
 
+// Returns the boolean value.
+func (b Boolean) Value() bool {
+	return bool(b)
+}
+
 // Symbol represents a variable or procedure name in a Scheme expression. It
 // is essentially a string but is treated differently.
 type Symbol string
@@ -197,10 +202,9 @@ func (v Void) String() string {
 	return ""
 }
 
-// TODO: introduce a Number type to aid converting between formats, performing operations
-
 // Number represents all numbers in Scheme, from integers to rationals.
 type Number interface {
+	Atom
 	// Add the given value to this number and return a new number.
 	Add(value interface{}) Number
 	// Divide this number by the divisor and return a new Number.
@@ -209,6 +213,8 @@ type Number interface {
 	Multiply(multiplier interface{}) Number
 	// Subtract the given value from this number and return a new number.
 	Subtract(value interface{}) Number
+	// IntValue returns the number as an int64.
+	IntValue() int64
 }
 
 type Integer int64
@@ -228,16 +234,29 @@ func (i Integer) Add(value interface{}) Number {
 	return nil
 }
 
-func (f Integer) Divide(divisor interface{}) Number {
+func (i Integer) Divide(divisor interface{}) Number {
 	return nil // TODO: implement Integer.Divide()
 }
 
-func (f Integer) Multiply(muliplier interface{}) Number {
+func (i Integer) Multiply(muliplier interface{}) Number {
 	return nil // TODO: implement Integer.Multiply()
 }
 
-func (f Integer) Subtract(value interface{}) Number {
+func (i Integer) Subtract(value interface{}) Number {
 	return nil // TODO: implement Integer.Subtract()
+}
+
+func (i Integer) Eval() interface{} {
+	return i
+}
+
+// IntValue returns the number as an int64.
+func (i Integer) IntValue() int64 {
+	return int64(i)
+}
+
+func (i Integer) String() string {
+	return fmt.Sprint(int64(i))
 }
 
 type Float float64
@@ -261,3 +280,20 @@ func (f Float) Multiply(muliplier interface{}) Number {
 func (f Float) Subtract(value interface{}) Number {
 	return nil // TODO: implement Float.Subtract()
 }
+
+func (f Float) Eval() interface{} {
+	return f
+}
+
+// IntValue returns the number as an int64.
+func (f Float) IntValue() int64 {
+	return int64(f)
+}
+
+func (f Float) String() string {
+	return fmt.Sprint(float64(f))
+}
+
+// TODO: add rational number type (Go has rational number support in math.big package)
+
+// TODO: add complex number type

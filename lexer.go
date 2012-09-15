@@ -255,6 +255,8 @@ func lexStart(l *lexer) stateFn {
 		return lexHash
 	case '\'', '`', ',':
 		return lexQuote
+	case '[', ']', '{', '}', '|':
+		return l.errorf("use of reserved character: %c", r)
 	default:
 		// let lexIdentifier sort out what exactly this is
 		l.backup()
@@ -355,6 +357,8 @@ func lexIdentifier(l *lexer) stateFn {
 		l.backup()
 		l.emit(tokenIdentifier)
 		return lexStart
+	} else if r == '@' {
+		return l.errorf("character not allowed to start identifier: %c", r)
 	}
 
 	for {
@@ -370,7 +374,7 @@ func lexIdentifier(l *lexer) stateFn {
 			return lexStart
 		}
 		// identifiers are letters, numbers, and extended characters (r5rs 2.1)
-		if !isAlphaNumeric(r) && !strings.ContainsRune("!$%&*+-./:<=>?@^_~", r) {
+		if !isAlphaNumeric(r) && !strings.ContainsRune("!$%&*/:<=>?^_~+-.@", r) {
 			return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
 		}
 		r = l.next()

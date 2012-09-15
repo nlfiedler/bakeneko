@@ -45,7 +45,7 @@ func TestEnvironmentParent(t *testing.T) {
 	}
 	err := e.Set(foo, "qux")
 	if err != nil {
-		t.Errorf("set of parent-defined var failed")
+		t.Errorf("set of parent-defined var failed: %v", err)
 	}
 	// check parent
 	v = p.Find(foo)
@@ -76,8 +76,35 @@ func TestEnvironmentOverride(t *testing.T) {
 	}
 }
 
-// TODO: test Callable
-// TODO: test Eval()
+func TestInterpret(t *testing.T) {
+	// if with true condition
+	input := `(if #t 1 2)`
+	result, err := Interpret(input)
+	if err != nil {
+		t.Errorf("Interpret() failed: %v", err)
+	}
+	if num, ok := result.(int64); ok {
+		if num != 1 {
+			t.Errorf("result wrong value: %v", num)
+		}
+	} else {
+		t.Errorf("result of wrong type: %T: %v", result, result)
+	}
+	// if with false condition
+	input = `(if #f 1 2)`
+	result, err = Interpret(input)
+	if err != nil {
+		t.Errorf("Interpret() failed: %v", err)
+	}
+	if num, ok := result.(int64); ok {
+		if num != 2 {
+			t.Errorf("result wrong value: %v", num)
+		}
+	} else {
+		t.Errorf("result of wrong type: %T: %v", result, result)
+	}
+}
+
 // TODO: for testing the results of evaluation, can assign "stdout" in the global
 //       environment to a bytes.Buffer then read the contents of that to see what
 //       the s-expr yielded

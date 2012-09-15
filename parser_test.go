@@ -209,6 +209,7 @@ func TestParseExprNumbers(t *testing.T) {
 func TestExpand(t *testing.T) {
 	mapping := make(map[string]string)
 	mapping[`(if #t (display "foo"))`] = `(if #t (display "foo") ())`
+	mapping[`(if #t 1 2)`] = `(if #t 1 2)`
 	mapping[`(quote abc)`] = `(quote abc)`
 	mapping[`(set! foo (quote bar))`] = `(set! foo (quote bar))`
 	mapping[`(set! foo (if #t (quote bar)))`] = `(set! foo (if #t (quote bar) ()))`
@@ -288,6 +289,54 @@ func TestParse(t *testing.T) {
 			}
 		} else {
 			t.Error("second let not a pair")
+		}
+	}
+}
+
+func TestParseSingle(t *testing.T) {
+	input := `(if #t "true" "false")`
+	result, err := parse(input)
+	if err != nil {
+		t.Errorf("failed to parse program: %v", err)
+	} else {
+		actual := stringify(result)
+		if actual != `(if #t "true" "false")` {
+			t.Errorf("parse() returned wrong result: %s", actual)
+		}
+		if result.Len() != 4 {
+			t.Error("expected one program elements with four parts")
+		}
+		elem1 := result.First()
+		if sym, ok := elem1.(Symbol); ok {
+			if sym != ifSym {
+				t.Error("first element expected to be 'if'")
+			}
+		} else {
+			t.Error("first element not a symbol")
+		}
+		elem2 := result.Second()
+		if val, ok := elem2.(Boolean); ok {
+			if val.Value() != true {
+				t.Error("second element expected to be '#t'")
+			}
+		} else {
+			t.Error("second element not a boolean")
+		}
+		elem3 := result.Third()
+		if val, ok := elem3.(String); ok {
+			if val.String() != `"true"` {
+				t.Errorf("third element expected to be 'true', but got '%v'", val)
+			}
+		} else {
+			t.Errorf("third element not a string: %v(%T)", elem3, elem3)
+		}
+		elem4 := Cxr("cadddr", result)
+		if val, ok := elem4.(String); ok {
+			if val.String() != `"false"` {
+				t.Errorf("fourth element expected to be 'false', but got '%v'", val)
+			}
+		} else {
+			t.Error("fourth element not a string: %v(%T)", elem4, elem4)
 		}
 	}
 }

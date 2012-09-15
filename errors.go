@@ -12,6 +12,7 @@ import (
 )
 
 var OutOfBounds = errors.New("liswat: index out of bounds")
+var ParserError = errors.New("liswat: unexpected parser error")
 
 // ErrorCode indicates the error status of the Scheme evaluation, with EOK
 // representing no error.

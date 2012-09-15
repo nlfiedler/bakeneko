@@ -39,7 +39,7 @@ var consSym = Symbol("cons")
 var macroTable = make(map[Symbol]Closure)
 
 // stringify takes a tree of elements and converts it to a string in
-// Scheme format (e.g. true is "#t", lists are "(...)", etc).
+// Scheme format (e.g. true becomes "#t", lists become "(...)", etc).
 func stringify(x interface{}) string {
 	buf := new(bytes.Buffer)
 	stringifyBuffer(x, buf)
@@ -78,18 +78,24 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 // consisting of program elements (i.e. function calls).
 func parse(expr string) (Pair, LispError) {
 	c := lex("parseExpr", expr)
-	var results Pair = emptyList
-	var tail Pair = emptyList
+	var results Pair = theEmptyList
+	var tail Pair = theEmptyList
 	for {
 		t, ok := <-c
 		if !ok || t.typ == tokenEOF {
+			if results.Len() == 1 {
+				first := results.First()
+				if pair, ok := first.(Pair); ok {
+					return pair, nil
+				}
+			}
 			return results, nil
 		}
 		elem, err := parserRead(t, c)
 		if err != nil {
 			return nil, err
 		}
-		if results == emptyList {
+		if results == theEmptyList {
 			results = NewPair(elem)
 			tail = results
 		} else {
@@ -208,7 +214,7 @@ func parseNextPair(c chan token) (interface{}, LispError) {
 func parserReadPair(t token, c chan token) (interface{}, LispError) {
 	// TODO: consider making this and parserRead() non-recursive
 	if t.typ == tokenCloseParen {
-		return emptyList, nil
+		return theEmptyList, nil
 	}
 	// read the first element in the list
 	car_obj, err := parserRead(t, c)
@@ -438,7 +444,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 		} else if sym == ifSym {
 			if pair.Len() == 3 {
 				// (if t c) => (if t c ())
-				pair.Append(emptyList)
+				pair.Append(theEmptyList)
 			}
 			if pair.Len() != 4 {
 				return nil, newParserError(ESYNTAX, pair, "if too many/few arguments")
@@ -471,7 +477,6 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 				f, args := list.First(), list.Rest()
 				lambda := NewList(lambdaSym, args)
 				lambda.Join(body)
-				// TODO: should be NewClosure?
 				pair = NewList(sym, f, lambda)
 				return expandListSafely(pair, false)
 			} else {
@@ -489,7 +494,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 						return nil, newParserError(ESYNTAX, pair,
 							"define-syntax only allowed at top level")
 					}
-					proc, err := Eval(val)
+					proc, err := Eval(val, theReportEnv)
 					if err != nil {
 						return nil, err
 					}
@@ -550,7 +555,6 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 			if err != nil {
 				return nil, err
 			}
-			// TODO: should be NewClosure?
 			return NewList(lambdaSym, vlist, body), nil
 
 		} else if sym == quasiquoteSym {

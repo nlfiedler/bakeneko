@@ -6,9 +6,9 @@
 
 package liswat
 
-import (
-	"code.google.com/p/goswat/container/vector"
-)
+// import (
+// 	// "code.google.com/p/goswat/container/vector"
+// )
 
 //
 // Interpreter for our Scheme-like language, which turns a tree of expressions
@@ -34,43 +34,36 @@ type Environment interface {
 	// Set assigns the value to the symbol in this environment, but only
 	// if there is a previously defined value for that symbol.
 	Set(sym Symbol, val interface{}) LispError
-	// Eval evaluates the given thing in the context of this environment.
-	// Typically expr is the result of parsing an expression.
-	Eval(expr interface{}) (interface{}, LispError)
-	// Parent returns the parent environment for this environment, or nil
-	// if this is the global environment.
-	Parent() Environment
 }
 
 // environment is an implementation of the Environment interface, which
 // supports mapping symbols to values, as well as delegating to a parent when
 // a symbol is not found in this environment.
 type environment struct {
-	vars   map[Symbol]interface{} // mapping of variable names to values
-	parent Environment            // environment to delegate to
+	writable bool                   // true if environment allows changes
+	vars     map[Symbol]interface{} // mapping of variable names to values
+	parent   Environment            // environment to delegate to
 }
 
 // NewEnvironment constructs an Environment with the given parent to provide a
 // fallback for finding variables. The parent may be nil.
 func NewEnvironment(parent Environment) Environment {
 	e := new(environment)
+	e.writable = true
 	e.vars = make(map[Symbol]interface{})
 	e.parent = parent
 	return e
 }
 
-// newGlobalEnvironment creates an environment with the default Scheme
-// procedures and variables in place for use in a global context.
-func newGlobalEnvironment() Environment {
-	ge := NewEnvironment(nil)
-	// TODO: add the standard Scheme procedures and variables
-	// TODO: define the "stdin" and "stdout" streams as variables
-	return ge
+// NewRestrictedEnvironment constructs an Environment with the given set of
+// mappings. The environment cannot be modified.
+func NewRestrictedEnvironment(parent Environment, mapping map[Symbol]interface{}) Environment {
+	e := new(environment)
+	e.writable = false
+	e.vars = mapping
+	e.parent = parent
+	return e
 }
-
-// globalEnv is the global environment which contains all of the built-in
-// functions, and is used for defining macros.
-var globalEnv Environment = newGlobalEnvironment()
 
 // Find retrieves the value for the given symbol. If it is not found in this
 // environment, the parent environment will be consulted. If no value is
@@ -88,40 +81,60 @@ func (e *environment) Find(sym Symbol) interface{} {
 
 // Define assigns the given value to the symbol in this environment.
 func (e *environment) Define(sym Symbol, val interface{}) {
-	e.vars[sym] = val
+	if e.writable {
+		e.vars[sym] = val
+	}
 }
 
 // Set assigns a value to the given symbol, if and only if that symbol
 // has a value already associated with it. If the symbol does not appear
 // in this environment, the parent will be consulted.
 func (e *environment) Set(sym Symbol, val interface{}) LispError {
-	_, ok := e.vars[sym]
-	if !ok {
-		if e.parent != nil {
-			return e.parent.Set(sym, val)
-		}
-		return NewLispErrorf(ESYMBOL, "symbol '%v' not yet defined", val)
-	} else {
-		e.vars[sym] = val
+	if !e.writable {
+		return NewLispError(ESUPPORT, "restricted environment not writable")
 	}
-	return nil
+	if _, ok := e.vars[sym]; ok {
+		e.vars[sym] = val
+		return nil
+	} else if e.parent != nil {
+		return e.parent.Set(sym, val)
+	}
+	return NewLispErrorf(ESYMBOL, "symbol '%v' not yet defined", sym)
 }
 
-// Parent returns the parent environment, or nil if this is the global
-// environment.
-func (e *environment) Parent() Environment {
-	return e.parent
+// newNullEnvironment constructs the "null" environment as defined in R5RS.
+func newNullEnvironment() Environment {
+	mapping := make(map[Symbol]interface{})
+	// TODO: add the syntactic bindings for all syntactic keywords in r5rs
+	ne := NewRestrictedEnvironment(nil, mapping)
+	return ne
 }
 
-// Lambda is a function body and its set of parameters.
-type Lambda struct {
+// nullEnvironment is the "null" environment in Scheme.
+var theNullEnvironment Environment = newNullEnvironment()
+
+// newReportEnvironment creates an environment with the default Scheme
+// procedures and variables in place for use in a global context.
+func newReportEnvironment() Environment {
+	mapping := make(map[Symbol]interface{})
+	// TODO: add the standard bindings defined in r5rs
+	ge := NewRestrictedEnvironment(theNullEnvironment, mapping)
+	return ge
+}
+
+// reportEnv is the global environment which contains all of the built-in
+// functions, and is used for defining macros.
+var theReportEnv Environment = newReportEnvironment()
+
+// lambda is a function body and its set of parameters.
+type lambda struct {
 	body   Pair // procedure definition
 	params Pair // formal parameter list
 }
 
-// NewLambda constructs a new Lambda for the given function body and parameters.
-func NewLambda(body, params Pair) *Lambda {
-	return &Lambda{body, params}
+// NewLambda constructs a new lambda for the given function body and parameters.
+func NewLambda(body, params Pair) *lambda {
+	return &lambda{body, params}
 }
 
 // Closure represents a procedure that can be invoked. It has an associated
@@ -134,15 +147,15 @@ type Closure interface {
 }
 
 // closure is an implementation of the Closure interface. It consists of a
-// Lambda and an environment in which to invoke the closure.
+// lambda and an environment in which to invoke the closure.
 type closure struct {
-	*Lambda             // function to be invoked
+	*lambda             // function to be invoked
 	env     Environment // defining environment
 }
 
 // NewClosure constructs a new Closure with the given definition, defining
 // environment, and parameters.
-func NewClosure(body Pair, env Environment, params Pair) Closure {
+func NewClosure(body, params Pair, env Environment) Closure {
 	lam := NewLambda(body, params)
 	return &closure{lam, env}
 }
@@ -172,116 +185,179 @@ func (c *closure) Invoke(values Pair) (interface{}, LispError) {
 		names = Cdr(names)
 		valuse = Cdr(valuse)
 	}
-	return env.Eval(c.body)
+	return Eval(c.body, env)
 }
 
 // Interpret parses the given Scheme expression, evaluates each of the top-
 // level elements, returning the result.
 func Interpret(prog string) (interface{}, LispError) {
-	// TODO: parse the program into a Pair chain
-	// TODO: construct the "halt" continuation which awaits the program result
-	// TODO: the result of the halt continuation is returned to the caller
-	// TODO: establish program counter ("control") starting at beginning
-	// TODO: Eval() each (top-level) program element
-	return nil, nil
+	// this is the "inject" step in CESK
+	pair, err := parse(prog)
+	if err != nil {
+		return nil, err
+	}
+	env := NewEnvironment(theReportEnv)
+	// this is the "step" in CESK
+	return Eval(pair, env)
 }
 
-// TODO: need a program counter (i.e. "control" in CESK)
-//     * during parsing, store program elements in Pair chain to avoid parsing again
-//     * control holds lambda ref and ref of Pair in lambda being run
-//     * after each step, move control to Pair.Rest()
-//     * when lambda pairs are exhausted, pop the frame from the stack
-// TODO: need a "frame" to hold associated environment and "control"
-// TODO: need a continuation, a stack of frames; each func call adds a new frame
-// TODO: root continuation is referred to as "halt", which waits for program to finish
-
-// TODO: some of what is below may be right; use formal definition to derive better functions
-
-// frame represents a single entry in the continuation, or stack of frames.
-type frame struct {
-	env Environment // env is this frame's environment
-	//head Pair        // head references to the beginning of the s-expression
-	curr Pair // curr references the current element being evaluated
+// isTrue determines if the given thing represents a "true" value in Scheme.
+// Only #f counts as false in Scheme, everything else is treated as true.
+func isTrue(test interface{}) bool {
+	if b, ok := test.(Boolean); ok {
+		return b.Value()
+	}
+	return true
 }
 
-type continuation struct {
-	head   Pair
-	curr   Pair
-	frames vector.Vector
-}
-
-// step moves execution forward until this continuation is exhausted, at which
-// point the result of the last element is returned.
-func (c *continuation) step() (result interface{}, err LispError) {
-	// while there is something to evaluate...
-	for c.curr != nil && c.curr.Len() > 0 {
-		// evaluate it and see what happened
-		result, err = Eval(c.curr)
-		if err != nil {
-			// exit early upon error
-			break
+// Eval evaluates the given s-expression using a specific environment.
+func Eval(expr interface{}, env Environment) (interface{}, LispError) {
+	// TODO: implement Eval, which is effectively the 'step' in CESK
+	for {
+		if sym, ok := expr.(Symbol); ok {
+			// symbolic reference
+			return env.Find(sym), nil
 		}
-		// move forward along the list of elements
-		next := c.curr.Rest()
-		if np, ok := next.(Pair); ok {
-			c.curr = np
+		pair, is_pair := expr.(Pair)
+		if !is_pair {
+			// atom
+			return expr, nil
+		}
+		first := pair.First()
+		if sym, issym := first.(Symbol); issym {
+			if sym == quoteSym {
+				// (quote exp)
+				return pair.Rest(), nil
+			} else if sym == ifSym {
+				// (if test conseq alt)
+				test := pair.Second()
+				okay, err := Eval(test, env)
+				if err != nil {
+					return nil, err
+				}
+				if isTrue(okay) {
+					expr = pair.Third()
+				} else {
+					expr = Cxr("cadddr", pair)
+				}
+			} else if sym == setSym {
+				// (set! var exp)
+				exp := pair.Third()
+				val, err := Eval(exp, env)
+				if err != nil {
+					return nil, err
+				}
+				name := pair.Second()
+				if ns, ok := name.(Symbol); ok {
+					env.Set(ns, val)
+				} else {
+					// this should _not_ happen
+					panic(ParserError)
+				}
+				return nil, nil
+			} else if sym == defineSym {
+				// (define var exp)
+				exp := pair.Third()
+				val, err := Eval(exp, env)
+				if err != nil {
+					return nil, err
+				}
+				name := pair.Second()
+				if ns, ok := name.(Symbol); ok {
+					env.Define(ns, val)
+				} else {
+					// this should _not_ happen
+					panic(ParserError)
+				}
+				return nil, nil
+			} else if sym == lambdaSym {
+				// 	elif x[0] is _lambda:    # (lambda (var*) exp)
+				// 	    (_, vars, exp) = x
+				// TODO: a Lambda "evaluates" to a Closure
+				// 	    return Procedure(vars, exp, env)
+			} else if sym == beginSym {
+				// (begin exp+)
+				rest := pair.Rest()
+				var result interface{}
+				var err LispError
+				if next, ok := rest.(Pair); ok {
+					for next.Len() > 0 {
+						result, err = Eval(next.First(), env)
+						if err != nil {
+							return nil, err
+						}
+						rest = next.Rest()
+						next, _ = rest.(Pair)
+					}
+				}
+				if rest != nil {
+					result, err = Eval(rest, env)
+					if err != nil {
+						return nil, err
+					}
+				}
+				return result, nil
+			} else {
+				// 	else:                    # (proc exp*)
+				// 	    exps = [eval(exp, env) for exp in x]
+				// 	    proc = exps.pop(0)
+				// 	    if isa(proc, Procedure):
+				// TODO: invoke the closure inside the loop to support tail recursion
+				// 		x = proc.exp
+				// 		env = Env(proc.parms, exps, proc.env)
+				// 	    else:
+				// 		return proc(*exps)
+			}
 		} else {
-			c.curr = nil
+			// TODO: what to do with nested lists? e.g. ((if #t "true" "false"))
+			return nil, NewLispErrorf(EARGUMENT, "nested list: %v", pair)
 		}
 	}
-	c.frames.Pop()
-	// the last element evaluate is the result
-	return result, err
-}
-
-// Eval evaluates the given s-expression in the global context and returns
-// the result. This is used primarily for defining macros in the parser.
-func Eval(expr interface{}) (interface{}, LispError) {
-	return globalEnv.Eval(expr)
-}
-
-// eval evaluates the given s-expression using a specific environment.
-func (e *environment) Eval(expr interface{}) (interface{}, LispError) {
-	// TODO: implement Eval
-	// This is essentially the "step" function in a CESK machine.
-	// TODO: needs the continuation, no?
-	// while True:
-	// 	if isa(x, Symbol):       # variable reference
-	// 	    return env.find(x)[x]
-	// 	elif not isa(x, list):   # constant literal
-	// 	    return x
-	// 	elif x[0] is _quote:     # (quote exp)
-	// 	    (_, exp) = x
-	// 	    return exp
-	// 	elif x[0] is _if:        # (if test conseq alt)
-	// 	    (_, test, conseq, alt) = x
-	// 	    x = (conseq if eval(test, env) else alt)
-	// 	elif x[0] is _set:       # (set! var exp)
-	// 	    (_, var, exp) = x
-	// 	    env.find(var)[var] = eval(exp, env)
-	// 	    return None
-	// 	elif x[0] is _define:    # (define var exp)
-	// 	    (_, var, exp) = x
-	// 	    env[var] = eval(exp, env)
-	// 	    return None
-	// 	elif x[0] is _lambda:    # (lambda (var*) exp)
-	// 	    (_, vars, exp) = x
-	// TODO: a Lambda "evaluates" to a Closure
-	// 	    return Procedure(vars, exp, env)
-	// 	elif x[0] is _begin:     # (begin exp+)
-	// 	    for exp in x[1:-1]:
-	// 		eval(exp, env)
-	// 	    x = x[-1]
-	// 	else:                    # (proc exp*)
-	// 	    exps = [eval(exp, env) for exp in x]
-	// 	    proc = exps.pop(0)
-	// 	    if isa(proc, Procedure):
-	// 		x = proc.exp
-	// 		env = Env(proc.parms, exps, proc.env)
-	// 	    else:
-	// 		return proc(*exps)
 	return nil, nil
 }
 
 // TODO: write define, set!, let, letrec, define-syntax
 // TODO: for let and letrec, see http://matt.might.net/articles/cesk-machines/
+
+// Not really convinced we need all this, seems like lispy.py-style Eval() is enough.
+//     * during parsing, store program elements in Pair chain to avoid parsing again
+//     * control holds lambda ref and ref of Pair in lambda being run
+//     * after each step, move control to Pair.Rest()
+//     * when an atom is encountered, return as the result of the continuation
+// // frame represents a single entry in the continuation, or stack of frames.
+// type frame struct {
+// 	env  Environment // env is this frame's environment
+// 	curr Pair        // curr references the current element being evaluated
+// }
+// type continuation struct {
+// 	head   Pair
+// 	curr   Pair
+// 	frames vector.Vector
+// }
+// // step moves execution forward until this continuation is exhausted, at which
+// // point the result of the last element is returned.
+// func (c *continuation) step() (result interface{}, err LispError) {
+// 	// TODO: get environment from current frame
+// 	env := reportEnv
+// 	// while there is something to evaluate...
+// 	for c.curr.Len() > 0 {
+// 		// evaluate it and see what happened
+// 		result, err = env.Eval(c.curr)
+// 		if err != nil {
+// 			// exit early upon error
+// 			break
+// 		}
+// 		// TODO: if result is an atomic expression, 'return' it to the current continuation
+// 		// TODO: if result is a procedure call (i.e. closure), call Invoke() on it
+// 		// move forward along the list of elements
+// 		next := c.curr.Rest()
+// 		if np, ok := next.(Pair); ok {
+// 			c.curr = np
+// 		} else {
+// 			c.curr = nil
+// 		}
+// 	}
+// 	c.frames.Pop()
+// 	// the last element evaluated is the result
+// 	return result, err
+// }
