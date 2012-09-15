@@ -76,8 +76,7 @@ func TestEnvironmentOverride(t *testing.T) {
 	}
 }
 
-func TestInterpret(t *testing.T) {
-	// if with true condition
+func TestInterpretIfTrue(t *testing.T) {
 	input := `(if #t 1 2)`
 	result, err := Interpret(input)
 	if err != nil {
@@ -90,14 +89,62 @@ func TestInterpret(t *testing.T) {
 	} else {
 		t.Errorf("result of wrong type: %T: %v", result, result)
 	}
-	// if with false condition
-	input = `(if #f 1 2)`
-	result, err = Interpret(input)
+}
+
+func TestInterpreterIfFalse(t *testing.T) {
+	input := `(if #f 1 2)`
+	result, err := Interpret(input)
 	if err != nil {
 		t.Errorf("Interpret() failed: %v", err)
 	}
 	if num, ok := result.(int64); ok {
 		if num != 2 {
+			t.Errorf("result wrong value: %v", num)
+		}
+	} else {
+		t.Errorf("result of wrong type: %T: %v", result, result)
+	}
+}
+
+func TestInterpretBegin(t *testing.T) {
+	// define and set! (inside a begin, bonus!)
+	input := `(begin (define foo 123) (set! foo 456) foo)`
+	result, err := Interpret(input)
+	if err != nil {
+		t.Errorf("Interpret() failed: %v", err)
+	}
+	if num, ok := result.(int64); ok {
+		if num != 456 {
+			t.Errorf("result wrong value: %v", num)
+		}
+	} else {
+		t.Errorf("result of wrong type: %T: %v", result, result)
+	}
+}
+
+func TestInterpretDefine(t *testing.T) {
+	input := `(begin (define foo 123) foo)`
+	result, err := Interpret(input)
+	if err != nil {
+		t.Errorf("Interpret() failed: %v", err)
+	}
+	if num, ok := result.(int64); ok {
+		if num != 123 {
+			t.Errorf("result wrong value: %v", num)
+		}
+	} else {
+		t.Errorf("result of wrong type: %T: %v", result, result)
+	}
+}
+
+func TestInterpretQuote(t *testing.T) {
+	input := `(begin (define foo (quote foo)) foo)`
+	result, err := Interpret(input)
+	if err != nil {
+		t.Errorf("Interpret() failed: %v", err)
+	}
+	if num, ok := result.(Symbol); ok {
+		if num != "foo" {
 			t.Errorf("result wrong value: %v", num)
 		}
 	} else {

@@ -6,10 +6,6 @@
 
 package liswat
 
-// import (
-// 	// "code.google.com/p/goswat/container/vector"
-// )
-
 //
 // Interpreter for our Scheme-like language, which turns a tree of expressions
 // into a final, evaluated result. This is modeled in the CESK-style as
@@ -210,9 +206,11 @@ func isTrue(test interface{}) bool {
 	return true
 }
 
-// Eval evaluates the given s-expression using a specific environment.
+// Eval evaluates the given s-expression using a specific environment and
+// returns the results. This handles tail-call recursion and invoking
+// procedures, both built-in and user-defined.
 func Eval(expr interface{}, env Environment) (interface{}, LispError) {
-	// TODO: implement Eval, which is effectively the 'step' in CESK
+	// this is effectively the 'step' function in CESK
 	for {
 		if sym, ok := expr.(Symbol); ok {
 			// symbolic reference
@@ -223,11 +221,15 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 			// atom
 			return expr, nil
 		}
+		if pair.Len() == 0 {
+			// empty list
+			return pair, nil
+		}
 		first := pair.First()
 		if sym, issym := first.(Symbol); issym {
 			if sym == quoteSym {
 				// (quote exp)
-				return pair.Rest(), nil
+				return pair.Second(), nil
 			} else if sym == ifSym {
 				// (if test conseq alt)
 				test := pair.Second()
@@ -282,12 +284,17 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				var err LispError
 				if next, ok := rest.(Pair); ok {
 					for next.Len() > 0 {
-						result, err = Eval(next.First(), env)
+						thing := next.First()
+						result, err = Eval(thing, env)
 						if err != nil {
 							return nil, err
 						}
 						rest = next.Rest()
 						next, _ = rest.(Pair)
+						if next == theEmptyList {
+							// we're done
+							rest = nil
+						}
 					}
 				}
 				if rest != nil {
@@ -309,55 +316,11 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				// 		return proc(*exps)
 			}
 		} else {
-			// TODO: what to do with nested lists? e.g. ((if #t "true" "false"))
-			return nil, NewLispErrorf(EARGUMENT, "nested list: %v", pair)
+			return nil, NewLispErrorf(EARGUMENT, "thing not handled: %v", pair)
 		}
 	}
 	return nil, nil
 }
 
-// TODO: write define, set!, let, letrec, define-syntax
+// TODO: write let, letrec, define-syntax
 // TODO: for let and letrec, see http://matt.might.net/articles/cesk-machines/
-
-// Not really convinced we need all this, seems like lispy.py-style Eval() is enough.
-//     * during parsing, store program elements in Pair chain to avoid parsing again
-//     * control holds lambda ref and ref of Pair in lambda being run
-//     * after each step, move control to Pair.Rest()
-//     * when an atom is encountered, return as the result of the continuation
-// // frame represents a single entry in the continuation, or stack of frames.
-// type frame struct {
-// 	env  Environment // env is this frame's environment
-// 	curr Pair        // curr references the current element being evaluated
-// }
-// type continuation struct {
-// 	head   Pair
-// 	curr   Pair
-// 	frames vector.Vector
-// }
-// // step moves execution forward until this continuation is exhausted, at which
-// // point the result of the last element is returned.
-// func (c *continuation) step() (result interface{}, err LispError) {
-// 	// TODO: get environment from current frame
-// 	env := reportEnv
-// 	// while there is something to evaluate...
-// 	for c.curr.Len() > 0 {
-// 		// evaluate it and see what happened
-// 		result, err = env.Eval(c.curr)
-// 		if err != nil {
-// 			// exit early upon error
-// 			break
-// 		}
-// 		// TODO: if result is an atomic expression, 'return' it to the current continuation
-// 		// TODO: if result is a procedure call (i.e. closure), call Invoke() on it
-// 		// move forward along the list of elements
-// 		next := c.curr.Rest()
-// 		if np, ok := next.(Pair); ok {
-// 			c.curr = np
-// 		} else {
-// 			c.curr = nil
-// 		}
-// 	}
-// 	c.frames.Pop()
-// 	// the last element evaluated is the result
-// 	return result, err
-// }

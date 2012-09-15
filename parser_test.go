@@ -210,6 +210,7 @@ func TestExpand(t *testing.T) {
 	mapping := make(map[string]string)
 	mapping[`(if #t (display "foo"))`] = `(if #t (display "foo") ())`
 	mapping[`(if #t 1 2)`] = `(if #t 1 2)`
+	mapping[`((if #t 1 2))`] = `(if #t 1 2)`
 	mapping[`(quote abc)`] = `(quote abc)`
 	mapping[`(set! foo (quote bar))`] = `(set! foo (quote bar))`
 	mapping[`(set! foo (if #t (quote bar)))`] = `(set! foo (if #t (quote bar) ()))`
@@ -217,6 +218,7 @@ func TestExpand(t *testing.T) {
 	mapping["(define-macro foo (lambda args (if #t (quote bar))))"] =
 		"(define-macro foo (lambda (args) (if #t (quote bar) ())))"
 	mapping[`(begin (if #t (display "foo")))`] = `(begin (if #t (display "foo") ()))`
+	mapping[`(begin (define foo 123) foo)`] = `(begin (define foo 123) foo)`
 	mapping[`(lambda (x) e1)`] = `(lambda (x) e1)`
 	mapping[`(lambda (x) e1 e2)`] = `(lambda (x) (begin e1 e2))`
 	mapping[`(foo (if #t (quote bar)))`] = `(foo (if #t (quote bar) ()))`

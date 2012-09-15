@@ -434,6 +434,14 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 		return x, nil
 	}
 	token := pair.First()
+	if pair.Len() == 1 {
+		// Check if thing inside is another pair, in which case we
+		// extract it and pretend the enclosing pair did not exist.
+		if np, ok := token.(Pair); ok {
+			pair = np
+			token = pair.First()
+		}
+	}
 	if sym, issym := token.(Symbol); issym {
 		if sym == quoteSym {
 			if pair.Len() != 2 {
