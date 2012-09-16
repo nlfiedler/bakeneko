@@ -324,7 +324,7 @@ func verifyCxr(t *testing.T, expected map[string]string, p Pair) {
 
 func verifyCxrTree(t *testing.T, expected map[string]string, input string) {
 	for k, v := range expected {
-		result, err := parseExpr(input)
+		result, err := parse(input)
 		if err != nil {
 			t.Error(err)
 		}

@@ -19,19 +19,15 @@ type expectedExpandError struct {
 
 func verifyExpandMap(mapping map[string]string, t *testing.T) {
 	for input, expected := range mapping {
-		x, err := parseExpr(input)
+		pair, err := parse(input)
 		if err != nil {
 			t.Fatalf("failed to parse %q: %s", input, err)
 		}
-		_, ok := x.(Pair)
-		if !ok {
-			t.Fatalf("parser returned non-pair for %q", input)
-		}
-		x, err = expand(x, true)
+		x, err := expand(pair, true)
 		if err != nil {
 			t.Fatalf("failed to expand %q: %s", input, err)
 		}
-		_, ok = x.(Pair)
+		_, ok := x.(Pair)
 		if !ok {
 			t.Fatalf("expand returned non-pair for %q: %T", input, x)
 		}
@@ -44,11 +40,11 @@ func verifyExpandMap(mapping map[string]string, t *testing.T) {
 
 func verifyExpandError(t *testing.T, expected map[string]expectedExpandError) {
 	for input, error := range expected {
-		x, err := parseExpr(input)
+		pair, err := parse(input)
 		if err != nil {
 			t.Fatalf("failed to parse %q: %s", input, err)
 		}
-		x, err = expand(x, true)
+		_, err = expand(pair, true)
 		if err == nil {
 			t.Fatalf("expand() should have failed with %q", input)
 		}
@@ -56,6 +52,21 @@ func verifyExpandError(t *testing.T, expected map[string]expectedExpandError) {
 			t.Errorf("expected [%s] but got [%s] for input %q", error.err, err, input)
 		}
 	}
+}
+
+// parseExpr parses a Lisp expression and returns the result, which may
+// be a string, number, symbol, or a list of expressions.
+func parseExpr(expr string) (interface{}, LispError) {
+	c := lex("parseExpr", expr)
+	t, ok := <-c
+	if !ok {
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+	}
+	defer drainLexer(c)
+	if t.typ == tokenEOF {
+		return eofObject, nil
+	}
+	return parserRead(t, c)
 }
 
 func verifyParse(input, expected string, t *testing.T) {
@@ -148,11 +159,12 @@ func TestParseQuotes(t *testing.T) {
 
 func TestParseVector(t *testing.T) {
 	input := "#(1 2 3)"
-	result, err := parseExpr(input)
+	pair, err := parse(input)
 	if err != nil {
 		msg := fmt.Sprintf("failed to parse expression '%s', %s", input, err)
 		t.Errorf(msg)
 	} else {
+		result := pair.First()
 		if slice, ok := result.([]interface{}); ok {
 			if len(slice) == 3 {
 				if slice[0] != int64(1) && slice[1] != int64(2) && slice[2] != int64(3) {
@@ -211,6 +223,7 @@ func TestExpand(t *testing.T) {
 	mapping[`(if #t (display "foo"))`] = `(if #t (display "foo") ())`
 	mapping[`(if #t 1 2)`] = `(if #t 1 2)`
 	mapping[`((if #t 1 2))`] = `(if #t 1 2)`
+	mapping[`(((if #t 1 2)))`] = `(if #t 1 2)`
 	mapping[`(quote abc)`] = `(quote abc)`
 	mapping[`(set! foo (quote bar))`] = `(set! foo (quote bar))`
 	mapping[`(set! foo (if #t (quote bar)))`] = `(set! foo (if #t (quote bar) ()))`

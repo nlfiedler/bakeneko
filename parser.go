@@ -78,6 +78,7 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 // consisting of program elements (i.e. function calls).
 func parse(expr string) (Pair, LispError) {
 	c := lex("parseExpr", expr)
+	defer drainLexer(c)
 	var results Pair = theEmptyList
 	var tail Pair = theEmptyList
 	for {
@@ -103,22 +104,6 @@ func parse(expr string) (Pair, LispError) {
 		}
 	}
 	panic("unreachable code")
-}
-
-// parseExpr parses a Lisp expression and returns the result, which may
-// be a string, number, symbol, or a list of expressions.
-func parseExpr(expr string) (interface{}, LispError) {
-	// XXX: except for tests, this function isn't useful anymore
-	c := lex("parseExpr", expr)
-	t, ok := <-c
-	if !ok {
-		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
-	}
-	defer drainLexer(c)
-	if t.typ == tokenEOF {
-		return eofObject, nil
-	}
-	return parserRead(t, c)
 }
 
 // parseNext reads a complete expression from the channel of tokens.
@@ -212,7 +197,6 @@ func parseNextPair(c chan token) (interface{}, LispError) {
 // list (one with '.' separating elements) or otherwise. This function assumes
 // that the previous token was an open parenthesis.
 func parserReadPair(t token, c chan token) (interface{}, LispError) {
-	// TODO: consider making this and parserRead() non-recursive
 	if t.typ == tokenCloseParen {
 		return theEmptyList, nil
 	}
@@ -434,12 +418,14 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 		return x, nil
 	}
 	token := pair.First()
-	if pair.Len() == 1 {
+	for pair.Len() == 1 {
 		// Check if thing inside is another pair, in which case we
 		// extract it and pretend the enclosing pair did not exist.
 		if np, ok := token.(Pair); ok {
 			pair = np
 			token = pair.First()
+		} else {
+			break
 		}
 	}
 	if sym, issym := token.(Symbol); issym {
