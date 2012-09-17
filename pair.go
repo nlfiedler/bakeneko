@@ -403,3 +403,64 @@ func (e EmptyList) setRest(a interface{}) {
 // theEmptyList represents an empty list and may be used as a place holder
 // in expressions that require a certain number of values.
 var theEmptyList EmptyList = EmptyList(0)
+
+// PairIterator provides a mechanism for visiting all of the elements in
+// a chain of Pairs.
+type PairIterator interface {
+	// HasNext returns true if there are more elements in the chain.
+	HasNext() bool
+	// Next returns the next element in the pair chain.
+	Next() interface{}
+	// IsProper returns true if the list was properly terminated.
+	IsProper() bool
+}
+
+// pairIterator is an implementation of the PairIterator interface.
+type pairIterator struct {
+	curr   Pair // curr is the Pair currently under consideration
+	proper bool // if true, list was proper (e.g. (a b c))
+}
+
+// NewPairIterator constructs an iterator for the given Pair.
+func NewPairIterator(pair Pair) PairIterator {
+	// assume the list is proper
+	if pair == theEmptyList {
+		return &pairIterator{nil, true}
+	}
+	return &pairIterator{pair, true}
+}
+
+// HasNext indicates if there is another value in the Pair chain.
+func (i *pairIterator) HasNext() bool {
+	return i.curr != nil
+}
+
+// IsProper indicates that the list was a proper list (e.g. (a b c)) versus an
+// improper list (e.g. (a b . c). This function will always return true until
+// the end of an improper list has been reached.
+func (i *pairIterator) IsProper() bool {
+	return i.curr != nil || i.proper
+}
+
+// Next returns the next value in the Pair chain, returning nil if the end of
+// the list has been reached.
+func (i *pairIterator) Next() interface{} {
+	var result interface{} = nil
+	if i.curr != nil {
+		if i.proper {
+			result = i.curr.First()
+			rest := i.curr.Rest()
+			if rest == theEmptyList {
+				i.curr = nil
+			} else if rp, ok := rest.(Pair); ok {
+				i.curr = rp
+			} else {
+				i.proper = false
+			}
+		} else {
+			result = i.curr.Rest()
+			i.curr = nil
+		}
+	}
+	return result
+}

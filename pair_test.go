@@ -8,6 +8,7 @@ package liswat
 
 import (
 	"fmt"
+	"github.com/bmizerany/assert"
 	"testing"
 )
 
@@ -444,4 +445,55 @@ func TestNestedList(t *testing.T) {
 	if p.String() != "(foo (bar baz) qux)" {
 		t.Errorf("expected (foo (bar baz) qux) but got '%s'", p.String())
 	}
+}
+
+func TestPairIterator(t *testing.T) {
+	foo := Symbol("foo")
+	bar := Symbol("bar")
+	baz := Symbol("baz")
+	qux := Symbol("qux")
+	p := NewList(foo, bar, baz, qux)
+	iter := NewPairIterator(p)
+	assert.T(t, iter.HasNext())
+	assert.Equal(t, foo, iter.Next())
+	assert.T(t, iter.IsProper())
+	assert.T(t, iter.HasNext())
+	assert.Equal(t, bar, iter.Next())
+	assert.T(t, iter.IsProper())
+	assert.T(t, iter.HasNext())
+	assert.Equal(t, baz, iter.Next())
+	assert.T(t, iter.IsProper())
+	assert.T(t, iter.HasNext())
+	assert.Equal(t, qux, iter.Next())
+	assert.T(t, iter.IsProper())
+	assert.T(t, !iter.HasNext())
+}
+
+func TestPairIteratorImproper(t *testing.T) {
+	foo := Symbol("foo")
+	bar := Symbol("bar")
+	p := Cons(foo, bar)
+	iter := NewPairIterator(p)
+	assert.T(t, iter.HasNext())
+	assert.T(t, iter.IsProper())
+	assert.Equal(t, foo, iter.Next())
+	assert.T(t, iter.IsProper())
+	assert.T(t, iter.HasNext())
+	assert.Equal(t, bar, iter.Next())
+	assert.T(t, !iter.HasNext())
+	assert.T(t, !iter.IsProper())
+}
+
+func TestPairIteratorEmpty(t *testing.T) {
+	iter := NewPairIterator(theEmptyList)
+	assert.T(t, !iter.HasNext())
+	assert.T(t, iter.IsProper())
+	assert.Equal(t, nil, iter.Next())
+}
+
+func TestPairIteratorNil(t *testing.T) {
+	iter := NewPairIterator(nil)
+	assert.T(t, !iter.HasNext())
+	assert.T(t, iter.IsProper())
+	assert.Equal(t, nil, iter.Next())
 }

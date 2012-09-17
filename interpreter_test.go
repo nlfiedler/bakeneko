@@ -7,8 +7,42 @@
 package liswat
 
 import (
+	"strings"
 	"testing"
 )
+
+// verifyInterpret takes a map of inputs to expected outputs, running the
+// inputs through the interpreter and checking the output.
+func verifyInterpret(t *testing.T, inputs map[string]string) {
+	for k, v := range inputs {
+		result, err := Interpret(k)
+		if err != nil {
+			t.Errorf("Interpret() failed for '%s' with: %v", k, err)
+		}
+		str := stringify(result)
+		if str != v {
+			t.Errorf("Interpret() yielded wrong result for '%s';"+
+				" expected '%s' but got '%s'", k, v, str)
+		}
+	}
+}
+
+// verifyInterpretError takes a map of inputs to expected error messages,
+// running the inputs through the interpreter and ensuring that each one fails
+// with the associated error message.
+func verifyInterpretError(t *testing.T, inputs map[string]string) {
+	for k, v := range inputs {
+		_, err := Interpret(k)
+		if err == nil {
+			t.Fatalf("Interpret() should have failed for '%s'", k)
+		}
+		str := err.ErrorMessage()
+		if !strings.Contains(str, v) {
+			t.Errorf("Interpret() yielded wrong error for '%s';"+
+				" expected '%s' but got '%s'", k, v, str)
+		}
+	}
+}
 
 func TestEnvironment(t *testing.T) {
 	e := NewEnvironment(nil)
@@ -103,6 +137,15 @@ func TestInterpreterIfFalse(t *testing.T) {
 		}
 	} else {
 		t.Errorf("result of wrong type: %T: %v", result, result)
+	}
+	// false with no alternate
+	input = `(if #f 1)`
+	result, err = Interpret(input)
+	if err != nil {
+		t.Errorf("Interpret() failed: %v", err)
+	}
+	if result != nil {
+		t.Error("expected if #f with no alternate to return empty list")
 	}
 }
 

@@ -101,6 +101,8 @@ func (e *environment) Set(sym Symbol, val interface{}) LispError {
 // newNullEnvironment constructs the "null" environment as defined in R5RS.
 func newNullEnvironment() Environment {
 	mapping := make(map[Symbol]interface{})
+	mapping[Symbol("append")] = NewBuiltin(builtinAppend)
+	mapping[Symbol("cons")] = NewBuiltin(builtinCons)
 	// TODO: add the syntactic bindings for all syntactic keywords in r5rs
 	ne := NewRestrictedEnvironment(nil, mapping)
 	return ne
@@ -121,6 +123,31 @@ func newReportEnvironment() Environment {
 // reportEnv is the global environment which contains all of the built-in
 // functions, and is used for defining macros.
 var theReportEnv Environment = newReportEnvironment()
+
+// builtinProcFunc is the type of the function that implements a built-in
+// Scheme procedure (e.g. builtinCons).
+type builtinProcFunc func([]interface{}) (interface{}, LispError)
+
+// Procedure represents a callable function in Scheme.
+type Procedure interface {
+	Call(values []interface{}) (interface{}, LispError)
+}
+
+// builtinProc is an implementation of Procedure for built-in functions.
+type builtinProc struct {
+	// builtin is the reference to the procedure implementation.
+	builtin builtinProcFunc
+}
+
+// NewBuiltin constructs a Procedure for the given built-in function.
+func NewBuiltin(f builtinProcFunc) Procedure {
+	return &builtinProc{f}
+}
+
+// Call invokes the built-in procedure implementation and returns the result.
+func (b *builtinProc) Call(values []interface{}) (interface{}, LispError) {
+	return b.builtin(values)
+}
 
 // lambda is a function body and its set of parameters.
 type lambda struct {
@@ -204,6 +231,25 @@ func isTrue(test interface{}) bool {
 		return b.Value()
 	}
 	return true
+}
+
+// evalToSlice evaluates the elements of the pair and appends the results to a
+// slice. The evaluation of the elements is made within the given environment.
+func evalToSlice(pair Pair, env Environment) ([]interface{}, LispError) {
+	results := make([]interface{}, 0)
+	var elems interface{} = pair
+	for elems != nil {
+		thing := Car(elems)
+		if thing != nil {
+			result, err := Eval(thing, env)
+			if err != nil {
+				return nil, err
+			}
+			results = append(results, result)
+		}
+		elems = Cdr(elems)
+	}
+	return results, nil
 }
 
 // Eval evaluates the given s-expression using a specific environment and
@@ -305,15 +351,21 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				}
 				return result, nil
 			} else {
-				// 	else:                    # (proc exp*)
-				// 	    exps = [eval(exp, env) for exp in x]
-				// 	    proc = exps.pop(0)
-				// 	    if isa(proc, Procedure):
-				// TODO: invoke the closure inside the loop to support tail recursion
-				// 		x = proc.exp
-				// 		env = Env(proc.parms, exps, proc.env)
-				// 	    else:
-				// 		return proc(*exps)
+				// (proc args*)
+				list, err := evalToSlice(pair, env)
+				if err != nil {
+					return nil, err
+				}
+				proc := list[0]
+				list = list[1:]
+				// TODO: handle user procedures, create new env with params, invoke
+				// TODO: how is a user-defined procedure different from a lambda?
+				if fun, ok := proc.(Procedure); ok {
+					return fun.Call(list)
+				} else {
+					return nil, NewLispErrorf(ESUPPORT,
+						"unhandled proc '%s': %v <%T>", sym, proc, proc)
+				}
 			}
 		} else {
 			return nil, NewLispErrorf(EARGUMENT, "thing not handled: %v", pair)
