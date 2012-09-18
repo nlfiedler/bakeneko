@@ -70,8 +70,9 @@ func NewList(a ...interface{}) Pair {
 	return head
 }
 
-// Cons constructs a pair to hold item a and b such that they are stored
-// in a single instance of Pair. This forms an improper list.
+// Cons constructs a pair to hold item a and b such that they are stored in a
+// single instance of Pair. This may form an improper list if b is not already
+// a proper list.
 func Cons(a, b interface{}) Pair {
 	return &pair{a, b}
 }

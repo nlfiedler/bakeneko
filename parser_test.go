@@ -19,7 +19,7 @@ type expectedExpandError struct {
 
 func verifyExpandMap(mapping map[string]string, t *testing.T) {
 	for input, expected := range mapping {
-		pair, err := parse(input)
+		pair, err := parseExpr(input)
 		if err != nil {
 			t.Fatalf("failed to parse %q: %s", input, err)
 		}
@@ -310,18 +310,18 @@ func TestParse(t *testing.T) {
 
 func TestParseSingle(t *testing.T) {
 	input := `(if #t "true" "false")`
-	result, err := parse(input)
+	result, err := parseExpr(input)
 	if err != nil {
 		t.Errorf("failed to parse program: %v", err)
-	} else {
-		actual := stringify(result)
+	} else if pair, ok := result.(Pair); ok {
+		actual := stringify(pair)
 		if actual != `(if #t "true" "false")` {
 			t.Errorf("parse() returned wrong result: %s", actual)
 		}
-		if result.Len() != 4 {
+		if pair.Len() != 4 {
 			t.Error("expected one program elements with four parts")
 		}
-		elem1 := result.First()
+		elem1 := pair.First()
 		if sym, ok := elem1.(Symbol); ok {
 			if sym != ifSym {
 				t.Error("first element expected to be 'if'")
@@ -329,7 +329,7 @@ func TestParseSingle(t *testing.T) {
 		} else {
 			t.Error("first element not a symbol")
 		}
-		elem2 := result.Second()
+		elem2 := pair.Second()
 		if val, ok := elem2.(Boolean); ok {
 			if val.Value() != true {
 				t.Error("second element expected to be '#t'")
@@ -337,7 +337,7 @@ func TestParseSingle(t *testing.T) {
 		} else {
 			t.Error("second element not a boolean")
 		}
-		elem3 := result.Third()
+		elem3 := pair.Third()
 		if val, ok := elem3.(String); ok {
 			if val.String() != `"true"` {
 				t.Errorf("third element expected to be 'true', but got '%v'", val)
@@ -345,7 +345,7 @@ func TestParseSingle(t *testing.T) {
 		} else {
 			t.Errorf("third element not a string: %v(%T)", elem3, elem3)
 		}
-		elem4 := Cxr("cadddr", result)
+		elem4 := Cxr("cadddr", pair)
 		if val, ok := elem4.(String); ok {
 			if val.String() != `"false"` {
 				t.Errorf("fourth element expected to be 'false', but got '%v'", val)

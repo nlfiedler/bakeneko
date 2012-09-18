@@ -144,7 +144,7 @@ func TestInterpreterIfFalse(t *testing.T) {
 	if err != nil {
 		t.Errorf("Interpret() failed: %v", err)
 	}
-	if result != nil {
+	if result != theEmptyList {
 		t.Error("expected if #f with no alternate to return empty list")
 	}
 }
@@ -192,6 +192,30 @@ func TestInterpretQuote(t *testing.T) {
 		}
 	} else {
 		t.Errorf("result of wrong type: %T: %v", result, result)
+	}
+	// syntactic keywords cannot be derived from functions
+	input = `((quote if) #f 1 2)`
+	result, err = Interpret(input)
+	if err == nil {
+		t.Error("Interpret() should have failed")
+	}
+	if !strings.Contains(err.ErrorMessage(), "is not applicable") {
+		t.Error("((quote if) ...) should have failed with 'not applicable'")
+	}
+}
+
+func TestInterpretLambda(t *testing.T) {
+	input := `(define fun
+  (lambda (x)
+    (if x 'foo 'bar)))
+(fun #t)
+`
+	result, err := Interpret(input)
+	if err != nil {
+		t.Errorf("Interpret() failed: %v", err)
+	}
+	if result != Symbol("foo") {
+		t.Error("expected lambda 'fun' to return symbol foo")
 	}
 }
 

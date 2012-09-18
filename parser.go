@@ -77,19 +77,13 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 // parse parses a Scheme program and returns the result, which will be a Pair
 // consisting of program elements (i.e. function calls).
 func parse(expr string) (Pair, LispError) {
-	c := lex("parseExpr", expr)
+	c := lex("parse", expr)
 	defer drainLexer(c)
 	var results Pair = theEmptyList
 	var tail Pair = theEmptyList
 	for {
 		t, ok := <-c
 		if !ok || t.typ == tokenEOF {
-			if results.Len() == 1 {
-				first := results.First()
-				if pair, ok := first.(Pair); ok {
-					return pair, nil
-				}
-			}
 			return results, nil
 		}
 		elem, err := parserRead(t, c)
@@ -488,7 +482,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 						return nil, newParserError(ESYNTAX, pair,
 							"define-syntax only allowed at top level")
 					}
-					proc, err := Eval(val, theReportEnv)
+					proc, err := Eval(val, theReportEnvironment)
 					if err != nil {
 						return nil, err
 					}
@@ -558,16 +552,18 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 			}
 			return expandQuasiquote(pair.Second())
 
-		} else if macro, ok := macroTable[sym]; ok {
+		} else if _, ok := macroTable[sym]; ok {
 			// (m arg...)
 			if pair, ispair := pair.Rest().(Pair); !ispair {
 				pair = NewPair(pair)
 			}
-			result, err := macro.Invoke(pair)
-			if err != nil {
-				return nil, err
-			}
-			return expand(result, toplevel)
+			return nil, nil
+			// TODO: implement macros
+			// result, err := macro.Invoke(pair)
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// return expand(result, toplevel)
 		}
 	}
 

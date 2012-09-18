@@ -122,7 +122,7 @@ func newReportEnvironment() Environment {
 
 // reportEnv is the global environment which contains all of the built-in
 // functions, and is used for defining macros.
-var theReportEnv Environment = newReportEnvironment()
+var theReportEnvironment Environment = newReportEnvironment()
 
 // builtinProcFunc is the type of the function that implements a built-in
 // Scheme procedure (e.g. builtinCons).
@@ -130,7 +130,9 @@ type builtinProcFunc func([]interface{}) (interface{}, LispError)
 
 // Procedure represents a callable function in Scheme.
 type Procedure interface {
-	Call(values []interface{}) (interface{}, LispError)
+	// Call invokes the built-in procedure with the given values,
+	// we are evaluated with the given environment.
+	Call(values interface{}, env Environment) (interface{}, LispError)
 }
 
 // builtinProc is an implementation of Procedure for built-in functions.
@@ -145,18 +147,32 @@ func NewBuiltin(f builtinProcFunc) Procedure {
 }
 
 // Call invokes the built-in procedure implementation and returns the result.
-func (b *builtinProc) Call(values []interface{}) (interface{}, LispError) {
-	return b.builtin(values)
+// The argument values are evaluated within the given environment before being
+// passed to the built-in procedure.
+func (b *builtinProc) Call(values interface{}, env Environment) (interface{}, LispError) {
+	args := make([]interface{}, 0)
+	for values != nil {
+		arg := Car(values)
+		if arg != nil {
+			result, err := Eval(arg, env)
+			if err != nil {
+				return nil, err
+			}
+			args = append(args, result)
+		}
+		values = Cdr(values)
+	}
+	return b.builtin(args)
 }
 
 // lambda is a function body and its set of parameters.
 type lambda struct {
-	body   Pair // procedure definition
-	params Pair // formal parameter list
+	body   interface{} // procedure definition
+	params Pair        // formal parameter list
 }
 
 // NewLambda constructs a new lambda for the given function body and parameters.
-func NewLambda(body, params Pair) *lambda {
+func NewLambda(body interface{}, params Pair) *lambda {
 	return &lambda{body, params}
 }
 
@@ -164,9 +180,11 @@ func NewLambda(body, params Pair) *lambda {
 // environment in which the procedure was defined, and any evaluations will be
 // done in the context of that environment.
 type Closure interface {
-	// Invoke this closure with the given arguments and return the result,
-	// along with any error.
-	Invoke(values Pair) (interface{}, LispError)
+	// Bind this closure with the given arguments and return the new
+	// environment, suitable for evaluating this closure.
+	Bind(values Pair) (Environment, LispError)
+	// Body returns the body of the closure for evaluation.
+	Body() interface{}
 }
 
 // closure is an implementation of the Closure interface. It consists of a
@@ -178,15 +196,14 @@ type closure struct {
 
 // NewClosure constructs a new Closure with the given definition, defining
 // environment, and parameters.
-func NewClosure(body, params Pair, env Environment) Closure {
+func NewClosure(body interface{}, params Pair, env Environment) Closure {
 	lam := NewLambda(body, params)
 	return &closure{lam, env}
 }
 
-// Invoke evaluates this closure using the parameter values. Its environment
-// is the one in which the procedure was defined, and it will be evaluated in
-// a new environment in which the parameters are bound to the given values.
-func (c *closure) Invoke(values Pair) (interface{}, LispError) {
+// Bind evaluates this values in the closure's associated environment,
+// and returns a new environment suitable for invoking the closure.
+func (c *closure) Bind(values Pair) (Environment, LispError) {
 	// TODO: support arbitrary numbers of arguments (e.g. (list 1 2 3 ...))
 	if c.params.Len() != values.Len() {
 		str := c.params.String()
@@ -196,6 +213,7 @@ func (c *closure) Invoke(values Pair) (interface{}, LispError) {
 	// map the symbols in c.params to given values, storing in env
 	var names interface{} = c.params
 	var valuse interface{} = values
+	var err LispError = nil
 	for names != nil {
 		name := Car(names)
 		sym, ok := name.(Symbol)
@@ -204,24 +222,43 @@ func (c *closure) Invoke(values Pair) (interface{}, LispError) {
 			return nil, NewLispErrorf(EARGUMENT, "name %s is not a symbol", name)
 		}
 		value := Car(valuse)
+		value, err = Eval(value, c.env)
+		if err != nil {
+			return nil, err
+		}
 		env.Define(sym, value)
 		names = Cdr(names)
 		valuse = Cdr(valuse)
 	}
-	return Eval(c.body, env)
+	return env, nil
 }
 
-// Interpret parses the given Scheme expression, evaluates each of the top-
-// level elements, returning the result.
+// Body returns the body of the closure for evaluation.
+func (c *closure) Body() interface{} {
+	return c.body
+}
+
+// Interpret parses the given Scheme program, evaluates each of the top-
+// level elements, returning the final result.
 func Interpret(prog string) (interface{}, LispError) {
-	// this is the "inject" step in CESK
-	pair, err := parse(prog)
+	// thus begins the "inject" operation in CESK
+	var err LispError
+	body, err := parse(prog)
 	if err != nil {
 		return nil, err
 	}
-	env := NewEnvironment(theReportEnv)
-	// this is the "step" in CESK
-	return Eval(pair, env)
+	// By ensuring that the program is wrapped inside a (begin ...) we
+	// create what constitutes the "halt" continuation, as well as the
+	// "step" function.
+	if body.Len() >= 1 && body.First() != beginSym {
+		body = Cons(beginSym, body)
+	}
+	expr, err := expand(body, true)
+	if err != nil {
+		return nil, err
+	}
+	env := NewEnvironment(theReportEnvironment)
+	return Eval(expr, env)
 }
 
 // isTrue determines if the given thing represents a "true" value in Scheme.
@@ -233,25 +270,6 @@ func isTrue(test interface{}) bool {
 	return true
 }
 
-// evalToSlice evaluates the elements of the pair and appends the results to a
-// slice. The evaluation of the elements is made within the given environment.
-func evalToSlice(pair Pair, env Environment) ([]interface{}, LispError) {
-	results := make([]interface{}, 0)
-	var elems interface{} = pair
-	for elems != nil {
-		thing := Car(elems)
-		if thing != nil {
-			result, err := Eval(thing, env)
-			if err != nil {
-				return nil, err
-			}
-			results = append(results, result)
-		}
-		elems = Cdr(elems)
-	}
-	return results, nil
-}
-
 // Eval evaluates the given s-expression using a specific environment and
 // returns the results. This handles tail-call recursion and invoking
 // procedures, both built-in and user-defined.
@@ -260,7 +278,12 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 	for {
 		if sym, ok := expr.(Symbol); ok {
 			// symbolic reference
-			return env.Find(sym), nil
+			val := env.Find(sym)
+			if val != nil {
+				return val, nil
+			} else {
+				return nil, NewLispErrorf(EARGUMENT, "Unbound variable: %s", sym)
+			}
 		}
 		pair, is_pair := expr.(Pair)
 		if !is_pair {
@@ -272,7 +295,24 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 			return pair, nil
 		}
 		first := pair.First()
+		// assume that the first is a syntactic keyword until we learn otherwise
+		keyword := true
 		if sym, issym := first.(Symbol); issym {
+			// TODO: handle cond syntactic keyword
+			// TODO: handle and syntactic keyword
+			// TODO: handle or syntactic keyword
+			// TODO: handle case syntactic keyword
+			// TODO: handle let syntactic keyword
+			// TODO: handle let* syntactic keyword
+			// TODO: handle letrec syntactic keyword
+			// TODO: for let and letrec, see http://matt.might.net/articles/cesk-machines/
+			// TODO: handle do syntactic keyword
+			// TODO: handle => syntactic keyword
+			// TODO: handle delay syntactic keyword
+			// TODO: handle else syntactic keyword
+			// TODO: handle quasiquote syntactic keyword
+			// TODO: handle unquote syntactic keyword
+			// TODO: handle unquote-splicing syntactic keyword
 			if sym == quoteSym {
 				// (quote exp)
 				return pair.Second(), nil
@@ -314,15 +354,20 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				if ns, ok := name.(Symbol); ok {
 					env.Define(ns, val)
 				} else {
-					// this should _not_ happen
+					// expand should have handled this already
 					panic(ParserError)
 				}
 				return nil, nil
 			} else if sym == lambdaSym {
-				// 	elif x[0] is _lambda:    # (lambda (var*) exp)
-				// 	    (_, vars, exp) = x
-				// TODO: a Lambda "evaluates" to a Closure
-				// 	    return Procedure(vars, exp, env)
+				// (lambda (var*) exp)
+				vars := pair.Second()
+				body := pair.Third()
+				if vlist, ok := vars.(Pair); ok {
+					return NewClosure(body, vlist, env), nil
+				} else {
+					// expand should have handled this already
+					panic(ParserError)
+				}
 			} else if sym == beginSym {
 				// (begin exp+)
 				rest := pair.Rest()
@@ -351,28 +396,37 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				}
 				return result, nil
 			} else {
-				// (proc args*)
-				list, err := evalToSlice(pair, env)
-				if err != nil {
-					return nil, err
-				}
-				proc := list[0]
-				list = list[1:]
-				// TODO: handle user procedures, create new env with params, invoke
-				// TODO: how is a user-defined procedure different from a lambda?
-				if fun, ok := proc.(Procedure); ok {
-					return fun.Call(list)
-				} else {
-					return nil, NewLispErrorf(ESUPPORT,
-						"unhandled proc '%s': %v <%T>", sym, proc, proc)
-				}
+				// nope, was not a syntactic keyword
+				keyword = false
 			}
 		} else {
-			return nil, NewLispErrorf(EARGUMENT, "thing not handled: %v", pair)
+			// nope, was not a syntactic keyword
+			keyword = false
+		}
+		if !keyword {
+			// (proc args*)
+			proc, err := Eval(first, env)
+			if err != nil {
+				return nil, err
+			}
+			if builtin, ok := proc.(Procedure); ok {
+				return builtin.Call(pair.Rest(), env)
+			} else if clos, ok := proc.(Closure); ok {
+				if args, ok := pair.Rest().(Pair); ok {
+					expr = clos.Body()
+					env, err = clos.Bind(args)
+					if err != nil {
+						return nil, err
+					}
+				} else {
+					return nil, NewLispErrorf(EARGUMENT,
+						"Combination must be a proper list: %v", pair)
+				}
+			} else {
+				return nil, NewLispErrorf(ESUPPORT,
+					"The object %v is not applicable.", proc)
+			}
 		}
 	}
-	return nil, nil
+	panic("unreachable code")
 }
-
-// TODO: write let, letrec, define-syntax
-// TODO: for let and letrec, see http://matt.might.net/articles/cesk-machines/
