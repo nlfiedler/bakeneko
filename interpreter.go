@@ -201,7 +201,7 @@ func NewClosure(body interface{}, params Pair, env Environment) Closure {
 	return &closure{lam, env}
 }
 
-// Bind evaluates this values in the closure's associated environment,
+// Bind evaluates the given values in the closure's associated environment,
 // and returns a new environment suitable for invoking the closure.
 func (c *closure) Bind(values Pair) (Environment, LispError) {
 	// TODO: support arbitrary numbers of arguments (e.g. (list 1 2 3 ...))
@@ -330,71 +330,16 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				}
 			} else if sym == setSym {
 				// (set! var exp)
-				exp := pair.Third()
-				val, err := Eval(exp, env)
-				if err != nil {
-					return nil, err
-				}
-				name := pair.Second()
-				if ns, ok := name.(Symbol); ok {
-					env.Set(ns, val)
-				} else {
-					// this should _not_ happen
-					panic(ParserError)
-				}
-				return nil, nil
+				return syntaxSet(pair, env)
 			} else if sym == defineSym {
 				// (define var exp)
-				exp := pair.Third()
-				val, err := Eval(exp, env)
-				if err != nil {
-					return nil, err
-				}
-				name := pair.Second()
-				if ns, ok := name.(Symbol); ok {
-					env.Define(ns, val)
-				} else {
-					// expand should have handled this already
-					panic(ParserError)
-				}
-				return nil, nil
+				return syntaxDefine(pair, env)
 			} else if sym == lambdaSym {
 				// (lambda (var*) exp)
-				vars := pair.Second()
-				body := pair.Third()
-				if vlist, ok := vars.(Pair); ok {
-					return NewClosure(body, vlist, env), nil
-				} else {
-					// expand should have handled this already
-					panic(ParserError)
-				}
+				return syntaxLambda(pair, env)
 			} else if sym == beginSym {
 				// (begin exp+)
-				rest := pair.Rest()
-				var result interface{}
-				var err LispError
-				if next, ok := rest.(Pair); ok {
-					for next.Len() > 0 {
-						thing := next.First()
-						result, err = Eval(thing, env)
-						if err != nil {
-							return nil, err
-						}
-						rest = next.Rest()
-						next, _ = rest.(Pair)
-						if next == theEmptyList {
-							// we're done
-							rest = nil
-						}
-					}
-				}
-				if rest != nil {
-					result, err = Eval(rest, env)
-					if err != nil {
-						return nil, err
-					}
-				}
-				return result, nil
+				return syntaxBegin(pair, env)
 			} else {
 				// nope, was not a syntactic keyword
 				keyword = false
@@ -429,4 +374,75 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 		}
 	}
 	panic("unreachable code")
+}
+
+// syntaxSet implements the syntactic keyword set!
+func syntaxSet(pair Pair, env Environment) (interface{}, LispError) {
+	exp := pair.Third()
+	val, err := Eval(exp, env)
+	if err != nil {
+		return nil, err
+	}
+	name := pair.Second()
+	if ns, ok := name.(Symbol); ok {
+		env.Set(ns, val)
+	} else {
+		return nil, NewLispErrorf(EARGUMENT, "name %v not a symbol", name)
+	}
+	return nil, nil
+}
+
+// syntaxDefine implements the syntactic keyword define
+func syntaxDefine(pair Pair, env Environment) (interface{}, LispError) {
+	exp := pair.Third()
+	val, err := Eval(exp, env)
+	if err != nil {
+		return nil, err
+	}
+	name := pair.Second()
+	if ns, ok := name.(Symbol); ok {
+		env.Define(ns, val)
+	} else {
+		return nil, NewLispErrorf(EARGUMENT, "name %v not a symbol", name)
+	}
+	return nil, nil
+}
+
+// syntaxLambda implements the syntactic keyword lambda
+func syntaxLambda(pair Pair, env Environment) (interface{}, LispError) {
+	vars := pair.Second()
+	body := pair.Third()
+	if vlist, ok := vars.(Pair); ok {
+		return NewClosure(body, vlist, env), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "lambda arguments wrong type: %v", vars)
+}
+
+// syntaxBegin implements the syntactic keyword begin
+func syntaxBegin(pair Pair, env Environment) (interface{}, LispError) {
+	rest := pair.Rest()
+	var result interface{}
+	var err LispError
+	if next, ok := rest.(Pair); ok {
+		for next.Len() > 0 {
+			thing := next.First()
+			result, err = Eval(thing, env)
+			if err != nil {
+				return nil, err
+			}
+			rest = next.Rest()
+			next, _ = rest.(Pair)
+			if next == theEmptyList {
+				// we're done
+				rest = nil
+			}
+		}
+	}
+	if rest != nil {
+		result, err = Eval(rest, env)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return result, nil
 }
