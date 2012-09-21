@@ -21,11 +21,16 @@ import (
 var endOfStreamMsg = "unexpectedly reached end of expression"
 
 var eofObject = Symbol("#<eof-object>")
+var andSym = Symbol("and")
+var arrowSym = Symbol("=>")
 var beginSym = Symbol("begin")
+var condSym = Symbol("cond")
 var defineSym = Symbol("define")
 var definesyntaxSym = Symbol("define-syntax")
+var elseSym = Symbol("else")
 var ifSym = Symbol("if")
 var lambdaSym = Symbol("lambda")
+var orSym = Symbol("or")
 var quasiquoteSym = Symbol("quasiquote")
 var quoteSym = Symbol("quote")
 var setSym = Symbol("set!")

@@ -207,7 +207,9 @@ func (c *closure) Bind(values Pair) (Environment, LispError) {
 	// TODO: support arbitrary numbers of arguments (e.g. (list 1 2 3 ...))
 	if c.params.Len() != values.Len() {
 		str := c.params.String()
-		return nil, NewLispErrorf(EARGUMENT, "wrong number of arguments for %v", str)
+		return nil, NewLispErrorf(EARGUMENT,
+			"wrong number of arguments for %v, expected %d, got %d", str,
+			c.params.Len(), values.Len())
 	}
 	env := NewEnvironment(c.env)
 	// map the symbols in c.params to given values, storing in env
@@ -290,7 +292,8 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 			// atom
 			return expr, nil
 		}
-		if pair.Len() == 0 {
+		length := pair.Len()
+		if length == 0 {
 			// empty list
 			return pair, nil
 		}
@@ -298,9 +301,6 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 		// assume that the first is a syntactic keyword until we learn otherwise
 		keyword := true
 		if sym, issym := first.(Symbol); issym {
-			// TODO: handle cond syntactic keyword
-			// TODO: handle and syntactic keyword
-			// TODO: handle or syntactic keyword
 			// TODO: handle case syntactic keyword
 			// TODO: handle let syntactic keyword
 			// TODO: handle let* syntactic keyword
@@ -319,11 +319,11 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 			} else if sym == ifSym {
 				// (if test conseq alt)
 				test := pair.Second()
-				okay, err := Eval(test, env)
+				result, err := Eval(test, env)
 				if err != nil {
 					return nil, err
 				}
-				if isTrue(okay) {
+				if isTrue(result) {
 					expr = pair.Third()
 				} else {
 					expr = Cxr("cadddr", pair)
@@ -339,7 +339,35 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				return syntaxLambda(pair, env)
 			} else if sym == beginSym {
 				// (begin exp+)
-				return syntaxBegin(pair, env)
+				exp, err := evalForTail(pair.Rest(), env)
+				if err != nil {
+					return nil, err
+				}
+				expr = exp
+			} else if sym == andSym {
+				// (and exp*)
+				exp, val, err := syntaxAnd(length, pair, env)
+				if exp != nil {
+					expr = exp
+				} else {
+					return val, err
+				}
+			} else if sym == orSym {
+				// (or exp*)
+				exp, val, err := syntaxOr(length, pair, env)
+				if exp != nil {
+					expr = exp
+				} else {
+					return val, err
+				}
+			} else if sym == condSym {
+				// (cond <clause>+)
+				val, exp, err := syntaxCond(length, pair, env)
+				if exp != nil {
+					expr = exp
+				} else {
+					return val, err
+				}
 			} else {
 				// nope, was not a syntactic keyword
 				keyword = false
@@ -374,6 +402,38 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 		}
 	}
 	panic("unreachable code")
+}
+
+// evalForTail implements a begin-style evaluation of a list of expressions,
+// returning the last expression as-is to be evaluated in a tail-call fashion.
+func evalForTail(expr interface{}, env Environment) (interface{}, LispError) {
+	// if the input is not a list, return it for evaluation
+	if pair, ok := expr.(Pair); ok {
+		// otherwise, evaluate all but the last expression in the list
+		length := pair.Len()
+		iter := NewPairIterator(pair)
+		for index := 1; index < length; index++ {
+			_, err := Eval(iter.Next(), env)
+			if err != nil {
+				return nil, err
+			}
+		}
+		// the last expression is a tail expression
+		expr = iter.Next()
+	}
+	return expr, nil
+}
+
+// extractFirst extracts the single expression from the list, if the argument
+// is indeed a list and it contains exactly one item. Otherwise the input is
+// returned unchanged.
+func extractFirst(expr interface{}) interface{} {
+	if pair, ok := expr.(Pair); ok {
+		if pair.Len() == 1 {
+			expr = pair.First()
+		}
+	}
+	return expr
 }
 
 // syntaxSet implements the syntactic keyword set!
@@ -418,31 +478,116 @@ func syntaxLambda(pair Pair, env Environment) (interface{}, LispError) {
 	return nil, NewLispErrorf(EARGUMENT, "lambda arguments wrong type: %v", vars)
 }
 
-// syntaxBegin implements the syntactic keyword begin
-func syntaxBegin(pair Pair, env Environment) (interface{}, LispError) {
-	rest := pair.Rest()
-	var result interface{}
-	var err LispError
-	if next, ok := rest.(Pair); ok {
-		for next.Len() > 0 {
-			thing := next.First()
-			result, err = Eval(thing, env)
-			if err != nil {
-				return nil, err
-			}
-			rest = next.Rest()
-			next, _ = rest.(Pair)
-			if next == theEmptyList {
-				// we're done
-				rest = nil
-			}
-		}
+// syntaxAnd implements the syntactic keyword and
+func syntaxAnd(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+	if length == 1 {
+		// (and) => #t
+		return nil, Boolean(true), nil
 	}
-	if rest != nil {
-		result, err = Eval(rest, env)
+	iter := NewPairIterator(pair)
+	iter.Next()
+	// up to the last expression is evaluated in place
+	for index := 2; index < length; index++ {
+		test := iter.Next()
+		result, err := Eval(test, env)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+		if !isTrue(result) {
+			return nil, Boolean(false), nil
 		}
 	}
-	return result, nil
+	// the last expression is a tail expression
+	return iter.Next(), nil, nil
+}
+
+// syntaxOr implements the syntactic keyword or
+func syntaxOr(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+	if length == 1 {
+		// (or) => #f
+		return nil, Boolean(false), nil
+	}
+	iter := NewPairIterator(pair)
+	iter.Next()
+	// up to the last expression is evaluated in place
+	for index := 2; index < length; index++ {
+		test := iter.Next()
+		result, err := Eval(test, env)
+		if err != nil {
+			return nil, nil, err
+		}
+		if isTrue(result) {
+			return nil, Boolean(true), nil
+		}
+	}
+	// the last expression is a tail expression
+	return iter.Next(), nil, nil
+}
+
+// syntaxCond implements the syntactic keyword cond, returning the evaluated
+// result, if not a tail-call, or nil for tail call, with the second return
+// value being the expression to be evaluated in tail-call fashion, while the
+// third return value is any error that occurred.
+func syntaxCond(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+	// evalExpr evaluates the expression(s) for the clause, returning the
+	// last expression in the sequence for evaluation in tail-call fashion.
+	evalExpr := func(test, expr interface{}) (interface{}, LispError) {
+		// we assume this is not an 'else' clause and that there are
+		// non-zero expressions to be evaluated
+		if epair, ok := expr.(Pair); ok {
+			if epair.First() == arrowSym {
+				// rest of expression is assumed to be a unary procedure,
+				// return it as a procedure invocation to be evaluated
+				expr = extractFirst(epair.Rest())
+				return List(expr, test), nil
+			}
+			return evalForTail(epair, env)
+		}
+		// should not get here
+		return nil, NewLispError(ESYNTAX, "malformed cond clause?")
+	}
+
+	iter := NewPairIterator(pair)
+	iter.Next()
+	for iter.HasNext() {
+		clause := iter.Next()
+		if clair, ok := clause.(Pair); ok {
+			if clair.Len() < 1 {
+				return nil, nil, NewLispErrorf(EARGUMENT,
+					"cond clause must not be empty: %v", clause)
+			}
+			test := clair.First()
+			if test == elseSym {
+				if clair.Len() < 2 {
+					return nil, nil, NewLispErrorf(EARGUMENT,
+						"cond else clause must not be empty: %v", clause)
+				}
+				exp, err := evalForTail(clair.Rest(), env)
+				return nil, exp, err
+			}
+			result, err := Eval(test, env)
+			if err != nil {
+				return nil, nil, err
+			}
+			if isTrue(result) {
+				if clair.Len() < 2 {
+					// return test result as result of cond
+					return result, nil, nil
+				}
+				exp, err := evalExpr(result, clair.Rest())
+				return nil, exp, err
+			}
+		} else {
+			return nil, nil, NewLispErrorf(EARGUMENT,
+				"cond clause must be a pair: %v", clause)
+		}
+	}
+	// unspecified!
+	return theEmptyList, nil, nil
+}
+
+// syntaxCase implements the syntactic keyword case
+func syntaxCase(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+	// TODO: implement syntactic case (need Atom.EqualTo() first)
+	return nil, nil, nil
 }

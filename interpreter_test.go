@@ -32,9 +32,9 @@ func verifyInterpret(t *testing.T, inputs map[string]string) {
 // with the associated error message.
 func verifyInterpretError(t *testing.T, inputs map[string]string) {
 	for k, v := range inputs {
-		_, err := Interpret(k)
+		result, err := Interpret(k)
 		if err == nil {
-			t.Fatalf("Interpret() should have failed for '%s'", k)
+			t.Fatalf("Interpret() should have failed for '%s', but got %v", k, result)
 		}
 		str := err.ErrorMessage()
 		if !strings.Contains(str, v) {
@@ -217,6 +217,85 @@ func TestInterpretLambda(t *testing.T) {
 	if result != Symbol("foo") {
 		t.Error("expected lambda 'fun' to return symbol foo")
 	}
+}
+
+func TestInterpretAnd(t *testing.T) {
+	inputs := make(map[string]Boolean)
+	inputs[`(and)`] = Boolean(true)
+	inputs[`(and #t)`] = Boolean(true)
+	inputs[`(and #t #t)`] = Boolean(true)
+	inputs[`(and #t #t #t)`] = Boolean(true)
+	inputs[`(and #f)`] = Boolean(false)
+	inputs[`(and #t #f)`] = Boolean(false)
+	inputs[`(and #t #t #f)`] = Boolean(false)
+	for input, expected := range inputs {
+		result, err := Interpret(input)
+		if err != nil {
+			t.Errorf("Interpret() failed: %v", err)
+		}
+		if b, ok := result.(Boolean); ok {
+			if b != expected {
+				t.Errorf("expected %s to return %v", input, expected)
+			}
+		} else {
+			t.Errorf("expected and to return boolean, got %v", result)
+		}
+	}
+}
+
+func TestInterpretOr(t *testing.T) {
+	inputs := make(map[string]Boolean)
+	inputs[`(or)`] = Boolean(false)
+	inputs[`(or #t)`] = Boolean(true)
+	inputs[`(or #f #f)`] = Boolean(false)
+	inputs[`(or #f #f #f)`] = Boolean(false)
+	inputs[`(or #f)`] = Boolean(false)
+	inputs[`(or #f #t)`] = Boolean(true)
+	inputs[`(or #f #f #t)`] = Boolean(true)
+	for input, expected := range inputs {
+		result, err := Interpret(input)
+		if err != nil {
+			t.Fatalf("Interpret() failed: %v", err)
+		}
+		if b, ok := result.(Boolean); ok {
+			if b != expected {
+				t.Errorf("expected %s to return %v", input, expected)
+			}
+		} else {
+			t.Errorf("expected and to return boolean, got %v", result)
+		}
+	}
+}
+
+func TestInterpretCond(t *testing.T) {
+	foo := Symbol("foo")
+	inputs := make(map[string]interface{})
+	inputs[`(cond (else 'foo))`] = foo
+	inputs[`(cond (#t 'foo))`] = foo
+	inputs[`(cond (#f 'bar) (#t 'foo))`] = foo
+	inputs[`(cond)`] = theEmptyList
+	inputs[`(cond (#f 'bar) (#f 'bar) (#t 'foo))`] = foo
+	inputs[`(cond (#f 'bar) (else 'foo))`] = foo
+	inputs[`(cond (#t (define bar 'bar) (set! bar 'foo) bar))`] = foo
+	inputs[`(cond (#f 'bar) (#f 'bar) (else 'foo))`] = foo
+	inputs[`(cond (#f))`] = theEmptyList
+	inputs[`(cond (#t))`] = Boolean(true)
+	inputs[`(cond (#t => (lambda (x) (if x 'bar 'foo))))`] = Symbol("bar")
+	for input, expected := range inputs {
+		result, err := Interpret(input)
+		if err != nil {
+			t.Fatalf("Interpret() failed: %v", err)
+		}
+		if result != expected {
+			t.Errorf("expected %s to return %v", input, expected)
+		}
+	}
+	// test error cases
+	errors := make(map[string]string)
+	errors[`(cond (else))`] = "cond else clause must not be empty"
+	errors[`(cond ())`] = "cond clause must not be empty"
+	errors[`(cond #f)`] = "cond clause must be a pair"
+	verifyInterpretError(t, errors)
 }
 
 // TODO: test tail-call optimization as defined in Scheme r5rs 3.5
