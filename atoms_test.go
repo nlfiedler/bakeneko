@@ -11,35 +11,137 @@ import (
 	"unicode/utf8"
 )
 
-func TestStringNil(t *testing.T) {
-	var s *StringImpl = nil
-	if s.Eval() != nil {
-		t.Error("nil String.Eval() should return nil")
+func TestBoolean(t *testing.T) {
+	b := NewBoolean("#t")
+	if boo, ok := b.Eval().(bool); !ok || !boo {
+		t.Error("#t Boolean is not true")
 	}
-	// nil String Set() should do nothing
-	s.Set(0, 'c')
-	result := s.String()
-	if result != "" {
-		t.Error("nil String.String() should return the empty string")
+	if !b.Value() {
+		t.Error("#t Boolean.Value() returned false")
 	}
-	if s.Len() != -1 {
-		t.Error("nil String.Len() should return -1")
+	if b.String() != "#t" {
+		t.Errorf("Boolean.String() returned %v", b)
+	}
+	// test EqualTo()
+	if _, err := b.EqualTo(nil); err == nil {
+		t.Error("Boolean.EqualTo(nil) should return error")
+	}
+	if _, err := b.EqualTo(Character('a')); err == nil {
+		t.Error("Boolean.EqualTo(rune) should return error")
+	}
+	bt := NewBoolean("#t")
+	bf := NewBoolean("#f")
+	if eq, err := b.EqualTo(bt); err != nil || !eq {
+		t.Error("Boolean.EqualTo() true did not work")
+	}
+	if eq, err := b.EqualTo(bf); err != nil || eq {
+		t.Error("Boolean.EqualTo() false did not work")
+	}
+	// test CompareTo()
+	if _, err := b.CompareTo(nil); err == nil {
+		t.Error("Boolean.CompareTo(nil) should return error")
+	}
+	if _, err := b.CompareTo(Character('a')); err == nil {
+		t.Error("Boolean.CompareTo(rune) should return error")
+	}
+	if cmp, err := b.CompareTo(bt); err != nil || cmp != 0 {
+		t.Error("Boolean.CompareTo() true did not work")
+	}
+	if cmp, err := bt.CompareTo(bf); err != nil || cmp <= 0 {
+		t.Error("Boolean.CompareTo() true<=>false did not work")
+	}
+	if cmp, err := bf.CompareTo(bt); err != nil || cmp >= 0 {
+		t.Error("Boolean.CompareTo() true<=>false did not work")
 	}
 }
 
-func TestStringEmpty(t *testing.T) {
+func TestSymbol(t *testing.T) {
+	s := Symbol("")
+	if s.Eval() != "" {
+		t.Error("empty Symbol should evaluate to empty string")
+	}
+	if s.String() != "" {
+		t.Error("empty Symbol.String() should return empty string")
+	}
+	if _, err := s.EqualTo(Boolean(true)); err == nil {
+		t.Error("Symbol.EqualTo() wrong type should fail")
+	}
+	if _, err := s.CompareTo(Boolean(true)); err == nil {
+		t.Error("Symbol.CompareTo() wrong type should fail")
+	}
+	if eq, err := s.EqualTo(Symbol("")); err != nil || !eq {
+		t.Error("Symbol.EqualTo() did not work")
+	}
+	if eq, err := s.EqualTo(Symbol("foo")); err != nil || eq {
+		t.Error("Symbol.EqualTo() did not work")
+	}
+	if cmp, err := s.CompareTo(Symbol("")); err != nil || cmp != 0 {
+		t.Error("Symbol.CompareTo() did not work")
+	}
+	if cmp, err := s.CompareTo(Symbol("foo")); err != nil || cmp == 0 {
+		t.Error("Symbol.CompareTo() did not work")
+	}
+	s = Symbol("foo")
+	if eq, err := s.EqualTo(Symbol("")); err != nil || eq {
+		t.Error("Symbol.EqualTo() did not work")
+	}
+	if eq, err := s.EqualTo(Symbol("foo")); err != nil || !eq {
+		t.Error("Symbol.EqualTo() did not work")
+	}
+	if cmp, err := s.CompareTo(Symbol("")); err != nil || cmp == 0 {
+		t.Error("Symbol.CompareTo() did not work")
+	}
+	if cmp, err := s.CompareTo(Symbol("foo")); err != nil || cmp != 0 {
+		t.Error("Symbol.CompareTo() did not work")
+	}
+	if cmp, err := s.CompareTo(Symbol("bar")); err != nil || cmp <= 0 {
+		t.Error("Symbol.CompareTo() did not work")
+	}
+	if cmp, err := s.CompareTo(Symbol("qux")); err != nil || cmp >= 0 {
+		t.Error("Symbol.CompareTo() did not work")
+	}
+}
+
+func TestString(t *testing.T) {
+	// nil String
+	var ns *StringImpl = nil
+	if ns.Eval() != nil {
+		t.Error("nil String.Eval() should return nil")
+	}
+	// nil String Set() should do nothing
+	ns.Set(0, 'c')
+	if ns.String() != "" {
+		t.Error("nil String.String() should return the empty string")
+	}
+	if ns.Len() != -1 {
+		t.Error("nil String.Len() should return -1")
+	}
+	if _, err := ns.EqualTo(nil); err == nil {
+		t.Error("nil String.EqualTo() should return error")
+	}
+	if _, err := ns.CompareTo(nil); err == nil {
+		t.Error("nil String.CompareTo() should return error")
+	}
+	// empty String
 	s := NewString("")
 	if s.Eval() != "" {
 		t.Error("empty String.Eval() should return the empty string")
 	}
-	paniced := false
-	defer func() {
-		if e := recover(); e != nil {
-			paniced = true
-		}
-	}()
-	s.Set(0, 'c')
-	if !paniced {
+
+	// callStringSet is used to trigger a panic in String.Set(), returning
+	// true if the call caused a panic, and false otherwise.
+	callStringSet := func(s String, i int) (okay bool) {
+		defer func() {
+			if e := recover(); e != nil {
+				// mark the test a success on the way out
+				okay = true
+			}
+		}()
+		s.Set(i, 'a')
+		panic("unreachable code")
+	}
+
+	if !callStringSet(s, 0) {
 		t.Error("String.Set() of emtpy string should have paniced")
 	}
 	if s.String() != "\"\"" {
@@ -48,10 +150,19 @@ func TestStringEmpty(t *testing.T) {
 	if s.Len() != 0 {
 		t.Error("empty String.Len() should return 0")
 	}
-}
-
-func TestStringNonEmpty(t *testing.T) {
-	s := NewString("abc")
+	os := NewString("")
+	result, err := s.EqualTo(os)
+	if err != nil {
+		t.Fatalf("empty String.EqualTo() returned error: %v", err)
+	}
+	if !result {
+		t.Error("empty String.EqualTo() should return true")
+	}
+	if _, err = s.EqualTo(Boolean(true)); err == nil {
+		t.Error("String.EqualTo() wrong type should have failed")
+	}
+	// non-empty String
+	s = NewString("abc")
 	if s.Eval() != "abc" {
 		t.Error("unmodified String.Eval() should return original value")
 	}
@@ -59,25 +170,39 @@ func TestStringNonEmpty(t *testing.T) {
 	if s.Eval() != "Abc" {
 		t.Error("modified String.Eval() should return modified value")
 	}
-	paniced := false
-	defer func() {
-		if e := recover(); e != nil {
-			paniced = true
-		}
-	}()
-	s.Set(1000, 'c')
-	if !paniced {
+	if !callStringSet(s, 1000) {
 		t.Error("String.Set() out of bounds should have paniced")
 	}
-	if s.String() != "Abc" {
+	if s.String() != "\"Abc\"" {
 		t.Error("modified String.String() should return the modified value")
 	}
 	if s.Len() != 3 {
 		t.Error("3-character String.Len() should return 3")
 	}
+	// test EqualTo()
+	if result, err = s.EqualTo(NewString("Abc")); err != nil || !result {
+		t.Error("String.EqualTo() should return true")
+	}
+	if result, err = s.EqualTo(NewString("abd")); err != nil || result {
+		t.Error("String.EqualTo() should return false")
+	}
+	if result, err = s.EqualTo(NewString("ab")); err != nil || result {
+		t.Error("String.EqualTo() should return false")
+	}
+	// test CompareTo()
+	if cmp, err := s.CompareTo(NewString("Abc")); err != nil || cmp != 0 {
+		t.Error("String.CompareTo() returned wrong value")
+	}
+	if cmp, err := s.CompareTo(NewString("Abd")); err != nil || cmp >= 0 {
+		t.Error("String.CompareTo() returned wrong value")
+	}
+	if cmp, err := s.CompareTo(NewString("Abb")); err != nil || cmp <= 0 {
+		t.Error("String.CompareTo() returned wrong value")
+	}
 }
 
 func TestCharacter(t *testing.T) {
+	// invalid inputs
 	ch := NewCharacter("")
 	if ch.Eval() != utf8.RuneError {
 		t.Error("short character input should return error character")
@@ -90,9 +215,75 @@ func TestCharacter(t *testing.T) {
 	if ch.Eval() != utf8.RuneError {
 		t.Error("long character input should return error character")
 	}
+	// letter 'n'
 	ch = NewCharacter("#\\n")
 	if ch.Eval() != 'n' {
 		t.Error("short character input should return error character")
+	}
+	if ch.String() != "#\\n" {
+		t.Errorf("Character.String() returned wrong value: %v", ch)
+	}
+	// special case: newline
+	ch = NewCharacter("#\\newline")
+	if ch.Eval() != '\n' {
+		t.Error("newline special case failed")
+	}
+	if ch.String() != "#\\newline" {
+		t.Errorf("Character.String() returned wrong value: %v", ch)
+	}
+	// special case: space
+	ch = NewCharacter("#\\space")
+	if ch.Eval() != ' ' {
+		t.Error("space special case failed")
+	}
+	if ch.String() != "#\\space" {
+		t.Errorf("Character.String() returned wrong value: %v", ch)
+	}
+	// test EqualTo()
+	oc := NewCharacter("#\\a")
+	eq, err := ch.EqualTo(oc)
+	if err != nil {
+		t.Fatalf("Character.EqualTo() returned error: %v", err)
+	}
+	if eq {
+		t.Error("Character.EqualTo() should have returned false")
+	}
+	ch = NewCharacter("#\\a")
+	eq, err = ch.EqualTo(oc)
+	if err != nil {
+		t.Fatalf("Character.EqualTo() returned error: %v", err)
+	}
+	if !eq {
+		t.Error("Character.EqualTo() should have returned true")
+	}
+	if _, err = ch.EqualTo(Boolean(true)); err == nil {
+		t.Error("Character.EqualTo() wrong type should have failed")
+	}
+	// test CompareTo()
+	cmp, err := ch.CompareTo(oc)
+	if err != nil {
+		t.Fatalf("Character.EqualTo() returned error: %v", err)
+	}
+	if cmp != 0 {
+		t.Error("Character.CompareTo() should have returned zero")
+	}
+	if _, err = ch.CompareTo(Boolean(true)); err == nil {
+		t.Error("Character.CompareTo() wrong type should have failed")
+	}
+	oc = NewCharacter("#\\b")
+	cmp, err = ch.CompareTo(oc)
+	if err != nil {
+		t.Fatalf("Character.EqualTo() returned error: %v", err)
+	}
+	if cmp >= 0 {
+		t.Error("Character.CompareTo() should have returned negative value")
+	}
+	cmp, err = oc.CompareTo(ch)
+	if err != nil {
+		t.Fatalf("Character.EqualTo() returned error: %v", err)
+	}
+	if cmp <= 0 {
+		t.Error("Character.CompareTo() should have returned positive value")
 	}
 }
 
@@ -102,5 +293,17 @@ func TestVoid(t *testing.T) {
 	}
 	if theVoid.String() != "" {
 		t.Error("Void.String() should return the empty string")
+	}
+	if _, err := theVoid.EqualTo(Boolean(true)); err == nil {
+		t.Error("Void.EqualTo() wrong type should have failed")
+	}
+	if eq, err := theVoid.EqualTo(Void(1)); err != nil || !eq {
+		t.Error("Void.EqualTo() should have worked")
+	}
+	if _, err := theVoid.CompareTo(Boolean(true)); err == nil {
+		t.Error("Void.CompareTo() wrong type should have failed")
+	}
+	if eq, err := theVoid.CompareTo(Void(1)); err != nil || eq != 0 {
+		t.Error("Void.CompareTo() should have worked")
 	}
 }

@@ -21,6 +21,15 @@ import (
 // evaluated to a value outside of the context of a specific environment.
 // These include strings, symbols, characters, and numbers.
 type Atom interface {
+	// CompareTo returns a negative integer, zero, or a positive integer
+	// as this object is less than, equal to, or greater than the
+	// specified object. An error is returned if the object is not of
+	// a suitable type for comparison.
+	CompareTo(other Atom) (int8, error)
+	// EqualTo returns true if the values of this atom and the specified
+	// object are equal, false otherwise. An error is returned if the
+	// object is not of the same type.
+	EqualTo(other Atom) (bool, error)
 	// Eval returns the result of evaluating this object.
 	Eval() interface{}
 	// String returns the string representation of this object.
@@ -41,6 +50,32 @@ func NewBoolean(val string) Boolean {
 		return Boolean(false)
 	}
 	panic(fmt.Sprintf("lexer/parser bug: '%s' is not boolean", val))
+}
+
+// CompareTo returns zero if this object represents the same boolean value as
+// the argument; a positive value if this object represents true and the
+// argument represents false; and a negative value if this object represents
+// false and the argument represents true.
+func (b Boolean) CompareTo(other Atom) (int8, error) {
+	if ob, ok := other.(Boolean); ok {
+		bb := bool(b)
+		obb := bool(ob)
+		if bb == obb {
+			return 0, nil
+		} else if bb {
+			return 1, nil
+		} else {
+			return -1, nil
+		}
+	}
+	return 0, TypeMismatch
+}
+
+func (b Boolean) EqualTo(other Atom) (bool, error) {
+	if ob, ok := other.(Boolean); ok {
+		return bool(b) == bool(ob), nil
+	}
+	return false, TypeMismatch
 }
 
 // Eval returns true or false depending on the value of the Boolean.
@@ -65,6 +100,26 @@ func (b Boolean) Value() bool {
 // is essentially a string but is treated differently.
 type Symbol string
 
+func (s Symbol) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(Symbol); ok {
+		if s == os {
+			return 0, nil
+		} else if s > os {
+			return 1, nil
+		} else {
+			return -1, nil
+		}
+	}
+	return 0, TypeMismatch
+}
+
+func (s Symbol) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(Symbol); ok {
+		return s == os, nil
+	}
+	return false, TypeMismatch
+}
+
 // Eval returns the name of the symbol as a string.
 func (s Symbol) Eval() interface{} {
 	return string(s)
@@ -88,22 +143,16 @@ type String interface {
 
 // StringImpl is an implementation of the String interface.
 type StringImpl struct {
-	// val is a mutable sequence of characters.
-	val []rune
+	// strng is the string value, if and only if the slice field is nil
+	strng string
+	// slice is the mutable version of this string, and if non-nil this
+	// field overrides any value in the strng field
+	slice []rune
 }
 
 // NewString constructs a Scheme string from the given Go string.
 func NewString(val string) String {
-	// Convert the string to a slice of runes, which allows us to later
-	// modify the string (i.e. when string-set! is called).
-	sl := make([]rune, 0)
-	pos := 0
-	for pos < len(val) {
-		r, width := utf8.DecodeRuneInString(val[pos:])
-		sl = append(sl, r)
-		pos += width
-	}
-	return &StringImpl{sl}
+	return &StringImpl{val, nil}
 }
 
 // Len returns the number of characters in this string.
@@ -111,7 +160,10 @@ func (s *StringImpl) Len() int {
 	if s == nil {
 		return -1
 	}
-	return len(s.val)
+	if s.slice != nil {
+		return len(s.slice)
+	}
+	return len(s.strng)
 }
 
 // Set changes the rune at the given zero-based position within the string.
@@ -120,19 +172,59 @@ func (s *StringImpl) Set(pos int, ch rune) {
 	if s == nil {
 		return
 	}
-	if pos < 0 || pos >= len(s.val) {
+	if s.slice == nil {
+		// convert the string to a slice of runes
+		s.slice = make([]rune, 0)
+		idx := 0
+		for idx < len(s.strng) {
+			r, width := utf8.DecodeRuneInString(s.strng[idx:])
+			s.slice = append(s.slice, r)
+			idx += width
+		}
+	}
+	if pos < 0 || pos >= len(s.slice) {
 		panic(OutOfBounds)
 	}
-	s.val[pos] = ch
+	s.slice[pos] = ch
 }
 
-// toString converts the slice of runes to a string.
+// toString converts the slice of runes to a string, saving the string
+// value to avoid the cost of conversion in the future.
 func (s *StringImpl) toString() string {
-	buf := new(bytes.Buffer)
-	for _, r := range s.val {
-		buf.WriteRune(r)
+	if s.slice != nil {
+		// convert the slice of runes back to a string
+		buf := new(bytes.Buffer)
+		for _, r := range s.slice {
+			buf.WriteRune(r)
+		}
+		s.strng = buf.String()
+		s.slice = nil
 	}
-	return buf.String()
+	return s.strng
+}
+
+func (s *StringImpl) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(*StringImpl); ok {
+		ost := os.toString()
+		st := s.toString()
+		if st == ost {
+			return 0, nil
+		} else if st > ost {
+			return 1, nil
+		} else {
+			return -1, nil
+		}
+	}
+	return 0, TypeMismatch
+}
+
+func (s *StringImpl) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(*StringImpl); ok {
+		ost := os.toString()
+		st := s.toString()
+		return st == ost, nil
+	}
+	return false, TypeMismatch
 }
 
 // Eval returns the String as a Go string.
@@ -166,11 +258,28 @@ func NewCharacter(val string) Character {
 		return Character('\n')
 	} else if len(val) != 3 {
 		return Character(utf8.RuneError)
-	} else {
-		// take whatever follows the #\ prefix
-		return Character(val[2])
 	}
-	panic("unreachable code")
+	// take whatever follows the #\ prefix
+	return Character(val[2])
+}
+
+func (c Character) CompareTo(other Atom) (int8, error) {
+	if oc, ok := other.(Character); ok {
+		if c == oc {
+			return 0, nil
+		} else if c < oc {
+			return -1, nil
+		}
+		return 1, nil
+	}
+	return 0, TypeMismatch
+}
+
+func (c Character) EqualTo(other Atom) (bool, error) {
+	if oc, ok := other.(Character); ok {
+		return c == oc, nil
+	}
+	return false, TypeMismatch
 }
 
 // Eval returns the character itself as a rune.
@@ -191,6 +300,20 @@ func (c Character) String() string {
 // Void is a placeholder in the environment for variables that have not been
 // assigned a value, as in the letrec binding construct.
 type Void int
+
+func (v Void) CompareTo(other Atom) (int8, error) {
+	if _, ok := other.(Void); ok {
+		return 0, nil
+	}
+	return 0, TypeMismatch
+}
+
+func (v Void) EqualTo(other Atom) (bool, error) {
+	if _, ok := other.(Void); ok {
+		return true, nil
+	}
+	return false, TypeMismatch
+}
 
 // Eval returns nil since Void has no value.
 func (v Void) Eval() interface{} {
@@ -213,8 +336,10 @@ type Number interface {
 	Multiply(multiplier interface{}) Number
 	// Subtract the given value from this number and return a new number.
 	Subtract(value interface{}) Number
-	// IntValue returns the number as an int64.
-	IntValue() int64
+	// IntegerValue returns the number as an Integer.
+	IntegerValue() Integer
+	// FloatValue returns the number as an Float.
+	FloatValue() Float
 }
 
 type Integer int64
@@ -246,13 +371,31 @@ func (i Integer) Subtract(value interface{}) Number {
 	return nil // TODO: implement Integer.Subtract()
 }
 
+func (i Integer) CompareTo(other Atom) (int8, error) {
+	if oi, ok := other.(Integer); ok {
+		return int8(int64(i) - int64(oi)), nil
+	}
+	return 0, TypeMismatch
+}
+
+func (i Integer) EqualTo(other Atom) (bool, error) {
+	if oi, ok := other.(Integer); ok {
+		return int64(i) == int64(oi), nil
+	}
+	return false, TypeMismatch
+}
+
 func (i Integer) Eval() interface{} {
 	return i
 }
 
-// IntValue returns the number as an int64.
-func (i Integer) IntValue() int64 {
-	return int64(i)
+// IntegerValue returns the number as an Integer.
+func (i Integer) IntegerValue() Integer {
+	return i
+}
+
+func (i Integer) FloatValue() Float {
+	return NewFloat(float64(i))
 }
 
 func (i Integer) String() string {
@@ -281,13 +424,39 @@ func (f Float) Subtract(value interface{}) Number {
 	return nil // TODO: implement Float.Subtract()
 }
 
+func (f Float) CompareTo(other Atom) (int8, error) {
+	if of, ok := other.(Float); ok {
+		ff := float64(f)
+		off := float64(of)
+		if ff == off {
+			return 0, nil
+		} else if ff > off {
+			return 1, nil
+		} else {
+			return -1, nil
+		}
+	}
+	return 0, TypeMismatch
+}
+
+func (f Float) EqualTo(other Atom) (bool, error) {
+	if of, ok := other.(Float); ok {
+		return float64(f) == float64(of), nil
+	}
+	return false, TypeMismatch
+}
+
 func (f Float) Eval() interface{} {
 	return f
 }
 
-// IntValue returns the number as an int64.
-func (f Float) IntValue() int64 {
-	return int64(f)
+// IntegerValue returns the number as an Integer.
+func (f Float) IntegerValue() Integer {
+	return NewInteger(int64(f))
+}
+
+func (f Float) FloatValue() Float {
+	return f
 }
 
 func (f Float) String() string {

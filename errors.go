@@ -11,6 +11,7 @@ import (
 	"fmt"
 )
 
+var TypeMismatch = errors.New("liswat: type mismatch in atom comparison")
 var OutOfBounds = errors.New("liswat: index out of bounds")
 var ParserError = errors.New("liswat: unexpected parser error")
 
