@@ -167,8 +167,14 @@ func TestParseVector(t *testing.T) {
 		result := pair.First()
 		if slice, ok := result.([]interface{}); ok {
 			if len(slice) == 3 {
-				if slice[0] != int64(1) && slice[1] != int64(2) && slice[2] != int64(3) {
-					t.Errorf("expected 1, 2, 3 in slice, but got %s", slice)
+				expected := new([3]Integer)
+				expected[0] = Integer(1)
+				expected[1] = Integer(2)
+				expected[2] = Integer(3)
+				for i, e := range expected {
+					if slice[i] != e {
+						t.Errorf("expected %v in vector, but got %s", e, slice[1])
+					}
 				}
 			} else {
 				t.Errorf("expected slice of length three but got %d", len(slice))

@@ -142,9 +142,17 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 	case tokenString:
 		return NewString(t.contents()), nil
 	case tokenInteger:
-		return atoi(t.val) // TODO: add new Number atom type
+		val, err := atoi(t.val)
+		if err != nil {
+			return nil, err
+		}
+		return NewInteger(val), nil
 	case tokenFloat:
-		return atof(t.val) // TODO: add new Number atom type
+		val, err := atof(t.val)
+		if err != nil {
+			return nil, err
+		}
+		return NewFloat(val), nil
 	case tokenComplex:
 		return atoc(t.val) // TODO: add new Number atom type
 	case tokenRational:

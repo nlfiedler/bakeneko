@@ -329,13 +329,13 @@ func (v Void) String() string {
 type Number interface {
 	Atom
 	// Add the given value to this number and return a new number.
-	Add(value interface{}) Number
+	Add(value Number) Number
 	// Divide this number by the divisor and return a new Number.
-	Divide(divisor interface{}) Number
+	Divide(divisor Number) Number
 	// Multiply this number by the multiplier and return a new Number.
-	Multiply(multiplier interface{}) Number
+	Multiply(multiplier Number) Number
 	// Subtract the given value from this number and return a new number.
-	Subtract(value interface{}) Number
+	Subtract(value Number) Number
 	// IntegerValue returns the number as an Integer.
 	IntegerValue() Integer
 	// FloatValue returns the number as an Float.
@@ -345,35 +345,40 @@ type Number interface {
 type Integer int64
 
 func NewInteger(val int64) Integer {
+	// TODO: change this to take a string and do atoi() on it
 	return Integer(val)
 }
 
-func (i Integer) Add(value interface{}) Number {
-	if fl, ok := value.(float64); ok {
-		return NewFloat(float64(i) + fl)
-	}
-
-	if in, ok := value.(int64); ok {
-		return NewInteger(int64(i) + in)
-	}
-	return nil
+func (i Integer) Add(value Number) Number {
+	vi := value.IntegerValue()
+	return NewInteger(int64(i) + int64(vi))
 }
 
-func (i Integer) Divide(divisor interface{}) Number {
-	return nil // TODO: implement Integer.Divide()
+func (i Integer) Divide(divisor Number) Number {
+	vi := divisor.IntegerValue()
+	return NewInteger(int64(i) / int64(vi))
 }
 
-func (i Integer) Multiply(muliplier interface{}) Number {
-	return nil // TODO: implement Integer.Multiply()
+func (i Integer) Multiply(muliplier Number) Number {
+	vi := muliplier.IntegerValue()
+	return NewInteger(int64(i) * int64(vi))
 }
 
-func (i Integer) Subtract(value interface{}) Number {
-	return nil // TODO: implement Integer.Subtract()
+func (i Integer) Subtract(value Number) Number {
+	vi := value.IntegerValue()
+	return NewInteger(int64(i) - int64(vi))
 }
 
 func (i Integer) CompareTo(other Atom) (int8, error) {
 	if oi, ok := other.(Integer); ok {
-		return int8(int64(i) - int64(oi)), nil
+		ii := int64(i)
+		ioi := int64(oi)
+		if ii < ioi {
+			return -1, nil
+		} else if ii > ioi {
+			return 1, nil
+		}
+		return 0, nil
 	}
 	return 0, TypeMismatch
 }
@@ -386,7 +391,7 @@ func (i Integer) EqualTo(other Atom) (bool, error) {
 }
 
 func (i Integer) Eval() interface{} {
-	return i
+	return int64(i)
 }
 
 // IntegerValue returns the number as an Integer.
@@ -405,23 +410,28 @@ func (i Integer) String() string {
 type Float float64
 
 func NewFloat(val float64) Float {
+	// TODO: change this to take a string and do atof() on it
 	return Float(val)
 }
 
-func (f Float) Add(value interface{}) Number {
-	return nil // TODO: implement Float.Add()
+func (f Float) Add(value Number) Number {
+	vf := value.FloatValue()
+	return NewFloat(float64(f) + float64(vf))
 }
 
-func (f Float) Divide(divisor interface{}) Number {
-	return nil // TODO: implement Float.Divide()
+func (f Float) Divide(divisor Number) Number {
+	vf := divisor.FloatValue()
+	return NewFloat(float64(f) / float64(vf))
 }
 
-func (f Float) Multiply(muliplier interface{}) Number {
-	return nil // TODO: implement Float.Multiply()
+func (f Float) Multiply(muliplier Number) Number {
+	vf := muliplier.FloatValue()
+	return NewFloat(float64(f) * float64(vf))
 }
 
-func (f Float) Subtract(value interface{}) Number {
-	return nil // TODO: implement Float.Subtract()
+func (f Float) Subtract(value Number) Number {
+	vf := value.FloatValue()
+	return NewFloat(float64(f) - float64(vf))
 }
 
 func (f Float) CompareTo(other Atom) (int8, error) {
@@ -447,7 +457,7 @@ func (f Float) EqualTo(other Atom) (bool, error) {
 }
 
 func (f Float) Eval() interface{} {
-	return f
+	return float64(f)
 }
 
 // IntegerValue returns the number as an Integer.
