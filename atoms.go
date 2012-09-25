@@ -336,6 +336,8 @@ type Number interface {
 	Multiply(multiplier Number) Number
 	// Subtract the given value from this number and return a new number.
 	Subtract(value Number) Number
+	// ComplexValue returns the number as a Complex.
+	ComplexValue() Complex
 	// IntegerValue returns the number as an Integer.
 	IntegerValue() Integer
 	// FloatValue returns the number as an Float.
@@ -345,7 +347,6 @@ type Number interface {
 type Integer int64
 
 func NewInteger(val int64) Integer {
-	// TODO: change this to take a string and do atoi() on it
 	return Integer(val)
 }
 
@@ -394,7 +395,10 @@ func (i Integer) Eval() interface{} {
 	return int64(i)
 }
 
-// IntegerValue returns the number as an Integer.
+func (i Integer) ComplexValue() Complex {
+	return NewComplex(complex(float64(i), 0.0))
+}
+
 func (i Integer) IntegerValue() Integer {
 	return i
 }
@@ -410,7 +414,6 @@ func (i Integer) String() string {
 type Float float64
 
 func NewFloat(val float64) Float {
-	// TODO: change this to take a string and do atof() on it
 	return Float(val)
 }
 
@@ -460,7 +463,10 @@ func (f Float) Eval() interface{} {
 	return float64(f)
 }
 
-// IntegerValue returns the number as an Integer.
+func (f Float) ComplexValue() Complex {
+	return NewComplex(complex(f, 0.0))
+}
+
 func (f Float) IntegerValue() Integer {
 	return NewInteger(int64(f))
 }
@@ -473,6 +479,74 @@ func (f Float) String() string {
 	return fmt.Sprint(float64(f))
 }
 
-// TODO: add rational number type (Go has rational number support in math.big package)
+type Complex complex128
 
-// TODO: add complex number type
+func NewComplex(val complex128) Complex {
+	return Complex(val)
+}
+
+func (c Complex) Add(value Number) Number {
+	vc := value.ComplexValue()
+	return NewComplex(complex128(c) + complex128(vc))
+}
+
+func (c Complex) Divide(divisor Number) Number {
+	vc := divisor.ComplexValue()
+	return NewComplex(complex128(c) / complex128(vc))
+}
+
+func (c Complex) Multiply(muliplier Number) Number {
+	vc := muliplier.ComplexValue()
+	return NewComplex(complex128(c) * complex128(vc))
+}
+
+func (c Complex) Subtract(value Number) Number {
+	vc := value.ComplexValue()
+	return NewComplex(complex128(c) - complex128(vc))
+}
+
+func (c Complex) CompareTo(other Atom) (int8, error) {
+	if oc, ok := other.(Complex); ok {
+		cc := complex128(c)
+		occ := complex128(oc)
+		if cc == occ {
+			return 0, nil
+		} else if real(cc) > real(occ) {
+			return 1, nil
+		} else {
+			return -1, nil
+		}
+	}
+	return 0, TypeMismatch
+}
+
+func (c Complex) EqualTo(other Atom) (bool, error) {
+	if oc, ok := other.(Complex); ok {
+		return complex128(c) == complex128(oc), nil
+	}
+	return false, TypeMismatch
+}
+
+func (c Complex) Eval() interface{} {
+	return complex128(c)
+}
+
+func (c Complex) IntegerValue() Integer {
+	return NewInteger(int64(real(complex128(c))))
+}
+
+func (c Complex) FloatValue() Float {
+	return Float(real(complex128(c)))
+}
+
+func (c Complex) ComplexValue() Complex {
+	return c
+}
+
+func (c Complex) String() string {
+	// return the number without the parentheses
+	str := fmt.Sprint(complex128(c))
+	return str[1 : len(str)-1]
+}
+
+// TODO: add rational number type (Go has rational number support in math.big package)

@@ -154,7 +154,11 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 		}
 		return NewFloat(val), nil
 	case tokenComplex:
-		return atoc(t.val) // TODO: add new Number atom type
+		val, err := atoc(t.val)
+		if err != nil {
+			return nil, err
+		}
+		return NewComplex(val), nil
 	case tokenRational:
 		return ator(t.val) // TODO: add new Number atom type
 	case tokenBoolean:
@@ -315,16 +319,17 @@ func atoi(text string) (int64, LispError) {
 
 // atoc attempts to coerce the given text into a complex numeric value,
 // returning an error if unsuccessful.
-func atoc(text string) (interface{}, LispError) {
+func atoc(text string) (complex128, LispError) {
+	var zero complex128 = complex(0.0, 0.0)
 	if split := strings.IndexRune(text, '@'); split > 0 {
 		// <real R> @ <real R>
 		reel, err := atof(text[:split])
 		if err != nil {
-			return nil, err
+			return zero, err
 		}
 		imaj, err := atof(text[split+1:])
 		if err != nil {
-			return nil, err
+			return zero, err
 		}
 		return complex(reel, imaj), nil
 	} else {
@@ -335,7 +340,7 @@ func atoc(text string) (interface{}, LispError) {
 		split := strings.IndexAny(text, "+-")
 		if split == -1 {
 			// there must be a sign, otherwise lexer messed up
-			return nil, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
+			return zero, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
 		} else if split == 0 {
 			// see if there is a second sign
 			split = strings.IndexAny(text[1:], "+-") + 1
@@ -345,7 +350,7 @@ func atoc(text string) (interface{}, LispError) {
 		if split > 0 {
 			reel, err = atof(text[:split])
 			if err != nil {
-				return nil, err
+				return zero, err
 			}
 		} else {
 			reel = 0.0
@@ -359,7 +364,7 @@ func atoc(text string) (interface{}, LispError) {
 		} else {
 			imaj, err = atof(ip)
 			if err != nil {
-				return nil, err
+				return zero, err
 			}
 		}
 		return complex(reel, imaj), nil
