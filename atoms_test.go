@@ -442,3 +442,47 @@ func TestComplex(t *testing.T) {
 		t.Errorf("Complex.String() yield wrong result: %s", f.String())
 	}
 }
+
+func TestRational(t *testing.T) {
+	r := NewRational(1, 4)
+	// test EqualTo()
+	if _, err := r.EqualTo(Boolean(true)); err == nil {
+		t.Error("Rational.EqualTo() wrong type should fail")
+	}
+	if eq, err := r.EqualTo(NewRational(1, 4)); err != nil || !eq {
+		t.Error("Rational.EqualTo() same value should be true")
+	}
+	if eq, err := r.EqualTo(NewRational(1, 5)); err != nil || eq {
+		t.Error("Rational.EqualTo() different value should be false")
+	}
+	// test CompareTo()
+	if _, err := r.CompareTo(Boolean(true)); err == nil {
+		t.Error("Rational.CompareTo() wrong type should fail")
+	}
+	if cmp, err := r.CompareTo(NewRational(1, 4)); err != nil || cmp != 0 {
+		t.Error("Rational.CompareTo() same value should be zero")
+	}
+	if cmp, err := r.CompareTo(NewRational(1, 3)); err != nil || cmp >= 0 {
+		t.Error("Rational.CompareTo() greater value should be negative")
+	}
+	if cmp, err := r.CompareTo(NewRational(1, 5)); err != nil || cmp <= 0 {
+		t.Error("Rational.CompareTo() lesser value should be positive")
+	}
+	// test Add(), Divide(), Eval(), Multiply(), Subtract()
+	if num, ok := r.Add(NewRational(1, 4)).Eval().(float64); !ok || num != 0.5 {
+		t.Errorf("Rational.Add(1/4) yielded wrong result: %v", num)
+	}
+	if num, ok := r.Subtract(NewRational(1, 8)).Eval().(float64); !ok || num != 0.125 {
+		t.Errorf("Rational.Subtract(1/8) yielded wrong result: %v", num)
+	}
+	if num, ok := r.Multiply(NewRational(4, 1)).Eval().(float64); !ok || num != 1.0 {
+		t.Errorf("Rational.Multiply(4) yielded wrong result: %v", num)
+	}
+	if num, ok := r.Divide(NewRational(1, 3)).Eval().(float64); !ok || num != 0.75 {
+		t.Errorf("Rational.Divide(1/3) yielded wrong result: %v", num)
+	}
+	// test String()
+	if r.String() != "1/4" {
+		t.Errorf("Rational.String() yield wrong result: %s", r.String())
+	}
+}

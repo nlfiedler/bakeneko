@@ -69,10 +69,6 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 			buf.Truncate(buf.Len() - 1)
 		}
 		buf.WriteString(")")
-	case complex64, complex128: // TODO: convert to Atom, handle this there
-		// print the complex number without parens
-		str := fmt.Sprintf("%v", i)
-		buf.WriteString(str[1 : len(str)-1])
 	default:
 		// this handles Atom and Pair
 		fmt.Fprintf(buf, "%v", i)
@@ -160,7 +156,11 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 		}
 		return NewComplex(val), nil
 	case tokenRational:
-		return ator(t.val) // TODO: add new Number atom type
+		a, b, err := ator(t.val)
+		if err != nil {
+			return nil, err
+		}
+		return NewRational(a, b), nil
 	case tokenBoolean:
 		return NewBoolean(t.val), nil
 	case tokenCharacter:
@@ -373,21 +373,22 @@ func atoc(text string) (complex128, LispError) {
 }
 
 // ator attempts to coerce the given text into a rational numeric value,
-// returning an error if unsuccessful.
-func ator(text string) (interface{}, LispError) {
+// returning an error if unsuccessful. The numerator and denominator are
+// returned separately to faciliate conversion to a Rational.
+func ator(text string) (int64, int64, LispError) {
 	if split := strings.IndexRune(text, '/'); split > 0 {
 		num, err := atoi(text[:split])
 		if err != nil {
-			return nil, err
+			return 0, 0, err
 		}
 		denom, err := atoi(text[split+1:])
 		if err != nil {
-			return nil, err
+			return 0, 0, err
 		}
-		return float64(num) / float64(denom), nil
+		return num, denom, nil
 	} else {
 		// lexer messed up if this happens
-		return nil, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
+		return 0, 0, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
 	}
 	panic("unreachable code")
 }

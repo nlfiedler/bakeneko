@@ -214,13 +214,13 @@ func TestParseExprNumbers(t *testing.T) {
 	mapping["-4i"] = "0-4i"
 	mapping["+i"] = "0+1i"
 	mapping["-i"] = "0-1i"
-	mapping["1/1"] = "1"
-	mapping["1/2"] = "0.5"
-	mapping["1/3"] = "0.3333333333333333"
-	mapping["1/4"] = "0.25"
-	mapping["3/4"] = "0.75"
-	mapping["6/10"] = "0.6"
-	mapping["100/1000"] = "0.1"
+	mapping["1/1"] = "1/1"
+	mapping["1/2"] = "1/2"
+	mapping["1/3"] = "1/3"
+	mapping["1/4"] = "1/4"
+	mapping["3/4"] = "3/4"
+	mapping["6/10"] = "3/5"
+	mapping["100/1000"] = "1/10"
 	verifyParseMap(mapping, t)
 }
 

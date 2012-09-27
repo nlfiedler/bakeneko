@@ -9,6 +9,7 @@ package liswat
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"unicode/utf8"
 )
 
@@ -21,10 +22,14 @@ import (
 // evaluated to a value outside of the context of a specific environment.
 // These include strings, symbols, characters, and numbers.
 type Atom interface {
-	// CompareTo returns a negative integer, zero, or a positive integer
-	// as this object is less than, equal to, or greater than the
-	// specified object. An error is returned if the object is not of
-	// a suitable type for comparison.
+	// CompareTo other to this atom and returns:
+	//
+	//   -1 if this <  other
+	//    0 if this == other
+	//    1 if this >  other
+	//
+	// An error is returned if the object is not of a suitable type for
+	// comparison.
 	CompareTo(other Atom) (int8, error)
 	// EqualTo returns true if the values of this atom and the specified
 	// object are equal, false otherwise. An error is returned if the
@@ -342,6 +347,8 @@ type Number interface {
 	IntegerValue() Integer
 	// FloatValue returns the number as an Float.
 	FloatValue() Float
+	// RationalValue returns the number as a Rational.
+	RationalValue() Rational
 }
 
 type Integer int64
@@ -405,6 +412,10 @@ func (i Integer) IntegerValue() Integer {
 
 func (i Integer) FloatValue() Float {
 	return NewFloat(float64(i))
+}
+
+func (i Integer) RationalValue() Rational {
+	return NewRational(int64(i), 1)
 }
 
 func (i Integer) String() string {
@@ -475,6 +486,10 @@ func (f Float) FloatValue() Float {
 	return f
 }
 
+func (f Float) RationalValue() Rational {
+	return NewRational(int64(f), 1)
+}
+
 func (f Float) String() string {
 	return fmt.Sprint(float64(f))
 }
@@ -543,10 +558,102 @@ func (c Complex) ComplexValue() Complex {
 	return c
 }
 
+func (c Complex) RationalValue() Rational {
+	return NewRational(int64(real(complex128(c))), 1)
+}
+
 func (c Complex) String() string {
 	// return the number without the parentheses
 	str := fmt.Sprint(complex128(c))
 	return str[1 : len(str)-1]
 }
 
-// TODO: add rational number type (Go has rational number support in math.big package)
+type Rational interface {
+	Number
+	// BigRat returns the actual math/big/Rat instance.
+	BigRat() *big.Rat
+}
+
+type rational struct {
+	*big.Rat
+}
+
+func NewRational(a, b int64) Rational {
+	return &rational{big.NewRat(a, b)}
+}
+
+func fromRational(a *big.Rat) Rational {
+	return &rational{a}
+}
+
+func (r *rational) BigRat() *big.Rat {
+	return r.Rat
+}
+
+func (r *rational) Add(value Number) Number {
+	vr := value.RationalValue()
+	rat := big.NewRat(1, 1)
+	rat.Add(r.Rat, vr.BigRat())
+	return fromRational(rat)
+}
+
+func (r *rational) Divide(divisor Number) Number {
+	vr := divisor.RationalValue()
+	rat := big.NewRat(1, 1)
+	rat.Quo(r.Rat, vr.BigRat())
+	return fromRational(rat)
+}
+
+func (r *rational) Multiply(muliplier Number) Number {
+	vr := muliplier.RationalValue()
+	rat := big.NewRat(1, 1)
+	rat.Mul(r.Rat, vr.BigRat())
+	return fromRational(rat)
+}
+
+func (r *rational) Subtract(value Number) Number {
+	vr := value.RationalValue()
+	rat := big.NewRat(1, 1)
+	rat.Sub(r.Rat, vr.BigRat())
+	return fromRational(rat)
+}
+
+func (r *rational) CompareTo(other Atom) (int8, error) {
+	if or, ok := other.(Rational); ok {
+		return int8(r.Cmp(or.BigRat())), nil
+	}
+	return 0, TypeMismatch
+}
+
+func (r *rational) EqualTo(other Atom) (bool, error) {
+	if or, ok := other.(Rational); ok {
+		return r.Cmp(or.BigRat()) == 0, nil
+	}
+	return false, TypeMismatch
+}
+
+func (r *rational) Eval() interface{} {
+	return r.toFloat()
+}
+
+func (r *rational) toFloat() float64 {
+	num := r.Num().Int64()
+	denom := r.Denom().Int64()
+	return float64(num) / float64(denom)
+}
+
+func (r *rational) IntegerValue() Integer {
+	return NewInteger(int64(r.toFloat()))
+}
+
+func (r *rational) FloatValue() Float {
+	return Float(r.toFloat())
+}
+
+func (r *rational) ComplexValue() Complex {
+	return NewComplex(complex(r.toFloat(), 0.0))
+}
+
+func (r *rational) RationalValue() Rational {
+	return r
+}
