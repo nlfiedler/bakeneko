@@ -22,7 +22,7 @@ import (
 // evaluated to a value outside of the context of a specific environment.
 // These include strings, symbols, characters, and numbers.
 type Atom interface {
-	// CompareTo other to this atom and returns:
+	// CompareTo compares other to this atom and returns:
 	//
 	//   -1 if this <  other
 	//    0 if this == other
@@ -422,6 +422,10 @@ func (i Integer) String() string {
 	return fmt.Sprint(int64(i))
 }
 
+func (i Integer) ToInteger() int64 {
+	return int64(i)
+}
+
 type Float float64
 
 func NewFloat(val float64) Float {
@@ -492,6 +496,10 @@ func (f Float) RationalValue() Rational {
 
 func (f Float) String() string {
 	return fmt.Sprint(float64(f))
+}
+
+func (f Float) ToFloat() float64 {
+	return float64(f)
 }
 
 type Complex complex128
@@ -566,6 +574,20 @@ func (c Complex) String() string {
 	// return the number without the parentheses
 	str := fmt.Sprint(complex128(c))
 	return str[1 : len(str)-1]
+}
+
+func (c Complex) ToComplex() complex128 {
+	return complex128(c)
+}
+
+// RealPart returns the floating-point real part of the complex number.
+func (c Complex) RealPart() float64 {
+	return real(complex128(c))
+}
+
+// ImagPart returns the floating-point imaginary part of the complex number.
+func (c Complex) ImagPart() float64 {
+	return imag(complex128(c))
 }
 
 type Rational interface {

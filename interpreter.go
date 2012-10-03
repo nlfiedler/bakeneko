@@ -103,6 +103,18 @@ func newNullEnvironment() Environment {
 	mapping := make(map[Symbol]interface{})
 	mapping[Symbol("append")] = NewBuiltin(builtinAppend)
 	mapping[Symbol("cons")] = NewBuiltin(builtinCons)
+	mapping[Symbol("number?")] = NewBuiltin(builtinIsNumber)
+	mapping[Symbol("complex?")] = NewBuiltin(builtinIsComplex)
+	mapping[Symbol("real?")] = NewBuiltin(builtinIsReal)
+	mapping[Symbol("rational?")] = NewBuiltin(builtinIsRational)
+	mapping[Symbol("integer?")] = NewBuiltin(builtinIsInteger)
+	mapping[Symbol("exact?")] = NewBuiltin(builtinIsExact)
+	mapping[Symbol("inexact?")] = NewBuiltin(builtinIsInexact)
+	mapping[Symbol("=")] = NewBuiltin(builtinIsEqual)
+	mapping[Symbol("<")] = NewBuiltin(builtinIsLess)
+	mapping[Symbol("<=")] = NewBuiltin(builtinIsLessEqual)
+	mapping[Symbol(">")] = NewBuiltin(builtinIsGreater)
+	mapping[Symbol(">=")] = NewBuiltin(builtinIsGreaterEqual)
 	// TODO: add the syntactic bindings for all syntactic keywords in r5rs
 	ne := NewRestrictedEnvironment(nil, mapping)
 	return ne

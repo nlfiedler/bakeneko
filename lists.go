@@ -15,7 +15,7 @@ package liswat
 func builtinCons(args []interface{}) (interface{}, LispError) {
 	if len(args) != 2 {
 		return nil, NewLispErrorf(EARGUMENT,
-			"cons() called with %d argument(s), requires two arguments", len(args))
+			"cons called with %d argument(s), requires two arguments", len(args))
 	}
 	return Cons(args[0], args[1]), nil
 }

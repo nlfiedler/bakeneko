@@ -11,9 +11,10 @@ import (
 	"fmt"
 )
 
-var TypeMismatch = errors.New("liswat: type mismatch in atom comparison")
+var NumberOutOfRange = errors.New("liswat: number value of out range")
 var OutOfBounds = errors.New("liswat: index out of bounds")
 var ParserError = errors.New("liswat: unexpected parser error")
+var TypeMismatch = errors.New("liswat: type mismatch in atom comparison")
 
 // ErrorCode indicates the error status of the Scheme evaluation, with EOK
 // representing no error.
