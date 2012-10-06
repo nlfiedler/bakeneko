@@ -367,6 +367,12 @@ func (i Integer) Divide(divisor Number) Number {
 	return NewInteger(int64(i) / int64(vi))
 }
 
+// Mod finds the remainder of dividing this number by the argument.
+func (i Integer) Mod(modulus Integer) Integer {
+	vi := modulus.IntegerValue()
+	return NewInteger(int64(i) % int64(vi))
+}
+
 func (i Integer) Multiply(muliplier Number) Number {
 	vi := muliplier.IntegerValue()
 	return NewInteger(int64(i) * int64(vi))
@@ -655,6 +661,9 @@ func (r *rational) EqualTo(other Atom) (bool, error) {
 }
 
 func (r *rational) Eval() interface{} {
+	if r.Denom().Int64() == 1 {
+		return r.Num().Int64()
+	}
 	return r.toFloat()
 }
 
@@ -678,4 +687,8 @@ func (r *rational) ComplexValue() Complex {
 
 func (r *rational) RationalValue() Rational {
 	return r
+}
+
+func (r *rational) String() string {
+	return r.RatString()
 }

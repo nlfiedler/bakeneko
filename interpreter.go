@@ -103,6 +103,7 @@ func newNullEnvironment() Environment {
 	mapping := make(map[Symbol]interface{})
 	mapping[Symbol("append")] = NewBuiltin(builtinAppend)
 	mapping[Symbol("cons")] = NewBuiltin(builtinCons)
+	// number support
 	mapping[Symbol("number?")] = NewBuiltin(builtinIsNumber)
 	mapping[Symbol("complex?")] = NewBuiltin(builtinIsComplex)
 	mapping[Symbol("real?")] = NewBuiltin(builtinIsReal)
@@ -115,6 +116,17 @@ func newNullEnvironment() Environment {
 	mapping[Symbol("<=")] = NewBuiltin(builtinIsLessEqual)
 	mapping[Symbol(">")] = NewBuiltin(builtinIsGreater)
 	mapping[Symbol(">=")] = NewBuiltin(builtinIsGreaterEqual)
+	mapping[Symbol("zero?")] = NewBuiltin(builtinIsZero)
+	mapping[Symbol("positive?")] = NewBuiltin(builtinIsPositive)
+	mapping[Symbol("negative?")] = NewBuiltin(builtinIsNegative)
+	mapping[Symbol("odd?")] = NewBuiltin(builtinIsOdd)
+	mapping[Symbol("even?")] = NewBuiltin(builtinIsEven)
+	mapping[Symbol("max")] = NewBuiltin(builtinMax)
+	mapping[Symbol("min")] = NewBuiltin(builtinMin)
+	mapping[Symbol("+")] = NewBuiltin(builtinAdd)
+	mapping[Symbol("-")] = NewBuiltin(builtinSubtract)
+	mapping[Symbol("*")] = NewBuiltin(builtinMultiply)
+	mapping[Symbol("/")] = NewBuiltin(builtinDivide)
 	// TODO: add the syntactic bindings for all syntactic keywords in r5rs
 	ne := NewRestrictedEnvironment(nil, mapping)
 	return ne

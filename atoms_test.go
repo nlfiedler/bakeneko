@@ -475,7 +475,7 @@ func TestRational(t *testing.T) {
 	if num, ok := r.Subtract(NewRational(1, 8)).Eval().(float64); !ok || num != 0.125 {
 		t.Errorf("Rational.Subtract(1/8) yielded wrong result: %v", num)
 	}
-	if num, ok := r.Multiply(NewRational(4, 1)).Eval().(float64); !ok || num != 1.0 {
+	if num, ok := r.Multiply(NewRational(4, 1)).Eval().(int64); !ok || num != 1 {
 		t.Errorf("Rational.Multiply(4) yielded wrong result: %v", num)
 	}
 	if num, ok := r.Divide(NewRational(1, 3)).Eval().(float64); !ok || num != 0.75 {

@@ -344,14 +344,16 @@ func lexIdentifier(l *lexer) stateFn {
 		return lexStart
 
 	} else if r == '+' || r == '-' {
-		// +/- must be whitespace delimited to be a identifier
+		// +/- must be "whitespace" delimited to be a identifier, which means
+		// the next token must either be the beginning of a number, or whitespace,
+		// or a closing parenthesis
 		r = l.peek()
 		if unicode.IsDigit(r) || r == 'i' || r == 'I' {
 			l.rewind()
 			return lexNumber
 		}
-		if !l.accept(" \t\r\n") {
-			// period must be whitespace delimited to be a identifier
+		if !l.accept(" \t\r\n)") {
+			// +/- must be "whitespace" delimited to be a identifier
 			return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
 		}
 		l.backup()

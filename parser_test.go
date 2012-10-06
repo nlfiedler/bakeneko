@@ -214,7 +214,7 @@ func TestParseExprNumbers(t *testing.T) {
 	mapping["-4i"] = "0-4i"
 	mapping["+i"] = "0+1i"
 	mapping["-i"] = "0-1i"
-	mapping["1/1"] = "1/1"
+	mapping["1/1"] = "1"
 	mapping["1/2"] = "1/2"
 	mapping["1/3"] = "1/3"
 	mapping["1/4"] = "1/4"
