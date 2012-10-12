@@ -413,3 +413,20 @@ func TestBuiltinDivide(t *testing.T) {
 	inputs[`(/ 1 0)`] = "division by zero"
 	verifyInterpretError(t, inputs)
 }
+
+func TestBuiltinAbs(t *testing.T) {
+	inputs := make(map[string]string)
+	inputs[`(abs 3)`] = `3`
+	inputs[`(abs -3)`] = `3`
+	inputs[`(abs -0.1)`] = `0.1`
+	inputs[`(abs 0.1)`] = `0.1`
+	inputs[`(abs -1/5)`] = `1/5`
+	inputs[`(abs 1/5)`] = `1/5`
+	verifyInterpret(t, inputs)
+	inputs = make(map[string]string)
+	inputs[`(abs)`] = "takes only one"
+	inputs[`(abs 3 3)`] = "takes only one"
+	inputs[`(abs 'a)`] = "numeric argument"
+	inputs[`(abs -1.0+0.5i)`] = "complex types"
+	verifyInterpretError(t, inputs)
+}

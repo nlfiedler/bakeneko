@@ -490,4 +490,30 @@ func builtinDivide(args []interface{}) (val interface{}, err LispError) {
 	return
 }
 
+// builtinAbs implements the abs procedure.
+func builtinAbs(args []interface{}) (interface{}, LispError) {
+	if len(args) != 1 {
+		return nil, NewLispErrorf(EARGUMENT,
+			"abs called with %d argument(s), takes only one", len(args))
+	}
+	num, is_num := args[0].(Number)
+	if !is_num {
+		return nil, NewLispError(EARGUMENT, "abs requires a numeric argument")
+	}
+	if _, is_cmplx := num.(Complex); is_cmplx {
+		return nil, NewLispError(EARGUMENT, "abs cannot operate on complex types")
+	}
+	var zero Number = NewInteger(0)
+	// do the coercion once since we may need it again
+	zero, num = coerceNumbers(zero, num)
+	cmp, err := compareNumbers(zero, num)
+	if err != nil {
+		return nil, NewLispError(EARGUMENT, err.Error())
+	}
+	if cmp > 0 {
+		num = zero.Subtract(num)
+	}
+	return num, nil
+}
+
 // TODO: finish the remaining number predicates and procedures from section 6.2
