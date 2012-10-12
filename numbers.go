@@ -516,4 +516,23 @@ func builtinAbs(args []interface{}) (interface{}, LispError) {
 	return num, nil
 }
 
+// builtinQuotient implements the quotient procedure.
+func builtinQuotient(args []interface{}) (val interface{}, err LispError) {
+	if len(args) != 2 {
+		return nil, NewLispError(EARGUMENT, "quotient requires two arguments")
+	}
+	dividend, ok := args[0].(Integer)
+	if !ok {
+		return nil, NewLispError(EARGUMENT, "quotient requires integer arguments")
+	}
+	divisor, ok := args[1].(Integer)
+	if !ok {
+		return nil, NewLispError(EARGUMENT, "quotient requires integer arguments")
+	}
+	if divisor.ToInteger() == 0 {
+		return nil, NewLispError(EARGUMENT, "division by zero")
+	}
+	return dividend.Divide(divisor), nil
+}
+
 // TODO: finish the remaining number predicates and procedures from section 6.2

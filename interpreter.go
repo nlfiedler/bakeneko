@@ -128,6 +128,7 @@ func newNullEnvironment() Environment {
 	mapping[Symbol("*")] = NewBuiltin(builtinMultiply)
 	mapping[Symbol("/")] = NewBuiltin(builtinDivide)
 	mapping[Symbol("abs")] = NewBuiltin(builtinAbs)
+	mapping[Symbol("quotient")] = NewBuiltin(builtinQuotient)
 	// TODO: add the syntactic bindings for all syntactic keywords in r5rs
 	ne := NewRestrictedEnvironment(nil, mapping)
 	return ne

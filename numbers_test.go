@@ -430,3 +430,22 @@ func TestBuiltinAbs(t *testing.T) {
 	inputs[`(abs -1.0+0.5i)`] = "complex types"
 	verifyInterpretError(t, inputs)
 }
+
+func TestBuiltinQuotient(t *testing.T) {
+	inputs := make(map[string]string)
+	inputs[`(quotient 5 2)`] = `2`
+	inputs[`(quotient 4 2)`] = `2`
+	inputs[`(quotient 1 2)`] = `0`
+	inputs[`(quotient 4 5)`] = `0`
+	inputs[`(quotient 5 4)`] = `1`
+	verifyInterpret(t, inputs)
+	inputs = make(map[string]string)
+	inputs[`(quotient)`] = "two arguments"
+	inputs[`(quotient 4)`] = "two arguments"
+	inputs[`(quotient 'a 4)`] = "integer arguments"
+	inputs[`(quotient 4 'b)`] = "integer arguments"
+	inputs[`(quotient 3.0 4)`] = "integer arguments"
+	inputs[`(quotient 4 3.0)`] = "integer arguments"
+	inputs[`(quotient 1 0)`] = "division by zero"
+	verifyInterpretError(t, inputs)
+}
