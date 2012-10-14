@@ -220,6 +220,8 @@ func TestLexerNumbers(t *testing.T) {
 	input["0"] = tokenInteger
 	input["0.1"] = tokenFloat
 	input["1.00"] = tokenFloat
+	// XXX: weird case, returns as tokenFloat '0.0'
+	// input["0.0.0"] = tokenFloat
 	input["123"] = tokenInteger
 	input["6e4"] = tokenFloat
 	input["7.91e+16"] = tokenFloat

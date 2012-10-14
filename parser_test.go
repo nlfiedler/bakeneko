@@ -192,6 +192,8 @@ func TestParseExprNumbers(t *testing.T) {
 	mapping["6e4"] = "60000"
 	mapping["12345"] = "12345"
 	mapping["2.1"] = "2.1"
+	// weird test case, parses as float 0.0 but test ignores the rest
+	mapping["0.0.0"] = "0"
 	mapping["3."] = "3"
 	mapping["7.91e+16"] = "7.91e+16"
 	mapping[".000001"] = "1e-06"
