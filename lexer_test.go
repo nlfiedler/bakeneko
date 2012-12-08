@@ -18,15 +18,11 @@ type expectedLexerResult struct {
 	val string
 }
 
-type expectedLexerError struct {
-	err string // expected error message substring
-	msg string // explanation of error condition
-}
-
 // verifyLexerResults calls lex() and checks that the resulting tokens
 // match the expected results.
 func verifyLexerResults(t *testing.T, input string, expected []expectedLexerResult) {
 	c := lex("unit", input)
+	failed := false
 	for i, e := range expected {
 		tok, ok := <-c
 		if !ok {
@@ -34,9 +30,15 @@ func verifyLexerResults(t *testing.T, input string, expected []expectedLexerResu
 		}
 		if tok.typ != e.typ {
 			t.Errorf("expected %d, got %d for '%s' (token %d)", e.typ, tok.typ, e.val, i)
+			failed = true
 		}
 		if tok.val != e.val {
 			t.Errorf("expected '%s', got '%s' (token %d, type %d)", e.val, tok.val, i, e.typ)
+			failed = true
+		}
+		// stop now since the rest of the inputs will also fail anyway
+		if failed {
+			break
 		}
 	}
 	drainLexer(c)
@@ -63,7 +65,7 @@ func verifyLexerResultsMap(t *testing.T, expected map[string]tokenType) {
 
 // verifyLexerErrors calls lex() and checks that the resulting tokens
 // resulted in an error, and (optionally) verifies the error message.
-func verifyLexerErrors(t *testing.T, input map[string]expectedLexerError) {
+func verifyLexerErrors(t *testing.T, input map[string]string) {
 	for i, e := range input {
 		c := lex("unit", i)
 		tok, ok := <-c
@@ -71,10 +73,10 @@ func verifyLexerErrors(t *testing.T, input map[string]expectedLexerError) {
 			t.Errorf("lexer channel closed?")
 		}
 		if tok.typ != tokenError {
-			t.Errorf("expected '%s' to fail with '%s'", i, e.err)
+			t.Errorf("expected '%s' to fail with '%s'", i, e)
 		}
-		if len(e.err) > 0 && !strings.Contains(tok.val, e.err) {
-			t.Errorf("expected '%s' but got '%s'(%d) for input '%s'", e.err, tok.val, tok.typ, i)
+		if len(e) > 0 && !strings.Contains(tok.val, e) {
+			t.Errorf("expected '%s' but got '%s'(%d) for input '%s'", e, tok.val, tok.typ, i)
 		}
 		drainLexer(c)
 	}
@@ -84,8 +86,29 @@ func TestLexerComments(t *testing.T) {
 	input := `; foo
 ; bar baz
 ; quux
+(foo 1 2)
+#| hey diddle diddle
+   #| the cat and the fiddle |#
+   the cow jumped over the moon |#
+(bar 3 4)
+#; (quote 1)
 `
 	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenOpenParen, "("})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "foo"})
+	expected = append(expected, expectedLexerResult{tokenInteger, "1"})
+	expected = append(expected, expectedLexerResult{tokenInteger, "2"})
+	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
+	expected = append(expected, expectedLexerResult{tokenOpenParen, "("})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "bar"})
+	expected = append(expected, expectedLexerResult{tokenInteger, "3"})
+	expected = append(expected, expectedLexerResult{tokenInteger, "4"})
+	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
+	expected = append(expected, expectedLexerResult{tokenComment, "#;"})
+	expected = append(expected, expectedLexerResult{tokenOpenParen, "("})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "quote"})
+	expected = append(expected, expectedLexerResult{tokenInteger, "1"})
+	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
 	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
@@ -153,8 +176,8 @@ func TestLexerFactorial(t *testing.T) {
 }
 
 func TestLexerUnclosedQuotes(t *testing.T) {
-	input := make(map[string]expectedLexerError)
-	input[`"foo`] = expectedLexerError{"unclosed quoted string", "unclosed quote should fail"}
+	input := make(map[string]string)
+	input[`"foo`] = "unclosed quoted string"
 	verifyLexerErrors(t, input)
 }
 
@@ -192,6 +215,27 @@ func TestLexerCharacters(t *testing.T) {
 	verifyLexerResults(t, input, expected)
 }
 
+func TestLexerBooleans(t *testing.T) {
+	input := "#t #f #true #false"
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenBoolean, "#t"})
+	expected = append(expected, expectedLexerResult{tokenBoolean, "#f"})
+	expected = append(expected, expectedLexerResult{tokenBoolean, "#true"})
+	expected = append(expected, expectedLexerResult{tokenBoolean, "#false"})
+	verifyLexerResults(t, input, expected)
+}
+
+func TestLexerBadBooleans(t *testing.T) {
+	input := make(map[string]string)
+	input["#truu"] = "invalid boolean"
+	input["#Falsa"] = "invalid boolean"
+	input["#Tree"] = "invalid boolean"
+	input["#falls"] = "invalid boolean"
+	input["#Fawlty"] = "invalid boolean"
+	input["#Trooper"] = "invalid boolean"
+	verifyLexerErrors(t, input)
+}
+
 func TestLexerVector(t *testing.T) {
 	input := "'#(1 2 3)"
 	expected := make([]expectedLexerResult, 0)
@@ -205,12 +249,12 @@ func TestLexerVector(t *testing.T) {
 }
 
 func TestLexerBadCharacter(t *testing.T) {
-	input := make(map[string]expectedLexerError)
-	input["#\\abc"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
-	input["#\\0"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
-	input["#\\a1"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
-	input["#\\nw"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
-	input["#\\sa"] = expectedLexerError{"malformed character escape", "invalid char escape should fail"}
+	input := make(map[string]string)
+	input["#\\abc"] = "malformed character escape"
+	input["#\\0"] = "malformed character escape"
+	input["#\\a1"] = "malformed character escape"
+	input["#\\nw"] = "malformed character escape"
+	input["#\\sa"] = "malformed character escape"
 	verifyLexerErrors(t, input)
 }
 
@@ -254,61 +298,69 @@ func TestLexerNumbers(t *testing.T) {
 }
 
 func TestLexerBadNumbers(t *testing.T) {
-	input := make(map[string]expectedLexerError)
-	input["0.a"] = expectedLexerError{"malformed number", "invalid number should fail"}
-	input["0a"] = expectedLexerError{"malformed number", "invalid number should fail"}
-	input["#dabc"] = expectedLexerError{"malformed number", "invalid number should fail"}
-	input["#o888"] = expectedLexerError{"malformed number", "invalid number should fail"}
-	input["#b123"] = expectedLexerError{"malformed number", "invalid number should fail"}
-	input["#xzyw"] = expectedLexerError{"malformed number", "invalid number should fail"}
-	input["#b#b00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#d#d00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#e#e00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#i#i00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#o#o00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#x#x00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#b#d00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#b#o00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#b#x00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#d#d00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#d#o00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#d#x00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#o#b00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#o#d00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#o#x00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#x#b00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#x#d00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#x#o00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#e#i00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
-	input["#i#e00"] = expectedLexerError{"malformed number prefix", "invalid number prefix should fail"}
+	input := make(map[string]string)
+	input["0.a"] = "malformed number"
+	input["0a"] = "malformed number"
+	input["#dabc"] = "malformed number"
+	input["#o888"] = "malformed number"
+	input["#b123"] = "malformed number"
+	input["#xzyw"] = "malformed number"
+	input["#b#b00"] = "malformed number prefix"
+	input["#d#d00"] = "malformed number prefix"
+	input["#e#e00"] = "malformed number prefix"
+	input["#i#i00"] = "malformed number prefix"
+	input["#o#o00"] = "malformed number prefix"
+	input["#x#x00"] = "malformed number prefix"
+	input["#b#d00"] = "malformed number prefix"
+	input["#b#o00"] = "malformed number prefix"
+	input["#b#x00"] = "malformed number prefix"
+	input["#d#d00"] = "malformed number prefix"
+	input["#d#o00"] = "malformed number prefix"
+	input["#d#x00"] = "malformed number prefix"
+	input["#o#b00"] = "malformed number prefix"
+	input["#o#d00"] = "malformed number prefix"
+	input["#o#x00"] = "malformed number prefix"
+	input["#x#b00"] = "malformed number prefix"
+	input["#x#d00"] = "malformed number prefix"
+	input["#x#o00"] = "malformed number prefix"
+	input["#e#i00"] = "malformed number prefix"
+	input["#i#e00"] = "malformed number prefix"
 	verifyLexerErrors(t, input)
 }
 
 func TestLexerIdentifiers(t *testing.T) {
-	input := "lambda list->vector q soup V17a + <=? a34kTMNs the-word-recursion-has-many-meanings - . ... "
+	input := `lambda q list->vector +soup+ + V17a <=? a34kTMNs |two words|
+ two\x20;words the-word-recursion-has-many-meanings - . ... || |foo @#$! bar|`
 	expected := make([]expectedLexerResult, 0)
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "lambda"})
-	expected = append(expected, expectedLexerResult{tokenIdentifier, "list->vector"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "q"})
-	expected = append(expected, expectedLexerResult{tokenIdentifier, "soup"})
-	expected = append(expected, expectedLexerResult{tokenIdentifier, "V17a"})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "list->vector"})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "+soup+"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "+"})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "V17a"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "<=?"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "a34kTMNs"})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "|two words|"})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, `two words`})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "the-word-recursion-has-many-meanings"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "-"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "."})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "..."})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "||"})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "|foo @#$! bar|"})
 	verifyLexerResults(t, input, expected)
 }
 
 func TestLexerBadIdentifiers(t *testing.T) {
-	input := make(map[string]expectedLexerError)
-	input[".a"] = expectedLexerError{"malformed identifier", "invalid identifier should fail"}
-	input["+a"] = expectedLexerError{"malformed identifier", "invalid identifier should fail"}
-	input["-a"] = expectedLexerError{"malformed identifier", "invalid identifier should fail"}
-	input[".. "] = expectedLexerError{"malformed identifier", "invalid identifier should fail"}
-	input["...a"] = expectedLexerError{"malformed identifier", "invalid identifier should fail"}
-	input[".... "] = expectedLexerError{"malformed identifier", "invalid identifier should fail"}
+	input := make(map[string]string)
+	input[".a"] = "malformed identifier"
+	input[".. "] = "malformed identifier"
+	input["...a"] = "malformed identifier"
+	input[".... "] = "malformed identifier"
+	input["a\\xXYZ;"] = "invalid number"
+	input["a|b"] = "invalid subsequent character"
+	input["a\\bc"] = "missing 'x' after '\\'"
+	input["|no\\allowed|"] = "not allowed in identifier"
+	input["@no"] = "character not allowed to start identifier"
 	verifyLexerErrors(t, input)
 }

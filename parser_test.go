@@ -57,16 +57,11 @@ func verifyExpandError(t *testing.T, expected map[string]expectedExpandError) {
 // parseExpr parses a Lisp expression and returns the result, which may
 // be a string, number, symbol, or a list of expressions.
 func parseExpr(expr string) (interface{}, LispError) {
-	c := lex("parseExpr", expr)
-	t, ok := <-c
-	if !ok {
-		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+	result, err := parse(expr)
+	if err != nil {
+		return nil, err
 	}
-	defer drainLexer(c)
-	if t.typ == tokenEOF {
-		return eofObject, nil
-	}
-	return parserRead(t, c)
+	return result.First(), nil
 }
 
 func verifyParse(input, expected string, t *testing.T) {
@@ -120,8 +115,8 @@ func TestParseExprNestedList(t *testing.T) {
 }
 
 func TestParseExprBoolean(t *testing.T) {
-	input := "( #t #f )"
-	expected := "(#t #f)"
+	input := "( #t #f #true #false )"
+	expected := "(#t #f #t #f)"
 	verifyParse(input, expected, t)
 }
 
@@ -154,6 +149,13 @@ func TestParseQuotes(t *testing.T) {
 	// TODO: support `#() vector quasi-quoting
 	// mapping["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] =
 	// 	"(quasiquote #(10 5 (unquote (sqrt 4)) (unquote-splicing (map sqrt (quote (16 9)))) 8))"
+	verifyParseMap(mapping, t)
+}
+
+func TestParseComments(t *testing.T) {
+	mapping := make(map[string]string)
+	mapping["#;(foo 'x)"] = ""
+	// TODO: add more test cases
 	verifyParseMap(mapping, t)
 }
 

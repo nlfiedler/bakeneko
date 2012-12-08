@@ -87,6 +87,16 @@ func parse(expr string) (Pair, LispError) {
 		if !ok || t.typ == tokenEOF {
 			return results, nil
 		}
+		if t.typ == tokenComment {
+			// ignore the next datum (r7rs 7.1.2)
+			t, ok = <-c
+			// TODO: if nothing left, then we're done
+			if !ok {
+				return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+			}
+			parserRead(t, c)
+			// then continue on as usual
+		}
 		elem, err := parserRead(t, c)
 		if err != nil {
 			return nil, err
@@ -119,7 +129,11 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 	case tokenEOF:
 		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	case tokenOpenParen:
-		return parseNextPair(c)
+		t, ok := <-c
+		if !ok {
+			return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+		}
+		return parserReadPair(t, c)
 	case tokenStartVector:
 		slice := make([]interface{}, 0, 16)
 		for t = range c {
@@ -189,19 +203,13 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 		}
 		return NewList(quote, pair), nil
 	case tokenIdentifier:
+		// TODO: if #!fold-case enabled, then lower, else not
 		return Symbol(strings.ToLower(t.val)), nil
+		// case tokenComment:
+		// 	// TODO: is this appropriate? maybe tests should not call parserRead()
+		// 	return "", nil
 	}
 	panic("unreachable code")
-}
-
-// parseNextPair reads a token from the channel and calls parserReadPair. This
-// function assumes that the previous token was an open parenthesis.
-func parseNextPair(c chan token) (interface{}, LispError) {
-	t, ok := <-c
-	if !ok {
-		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
-	}
-	return parserReadPair(t, c)
 }
 
 // parserReadPair expects to read the contents of a list, whether a proper

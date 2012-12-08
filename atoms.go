@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -48,10 +49,11 @@ type Boolean bool
 // (e.g. "#t", "#T", "#f", and "#F") and constructs a new Boolean atom. If val
 // does not represent a boolean value then panic ensues.
 func NewBoolean(val string) Boolean {
-	if val == "#t" || val == "#T" {
+	// lexer validated token is authentic boolean, just need value
+	lower := strings.ToLower(val)
+	if lower == "#t" || lower == "#true" {
 		return Boolean(true)
-	} else if val == "#f" || val == "#F" {
-		// lexer already validated that it is #f or #F
+	} else if val == "#f" || val == "#false" {
 		return Boolean(false)
 	}
 	panic(fmt.Sprintf("lexer/parser bug: '%s' is not boolean", val))

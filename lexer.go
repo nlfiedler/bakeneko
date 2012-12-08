@@ -12,7 +12,9 @@ package liswat
 //
 
 import (
+	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -28,6 +30,7 @@ const eof = unicode.UpperLower
 const (
 	_                tokenType = iota // undefined
 	tokenError                        // error occurred
+	tokenComment                      // #; comment of next datum
 	tokenString                       // string literal
 	tokenQuote                        // quoted list
 	tokenCharacter                    // character literal
@@ -156,9 +159,14 @@ func (l *lexer) run() {
 	close(l.tokens) // No more tokens will be delivered.
 }
 
-// emit passes a token back to the client via the channel.
+// emit passes the current token back to the client via the channel.
 func (l *lexer) emit(t tokenType) {
-	l.tokens <- token{t, l.input[l.start:l.pos]}
+	l.emitText(t, l.input[l.start:l.pos])
+}
+
+// emitText passes the given token back to the client via the channel.
+func (l *lexer) emitText(t tokenType, text string) {
+	l.tokens <- token{t, text}
 	l.start = l.pos
 }
 
@@ -193,8 +201,11 @@ func (l *lexer) rewind() {
 
 // peek returns but does not consume the next rune in the input.
 func (l *lexer) peek() rune {
+	// save the width so that backup after peek works correctly
+	w := l.width
 	r := l.next()
 	l.backup()
+	l.width = w
 	return r
 }
 
@@ -219,10 +230,7 @@ func (l *lexer) acceptRun(valid string) bool {
 // errorf returns an error token and terminates the scan by passing back
 // a nil pointer that will be the next state.
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
-	l.tokens <- token{
-		tokenError,
-		fmt.Sprintf(format, args...),
-	}
+	l.emitText(tokenError, fmt.Sprintf(format, args...))
 	return lexStart
 }
 
@@ -255,7 +263,7 @@ func lexStart(l *lexer) stateFn {
 		return lexHash
 	case '\'', '`', ',':
 		return lexQuote
-	case '[', ']', '{', '}', '|':
+	case '[', ']', '{', '}':
 		return l.errorf("use of reserved character: %c", r)
 	default:
 		// let lexIdentifier sort out what exactly this is
@@ -302,10 +310,37 @@ func lexComment(l *lexer) stateFn {
 		r := l.next()
 		switch r {
 		case eof, '\n', '\r':
-			// whitespace after comment is significant (r5rs 2.2),
+			// whitespace after comment is significant (r7rs 2.2),
 			// but we ignore whitespace anyway
 			l.ignore()
 			return lexStart
+		}
+	}
+	panic("unreachable code")
+}
+
+// lexBlockComment expects the current position to be the start of a block
+// comment (#|...|#) and advances until it finds the end of the comment.
+// Comments may be nested (#|..#|..|#..|#) but must be properly so, as stated
+// in r7rs 2.2.
+func lexBlockComment(l *lexer) stateFn {
+	nesting := 1
+	for {
+		r := l.next()
+		switch r {
+		case '#':
+			if r = l.next(); r == '|' {
+				nesting++
+			}
+		case '|':
+			if r = l.next(); r == '#' {
+				if nesting--; nesting == 0 {
+					l.ignore()
+					return lexStart
+				}
+			}
+		case eof:
+			return l.errorf("improperly ended block comment starting at %d", l.start)
 		}
 	}
 	panic("unreachable code")
@@ -315,10 +350,9 @@ func lexComment(l *lexer) stateFn {
 // an identifier.
 func lexIdentifier(l *lexer) stateFn {
 	r := l.next()
-	// check for special case first characters that may be the start
-	// of a number or used as identifiers all by themselves, but
-	// cannot be at the beginning of an identifier: + - . ...
-	// (r5rs 2.1, 2.3, 4.1.4)
+	// check for special case first characters that may be the start of
+	// a number or used as identifiers all by themselves: + - . ...
+	// (r7rs 2.1, 2.3, 4.1.4)
 	if r == '.' {
 		r = l.next()
 		if r == '.' {
@@ -329,7 +363,7 @@ func lexIdentifier(l *lexer) stateFn {
 					return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
 				}
 			} else {
-				// there is no .. in r5rs
+				// there is no .. in r7rs
 				return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
 			}
 		} else if unicode.IsDigit(r) {
@@ -344,42 +378,75 @@ func lexIdentifier(l *lexer) stateFn {
 		return lexStart
 
 	} else if r == '+' || r == '-' {
-		// +/- must be "whitespace" delimited to be a identifier, which means
-		// the next token must either be the beginning of a number, or whitespace,
-		// or a closing parenthesis
+		// +/- may be the start of a number or an identifier
 		r = l.peek()
 		if unicode.IsDigit(r) || r == 'i' || r == 'I' {
 			l.rewind()
 			return lexNumber
 		}
-		if !l.accept(" \t\r\n)") {
-			// +/- must be "whitespace" delimited to be a identifier
-			return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
+	} else if r == '|' {
+		// form |identifier| allows anything except \
+		for {
+			r = l.next()
+			if r == '\\' {
+				return l.errorf("character %c not allowed in identifier %q",
+					r, l.input[l.start:l.pos])
+			} else if r == '|' {
+				l.emit(tokenIdentifier)
+				return lexStart
+			}
 		}
-		l.backup()
-		l.emit(tokenIdentifier)
-		return lexStart
 	} else if r == '@' {
 		return l.errorf("character not allowed to start identifier: %c", r)
 	}
 
+	// average case identifier that may contain \x escapes
+	l.backup()
+	ident := new(bytes.Buffer)
 	for {
+		r = l.next()
 		if r == eof {
 			return l.errorf("unexpectedly reached end at %q", l.input[l.start:l.pos])
+		}
+		if r == '\\' {
+			// allow for \xXX[X[X]]; hex character escapes in identifiers
+			if l.next() != 'x' {
+				return l.errorf("missing 'x' after '\\': %q", l.input[l.start:l.pos])
+			}
+			hex := new(bytes.Buffer)
+			for {
+				r = l.next()
+				if r == ';' {
+					// skip over the semicolon
+					r = l.next()
+					break
+				} else if r == eof {
+					return l.errorf("unexpectedly reached end at %q",
+						l.input[l.start:l.pos])
+				}
+				hex.WriteRune(r)
+			}
+			// verify this is a valid inline hex escape value
+			ch, err := strconv.ParseInt(hex.String(), 16, 32)
+			if err != nil {
+				return l.errorf("invalid number: %v for %q", err, l.input[l.start:l.pos])
+			}
+			// convert the character now to save the trouble later
+			ident.WriteRune(rune(ch))
 		}
 		// check for the end of the identifier (note that these are assumed
 		// to not appear as the first character, as lexStart would have
 		// sent control to some other state function)
 		if strings.ContainsRune("'\",`;() \t\n\r", r) {
 			l.backup()
-			l.emit(tokenIdentifier)
+			l.emitText(tokenIdentifier, ident.String())
 			return lexStart
 		}
-		// identifiers are letters, numbers, and extended characters (r5rs 2.1)
-		if !isAlphaNumeric(r) && !strings.ContainsRune("!$%&*/:<=>?^_~+-.@", r) {
-			return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
+		// identifiers are letters, numbers, and extended characters (r7rs 2.1)
+		if !isAlphaNumeric(r) && !strings.ContainsRune("!$%&*+-./:<=>?@^_~", r) {
+			return l.errorf("invalid subsequent character: %q", l.input[l.start:l.pos])
 		}
-		r = l.next()
+		ident.WriteRune(r)
 	}
 	panic("unreachable code")
 }
@@ -390,7 +457,7 @@ func lexIdentifier(l *lexer) stateFn {
 func lexNumber(l *lexer) stateFn {
 
 	//
-	// See r5rs 7.1.1 for detailed format for numeric constants
+	// See r7rs 7.1.1 for detailed format for numeric constants
 	//
 	float := false
 	cmplx := false
@@ -534,8 +601,18 @@ func lexHash(l *lexer) stateFn {
 	r := l.next()
 	switch r {
 	case 't', 'f', 'T', 'F':
+		// allow for #true and #false
+		l.acceptRun("aelrsu")
+		sym := l.input[l.start+1 : l.pos]
+		if len(sym) > 1 && sym != "true" && sym != "false" {
+			return l.errorf("invalid boolean: %q", l.input[l.start:l.pos])
+		}
 		l.emit(tokenBoolean)
 		return lexStart
+	// TODO: implement #u8( bytevector constants
+	// TODO: implement #0-9= and #0-9# labels and references for literal data
+	case '|':
+		return lexBlockComment
 	case '(':
 		l.emit(tokenStartVector)
 		return lexStart
@@ -543,16 +620,19 @@ func lexHash(l *lexer) stateFn {
 		// let lexNumber sort out the prefix
 		l.rewind()
 		return lexNumber
+	case ';':
+		// parser must deal with this type of comment
+		l.emit(tokenComment)
+		return lexStart
 	case '\\':
+		// TODO: also allow for alarm, backspace, delete, escape, null, return, tab
 		// check if 'space' or 'newline'
-		l.acceptRun("aceilnpsw")
+		l.acceptRun("abcdeiklmnoprstuw")
 		sym := l.input[l.start+2 : l.pos]
 		if sym == "newline" {
-			l.tokens <- token{tokenCharacter, "#\\\n"}
-			l.start = l.pos
+			l.emitText(tokenCharacter, "#\\\n")
 		} else if sym == "space" {
-			l.tokens <- token{tokenCharacter, "#\\ "}
-			l.start = l.pos
+			l.emitText(tokenCharacter, "#\\ ")
 		} else {
 			// go back to #, consume #\...
 			l.rewind()
