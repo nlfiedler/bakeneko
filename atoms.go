@@ -436,6 +436,10 @@ func (i Integer) ToInteger() int64 {
 
 type Float float64
 
+// TODO: read about floating point math and ensure none of those mistakes
+//       are made in the code below
+// http://www.codeproject.com/Articles/29637/Five-Tips-for-Floating-Point-Programming
+
 func NewFloat(val float64) Float {
 	return Float(val)
 }
