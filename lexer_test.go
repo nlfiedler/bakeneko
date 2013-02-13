@@ -11,6 +11,8 @@ import (
 	"testing"
 )
 
+// TODO: start using gocheck (http://labix.org/gocheck)
+
 // expectedLexerResult is equivalent to a token and is used in comparing the
 // results from the lexer.
 type expectedLexerResult struct {
