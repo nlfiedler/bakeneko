@@ -43,6 +43,9 @@ var consSym = Symbol("cons")
 // Symbol to instances of Closure.
 var macroTable = make(map[Symbol]Closure)
 
+// TODO: introduce a new type (Any) that represents anything in Scheme, use this over interface{}
+// TODO: may want a new type (Value) to represent all values(?)
+
 // stringify takes a tree of elements and converts it to a string in
 // Scheme format (e.g. true becomes "#t", lists become "(...)", etc).
 func stringify(x interface{}) string {
@@ -90,12 +93,16 @@ func parse(expr string) (Pair, LispError) {
 		if t.typ == tokenComment {
 			// ignore the next datum (r7rs 7.1.2)
 			t, ok = <-c
-			// TODO: if nothing left, then we're done
-			if !ok {
-				return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+			if !ok || t.typ == tokenEOF {
+				return results, nil
 			}
 			parserRead(t, c)
-			// then continue on as usual
+			// read from the channel to get the next thing
+			t, ok = <-c
+			if !ok || t.typ == tokenEOF {
+				return results, nil
+			}
+			// otherwise continue on as usual
 		}
 		elem, err := parserRead(t, c)
 		if err != nil {
