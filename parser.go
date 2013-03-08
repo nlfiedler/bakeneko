@@ -43,9 +43,6 @@ var consSym = Symbol("cons")
 // Symbol to instances of Closure.
 var macroTable = make(map[Symbol]Closure)
 
-// TODO: introduce a new type (Any) that represents anything in Scheme, use this over interface{}
-// TODO: may want a new type (Value) to represent all values(?)
-
 // stringify takes a tree of elements and converts it to a string in
 // Scheme format (e.g. true becomes "#t", lists become "(...)", etc).
 func stringify(x interface{}) string {
