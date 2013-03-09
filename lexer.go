@@ -625,14 +625,27 @@ func lexHash(l *lexer) stateFn {
 		l.emit(tokenComment)
 		return lexStart
 	case '\\':
-		// TODO: also allow for alarm, backspace, delete, escape, null, return, tab
-		// check if 'space' or 'newline'
+		// check for one of the many special character names
 		l.acceptRun("abcdeiklmnoprstuw")
 		sym := l.input[l.start+2 : l.pos]
 		if sym == "newline" {
 			l.emitText(tokenCharacter, "#\\\n")
 		} else if sym == "space" {
 			l.emitText(tokenCharacter, "#\\ ")
+		} else if sym == "alarm" {
+			l.emitText(tokenCharacter, "#\\\a")
+		} else if sym == "backspace" {
+			l.emitText(tokenCharacter, "#\\\b")
+		} else if sym == "delete" {
+			l.emitText(tokenCharacter, "#\\\u007f")
+		} else if sym == "escape" {
+			l.emitText(tokenCharacter, "#\\\u001b")
+		} else if sym == "null" {
+			l.emitText(tokenCharacter, "#\\\u0000")
+		} else if sym == "return" {
+			l.emitText(tokenCharacter, "#\\\r")
+		} else if sym == "tab" {
+			l.emitText(tokenCharacter, "#\\\t")
 		} else {
 			// go back to #, consume #\...
 			l.rewind()

@@ -206,12 +206,20 @@ func TestLexerQuotes(t *testing.T) {
 }
 
 func TestLexerCharacters(t *testing.T) {
-	input := "#\\a #\\space #\\newline #\\t"
+	input := `#\a #\space #\newline #\t
+	#\alarm #\backspace #\delete #\escape #\null #\return #\tab`
 	expected := make([]expectedLexerResult, 0)
 	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\a"})
 	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\ "})
 	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\n"})
 	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\t"})
+	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\a"})
+	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\b"})
+	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\u007f"})
+	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\u001b"})
+	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\u0000"})
+	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\r"})
+	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\t"})
 	verifyLexerResults(t, input, expected)
 }
 
