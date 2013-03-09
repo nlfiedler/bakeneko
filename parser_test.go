@@ -19,11 +19,11 @@ type expectedExpandError struct {
 
 func verifyExpandMap(mapping map[string]string, t *testing.T) {
 	for input, expected := range mapping {
-		pair, err := parseExpr(input)
+		pair, err := parse(input)
 		if err != nil {
 			t.Fatalf("failed to parse %q: %s", input, err)
 		}
-		x, err := expand(pair, true)
+		x, err := expand(pair.First(), true)
 		if err != nil {
 			t.Fatalf("failed to expand %q: %s", input, err)
 		}
@@ -54,24 +54,13 @@ func verifyExpandError(t *testing.T, expected map[string]expectedExpandError) {
 	}
 }
 
-// parseExpr parses a Lisp expression and returns the result, which may
-// be a string, number, symbol, or a list of expressions.
-func parseExpr(expr string) (interface{}, LispError) {
-	// TODO: this func is of little value, eliminate it
-	result, err := parse(expr)
-	if err != nil {
-		return nil, err
-	}
-	return result.First(), nil
-}
-
 func verifyParse(input, expected string, t *testing.T) {
-	result, err := parseExpr(input)
+	result, err := parse(input)
 	if err != nil {
 		msg := fmt.Sprintf("failed to parse expression '%s', %s", input, err)
 		t.Errorf(msg)
 	} else {
-		actual := stringify(result)
+		actual := stringify(result.First())
 		if actual != expected {
 			t.Errorf("expected <<%s>>, but got <<%s>>", expected, actual)
 		}
@@ -350,10 +339,14 @@ func TestParse(t *testing.T) {
 
 func TestParseSingle(t *testing.T) {
 	input := `(if #t "true" "false")`
-	result, err := parseExpr(input)
+	pair, err := parse(input)
+	pair, ok := pair.First().(Pair)
+	if !ok {
+		t.Error("result is not a tree!")
+	}
 	if err != nil {
 		t.Errorf("failed to parse program: %v", err)
-	} else if pair, ok := result.(Pair); ok {
+	} else {
 		actual := stringify(pair)
 		if actual != `(if #t "true" "false")` {
 			t.Errorf("parse() returned wrong result: %s", actual)
