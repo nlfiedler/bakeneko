@@ -98,7 +98,7 @@ func (e *environment) Set(sym Symbol, val interface{}) LispError {
 	return NewLispErrorf(ESYMBOL, "symbol '%v' not yet defined", sym)
 }
 
-// newNullEnvironment constructs the "null" environment as defined in R5RS.
+// newNullEnvironment constructs the "null" environment as defined in R7RS.
 func newNullEnvironment() Environment {
 	mapping := make(map[Symbol]interface{})
 	mapping[Symbol("append")] = NewBuiltin(builtinAppend)
@@ -129,7 +129,7 @@ func newNullEnvironment() Environment {
 	mapping[Symbol("/")] = NewBuiltin(builtinDivide)
 	mapping[Symbol("abs")] = NewBuiltin(builtinAbs)
 	mapping[Symbol("quotient")] = NewBuiltin(builtinQuotient)
-	// TODO: add the syntactic bindings for all syntactic keywords in r5rs
+	// TODO: add the syntactic bindings for all syntactic keywords in r7rs
 	ne := NewRestrictedEnvironment(nil, mapping)
 	return ne
 }
@@ -141,7 +141,7 @@ var theNullEnvironment Environment = newNullEnvironment()
 // procedures and variables in place for use in a global context.
 func newReportEnvironment() Environment {
 	mapping := make(map[Symbol]interface{})
-	// TODO: add the standard bindings defined in r5rs
+	// TODO: add the standard bindings defined in r7rs
 	ge := NewRestrictedEnvironment(theNullEnvironment, mapping)
 	return ge
 }

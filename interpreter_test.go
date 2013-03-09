@@ -298,7 +298,7 @@ func TestInterpretCond(t *testing.T) {
 	verifyInterpretError(t, errors)
 }
 
-// TODO: test tail-call optimization as defined in Scheme r5rs 3.5
+// TODO: test tail-call optimization as defined in Scheme r7rs 3.5
 
 // TODO: for testing the results of evaluation, can assign "stdout" in the global
 //       environment to a bytes.Buffer then read the contents of that to see what
