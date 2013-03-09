@@ -621,7 +621,8 @@ func lexHash(l *lexer) stateFn {
 		l.rewind()
 		return lexNumber
 	case ';':
-		// parser must deal with this type of comment
+		// line comment, with optional space; parser does the real work
+		l.accept(" ")
 		l.emit(tokenComment)
 		return lexStart
 	case '\\':

@@ -39,6 +39,18 @@ var unquotesplicingSym = Symbol("unquote-splicing")
 var appendSym = Symbol("append")
 var consSym = Symbol("cons")
 
+// None represents the result of a line comment, or other results of parsing
+// that resolve to nothing.
+type None int
+
+// theNone is the singleton None instance.
+var theNone = None(0)
+
+// String for None returns the empty string.
+func (n None) String() string {
+	return ""
+}
+
 // macroTable stores the globally defined macros, mapping instances of
 // Symbol to instances of Closure.
 var macroTable = make(map[Symbol]Closure)
@@ -87,20 +99,6 @@ func parse(expr string) (Pair, LispError) {
 		t, ok := <-c
 		if !ok || t.typ == tokenEOF {
 			return results, nil
-		}
-		if t.typ == tokenComment {
-			// ignore the next datum (r7rs 7.1.2)
-			t, ok = <-c
-			if !ok || t.typ == tokenEOF {
-				return results, nil
-			}
-			parserRead(t, c)
-			// read from the channel to get the next thing
-			t, ok = <-c
-			if !ok || t.typ == tokenEOF {
-				return results, nil
-			}
-			// otherwise continue on as usual
 		}
 		elem, err := parserRead(t, c)
 		if err != nil {
@@ -231,9 +229,13 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 	case tokenIdentifier:
 		// TODO: if #!fold-case enabled, then lower, else not
 		return Symbol(strings.ToLower(t.val)), nil
-		// case tokenComment:
-		// 	// TODO: is this appropriate? maybe tests should not call parserRead()
-		// 	return "", nil
+	case tokenComment:
+		// ignore the next datum (r7rs 7.1.2)
+		_, err := parseNext(c)
+		if err != nil {
+			return nil, err
+		}
+		return theNone, nil
 	}
 	panic("unreachable code")
 }

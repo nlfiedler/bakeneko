@@ -104,7 +104,7 @@ func TestLexerComments(t *testing.T) {
 	expected = append(expected, expectedLexerResult{tokenInteger, "3"})
 	expected = append(expected, expectedLexerResult{tokenInteger, "4"})
 	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
-	expected = append(expected, expectedLexerResult{tokenComment, "#;"})
+	expected = append(expected, expectedLexerResult{tokenComment, "#; "})
 	expected = append(expected, expectedLexerResult{tokenOpenParen, "("})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "quote"})
 	expected = append(expected, expectedLexerResult{tokenInteger, "1"})

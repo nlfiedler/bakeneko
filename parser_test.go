@@ -144,9 +144,11 @@ func TestParseQuotes(t *testing.T) {
 
 func TestParseComments(t *testing.T) {
 	mapping := make(map[string]string)
-	// TODO: not sure that this is the correct result
-	mapping["#;(foo 'x)"] = "()"
-	// TODO: add more test cases
+	mapping["#;(foo 'x)"] = ""
+	mapping["(bar #;(foo 'x) quux)"] = "(bar  quux)"
+	mapping["#; (foo 'x)"] = ""
+	mapping["#;()"] = ""
+	mapping["#;(foo (+ 1 2) 'a)"] = ""
 	verifyParseMap(mapping, t)
 }
 
