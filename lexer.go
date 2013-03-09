@@ -28,22 +28,23 @@ const eof = unicode.UpperLower
 
 // token types
 const (
-	_                tokenType = iota // undefined
-	tokenError                        // error occurred
-	tokenComment                      // #; comment of next datum
-	tokenString                       // string literal
-	tokenQuote                        // quoted list
-	tokenCharacter                    // character literal
-	tokenIdentifier                   // identifier token
-	tokenInteger                      // integer literal
-	tokenFloat                        // floating point literal
-	tokenComplex                      // complex number
-	tokenRational                     // rational number
-	tokenBoolean                      // boolean value (#t or #f)
-	tokenOpenParen                    // open parenthesis
-	tokenStartVector                  // beginning of vector
-	tokenCloseParen                   // close parenthesis
-	tokenEOF                          // end-of-file token
+	_               tokenType = iota // undefined
+	tokenError                       // error occurred
+	tokenComment                     // #; comment of next datum
+	tokenString                      // string literal
+	tokenQuote                       // quoted list
+	tokenCharacter                   // character literal
+	tokenIdentifier                  // identifier token
+	tokenInteger                     // integer literal
+	tokenFloat                       // floating point literal
+	tokenComplex                     // complex number
+	tokenRational                    // rational number
+	tokenBoolean                     // boolean value (#t or #f)
+	tokenOpenParen                   // open parenthesis
+	tokenVector                      // beginning of vector
+	tokenByteVector                  // beginning of byte vector
+	tokenCloseParen                  // close parenthesis
+	tokenEOF                         // end-of-file token
 )
 
 // token represents a token returned from the scanner.
@@ -609,12 +610,11 @@ func lexHash(l *lexer) stateFn {
 		}
 		l.emit(tokenBoolean)
 		return lexStart
-	// TODO: implement #u8( bytevector constants
 	// TODO: implement #0-9= and #0-9# labels and references for literal data
 	case '|':
 		return lexBlockComment
 	case '(':
-		l.emit(tokenStartVector)
+		l.emit(tokenVector)
 		return lexStart
 	case 'b', 'd', 'e', 'i', 'o', 'x':
 		// let lexNumber sort out the prefix
@@ -662,6 +662,15 @@ func lexHash(l *lexer) stateFn {
 			l.emit(tokenCharacter)
 		}
 		return lexStart
+	case 'u':
+		// byte vector support (e.g. #u8(...))
+		if r := l.next(); r == '8' {
+			if r := l.next(); r == '(' {
+				l.emit(tokenByteVector)
+				return lexStart
+			}
+		}
+		fallthrough
 	default:
 		return l.errorf("unrecognized hash value: %q", l.input[l.start:l.pos])
 	}

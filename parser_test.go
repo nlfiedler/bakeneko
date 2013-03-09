@@ -189,6 +189,34 @@ func TestParseVector(t *testing.T) {
 	}
 }
 
+func TestParseByteVector(t *testing.T) {
+	input := "#u8(0 10 5)"
+	pair, err := parse(input)
+	if err != nil {
+		msg := fmt.Sprintf("failed to parse expression '%s', %s", input, err)
+		t.Errorf(msg)
+	} else {
+		result := pair.First()
+		if slice, ok := result.([]uint8); ok {
+			if len(slice) == 3 {
+				expected := new([3]uint8)
+				expected[0] = uint8(0)
+				expected[1] = uint8(10)
+				expected[2] = uint8(5)
+				for i, e := range expected {
+					if slice[i] != e {
+						t.Errorf("expected %v in byte vector, but got %s", e, slice[1])
+					}
+				}
+			} else {
+				t.Errorf("expected slice of length three but got %d", len(slice))
+			}
+		} else {
+			t.Errorf("expected slice but got %T", result)
+		}
+	}
+}
+
 func TestParseExprNumbers(t *testing.T) {
 	mapping := make(map[string]string)
 	mapping["1.2345"] = "1.2345"

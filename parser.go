@@ -57,6 +57,7 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 	switch i := x.(type) {
 	case nil:
 		buf.WriteString("()")
+		// TODO: print byte vectors?
 	case []interface{}:
 		// to print vectors?
 		buf.WriteString("(")
@@ -138,7 +139,7 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 			return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 		}
 		return parserReadPair(t, c)
-	case tokenStartVector:
+	case tokenVector:
 		slice := make([]interface{}, 0, 16)
 		for t = range c {
 			if t.typ == tokenCloseParen {
@@ -149,6 +150,27 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 				return nil, err
 			}
 			slice = append(slice, val)
+		}
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+	case tokenByteVector:
+		slice := make([]uint8, 0, 16)
+		for t = range c {
+			if t.typ == tokenCloseParen {
+				return slice, nil
+			} else if t.typ == tokenInteger {
+				val, err := atoi(t.val)
+				if err != nil {
+					return nil, err
+				}
+				if val < 0 || val > 255 {
+					return nil, NewLispErrorf(ESYNTAX,
+						"byte vector value out of range: %s", t.val)
+				}
+				slice = append(slice, uint8(val))
+			} else {
+				return nil, NewLispErrorf(ESYNTAX,
+					"invalid byte vector element: %s", t.val)
+			}
 		}
 		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	case tokenCloseParen:

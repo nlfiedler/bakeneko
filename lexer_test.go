@@ -248,12 +248,30 @@ func TestLexerVector(t *testing.T) {
 	input := "'#(1 2 3)"
 	expected := make([]expectedLexerResult, 0)
 	expected = append(expected, expectedLexerResult{tokenQuote, "'"})
-	expected = append(expected, expectedLexerResult{tokenStartVector, "#("})
+	expected = append(expected, expectedLexerResult{tokenVector, "#("})
 	expected = append(expected, expectedLexerResult{tokenInteger, "1"})
 	expected = append(expected, expectedLexerResult{tokenInteger, "2"})
 	expected = append(expected, expectedLexerResult{tokenInteger, "3"})
 	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
 	verifyLexerResults(t, input, expected)
+}
+
+func TestLexerByteVector(t *testing.T) {
+	input := "#u8(1 2 3)"
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenByteVector, "#u8("})
+	expected = append(expected, expectedLexerResult{tokenInteger, "1"})
+	expected = append(expected, expectedLexerResult{tokenInteger, "2"})
+	expected = append(expected, expectedLexerResult{tokenInteger, "3"})
+	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
+	verifyLexerResults(t, input, expected)
+}
+
+func TestLexerBadByteVector(t *testing.T) {
+	input := make(map[string]string)
+	input["#u(0 1 2)"] = "unrecognized hash value"
+	input["#u8"] = "unrecognized hash value"
+	verifyLexerErrors(t, input)
 }
 
 func TestLexerBadCharacter(t *testing.T) {
