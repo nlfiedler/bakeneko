@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -69,19 +69,6 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 	switch i := x.(type) {
 	case nil:
 		buf.WriteString("()")
-		// TODO: print byte vectors?
-	case []interface{}:
-		// to print vectors?
-		buf.WriteString("(")
-		for _, v := range i {
-			stringifyBuffer(v, buf)
-			buf.WriteString(" ")
-		}
-		// lop off the trailing space
-		if buf.Len() > 2 {
-			buf.Truncate(buf.Len() - 1)
-		}
-		buf.WriteString(")")
 	default:
 		// this handles Atom and Pair
 		fmt.Fprintf(buf, "%v", i)
@@ -141,7 +128,7 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 		slice := make([]interface{}, 0, 16)
 		for t = range c {
 			if t.typ == tokenCloseParen {
-				return slice, nil
+				return NewVector(slice), nil
 			}
 			val, err := parserRead(t, c)
 			if err != nil {
@@ -154,7 +141,7 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 		slice := make([]uint8, 0, 16)
 		for t = range c {
 			if t.typ == tokenCloseParen {
-				return slice, nil
+				return NewByteVector(slice), nil
 			} else if t.typ == tokenInteger {
 				val, err := atoi(t.val)
 				if err != nil {

@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -160,19 +160,19 @@ func TestParseVector(t *testing.T) {
 		t.Errorf(msg)
 	} else {
 		result := pair.First()
-		if slice, ok := result.([]interface{}); ok {
-			if len(slice) == 3 {
+		if slice, ok := result.(Vector); ok {
+			if slice.Length() == 3 {
 				expected := new([3]Integer)
 				expected[0] = Integer(1)
 				expected[1] = Integer(2)
 				expected[2] = Integer(3)
 				for i, e := range expected {
-					if slice[i] != e {
-						t.Errorf("expected %v in vector, but got %s", e, slice[1])
+					if slice.Get(i) != e {
+						t.Errorf("expected %v in vector, but got %s", e, slice.Get(i))
 					}
 				}
 			} else {
-				t.Errorf("expected slice of length three but got %d", len(slice))
+				t.Errorf("expected slice of length three but got %d", slice.Length())
 			}
 		} else {
 			t.Errorf("expected slice but got %T", result)
@@ -188,19 +188,19 @@ func TestParseByteVector(t *testing.T) {
 		t.Errorf(msg)
 	} else {
 		result := pair.First()
-		if slice, ok := result.([]uint8); ok {
-			if len(slice) == 3 {
+		if bv, ok := result.(ByteVector); ok {
+			if bv.Length() == 3 {
 				expected := new([3]uint8)
 				expected[0] = uint8(0)
 				expected[1] = uint8(10)
 				expected[2] = uint8(5)
 				for i, e := range expected {
-					if slice[i] != e {
-						t.Errorf("expected %v in byte vector, but got %s", e, slice[1])
+					if bv.Get(i) != e {
+						t.Errorf("expected %v in byte vector, but got %s", e, bv.Get(i))
 					}
 				}
 			} else {
-				t.Errorf("expected slice of length three but got %d", len(slice))
+				t.Errorf("expected slice of length three but got %d", bv.Length())
 			}
 		} else {
 			t.Errorf("expected slice but got %T", result)
