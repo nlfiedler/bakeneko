@@ -214,8 +214,7 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 		}
 		return NewList(quote, pair), nil
 	case tokenIdentifier:
-		// TODO: if #!fold-case enabled, then lower, else not
-		return Symbol(strings.ToLower(t.val)), nil
+		return Symbol(t.val), nil
 	case tokenComment:
 		// ignore the next datum (r7rs 7.1.2)
 		_, err := parseNext(c)

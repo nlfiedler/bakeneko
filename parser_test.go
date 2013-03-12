@@ -178,6 +178,8 @@ func TestParseVector(t *testing.T) {
 			t.Errorf("expected slice but got %T", result)
 		}
 	}
+	// This particular input should come back exactly as given.
+	verifyParse(input, input, t)
 }
 
 func TestParseByteVector(t *testing.T) {
@@ -206,6 +208,8 @@ func TestParseByteVector(t *testing.T) {
 			t.Errorf("expected slice but got %T", result)
 		}
 	}
+	// This particular input should come back exactly as given.
+	verifyParse(input, input, t)
 }
 
 func TestParseExprNumbers(t *testing.T) {

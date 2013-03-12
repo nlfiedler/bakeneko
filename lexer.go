@@ -112,12 +112,13 @@ func (t *token) contents() string {
 
 // lexer holds the state of the scanner.
 type lexer struct {
-	name   string     // used only for error reports.
-	input  string     // the string being scanned.
-	start  int        // start position of this token.
-	pos    int        // current position in the input.
-	width  int        // width of last rune read from input.
-	tokens chan token // channel of scanned tokens.
+	name    string     // used only for error reports
+	input   string     // the string being scanned
+	start   int        // start position of this token
+	pos     int        // current position in the input
+	width   int        // width of last rune read from input
+	folding bool       // true if fold-case is enabled
+	tokens  chan token // channel of scanned tokens
 }
 
 // String returns a string representation of the lexer, useful for
@@ -311,7 +312,7 @@ func lexComment(l *lexer) stateFn {
 		r := l.next()
 		switch r {
 		case eof, '\n', '\r':
-			// whitespace after comment is significant (r7rs 2.2),
+			// whitespace after comment is significant (R7RS 2.2),
 			// but we ignore whitespace anyway
 			l.ignore()
 			return lexStart
@@ -323,7 +324,7 @@ func lexComment(l *lexer) stateFn {
 // lexBlockComment expects the current position to be the start of a block
 // comment (#|...|#) and advances until it finds the end of the comment.
 // Comments may be nested (#|..#|..|#..|#) but must be properly so, as stated
-// in r7rs 2.2.
+// in R7RS 2.2.
 func lexBlockComment(l *lexer) stateFn {
 	nesting := 1
 	for {
@@ -347,13 +348,28 @@ func lexBlockComment(l *lexer) stateFn {
 	panic("unreachable code")
 }
 
+// emitIdentifier will fold the case of the identifier if the #fold-case
+// directive is enabled, then emit the identifier to the token channel.
+// Otherwise, no folding is performed before emitting the token, per the
+// default. If the ident parameter is empty, the current token text will
+// be emitted, otherwise the value of ident is emitted.
+func (l *lexer) emitIdentifier(ident string) {
+	if ident == "" {
+		ident = l.input[l.start:l.pos]
+	}
+	if l.folding {
+		ident = strings.ToLower(ident)
+	}
+	l.emitText(tokenIdentifier, ident)
+}
+
 // lexIdentifier processes the text at the current location as if it were
 // an identifier.
 func lexIdentifier(l *lexer) stateFn {
 	r := l.next()
 	// check for special case first characters that may be the start of
 	// a number or used as identifiers all by themselves: + - . ...
-	// (r7rs 2.1, 2.3, 4.1.4)
+	// (R7RS 2.1, 2.3, 4.1.4)
 	if r == '.' {
 		r = l.next()
 		if r == '.' {
@@ -364,7 +380,7 @@ func lexIdentifier(l *lexer) stateFn {
 					return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
 				}
 			} else {
-				// there is no .. in r7rs
+				// there is no .. in R7RS
 				return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
 			}
 		} else if unicode.IsDigit(r) {
@@ -375,7 +391,7 @@ func lexIdentifier(l *lexer) stateFn {
 			return l.errorf("malformed identifier: %q", l.input[l.start:l.pos])
 		}
 		l.backup()
-		l.emit(tokenIdentifier)
+		l.emitIdentifier("")
 		return lexStart
 
 	} else if r == '+' || r == '-' {
@@ -393,7 +409,7 @@ func lexIdentifier(l *lexer) stateFn {
 				return l.errorf("character %c not allowed in identifier %q",
 					r, l.input[l.start:l.pos])
 			} else if r == '|' {
-				l.emit(tokenIdentifier)
+				l.emitIdentifier("")
 				return lexStart
 			}
 		}
@@ -406,9 +422,6 @@ func lexIdentifier(l *lexer) stateFn {
 	ident := new(bytes.Buffer)
 	for {
 		r = l.next()
-		if r == eof {
-			return l.errorf("unexpectedly reached end at %q", l.input[l.start:l.pos])
-		}
 		if r == '\\' {
 			// allow for \xXX[X[X]]; hex character escapes in identifiers
 			if l.next() != 'x' {
@@ -438,12 +451,12 @@ func lexIdentifier(l *lexer) stateFn {
 		// check for the end of the identifier (note that these are assumed
 		// to not appear as the first character, as lexStart would have
 		// sent control to some other state function)
-		if strings.ContainsRune("'\",`;() \t\n\r", r) {
+		if r == eof || strings.ContainsRune("'\",`;() \t\n\r", r) {
 			l.backup()
-			l.emitText(tokenIdentifier, ident.String())
+			l.emitIdentifier(ident.String())
 			return lexStart
 		}
-		// identifiers are letters, numbers, and extended characters (r7rs 2.1)
+		// identifiers are letters, numbers, and extended characters (R7RS 2.1)
 		if !isAlphaNumeric(r) && !strings.ContainsRune("!$%&*+-./:<=>?@^_~", r) {
 			return l.errorf("invalid subsequent character: %q", l.input[l.start:l.pos])
 		}
@@ -458,7 +471,7 @@ func lexIdentifier(l *lexer) stateFn {
 func lexNumber(l *lexer) stateFn {
 
 	//
-	// See r7rs 7.1.1 for detailed format for numeric constants
+	// See R7RS 7.1.1 for detailed format for numeric constants
 	//
 	float := false
 	cmplx := false
@@ -627,8 +640,15 @@ func lexHash(l *lexer) stateFn {
 		return lexStart
 	case '\\':
 		// check for one of the many special character names
-		l.acceptRun("abcdeiklmnoprstuw")
+		if l.folding {
+			l.acceptRun("abcdeiklmnoprstuwABCDEIKLMNOPRSTUW")
+		} else {
+			l.acceptRun("abcdeiklmnoprstuw")
+		}
 		sym := l.input[l.start+2 : l.pos]
+		if l.folding {
+			sym = strings.ToLower(sym)
+		}
 		if sym == "newline" {
 			l.emitText(tokenCharacter, "#\\\n")
 		} else if sym == "space" {
@@ -671,7 +691,21 @@ func lexHash(l *lexer) stateFn {
 				return lexStart
 			}
 		}
-		fallthrough
+		return l.errorf("unrecognized hash value: %q", l.input[l.start:l.pos])
+	case '!':
+		// handle #!fold-case and #!no-fold-case directives (R7RS 2.1)
+		l.acceptRun("no-fldcase")
+		sym := l.input[l.start+2 : l.pos]
+		if sym == "fold-case" {
+			l.folding = true
+		} else if sym == "no-fold-case" {
+			l.folding = false
+		} else {
+			return l.errorf("invalid directive: %q", l.input[l.start:l.pos])
+		}
+
+		l.ignore()
+		return lexStart
 	default:
 		return l.errorf("unrecognized hash value: %q", l.input[l.start:l.pos])
 	}

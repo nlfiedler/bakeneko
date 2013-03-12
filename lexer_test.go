@@ -377,6 +377,22 @@ func TestLexerIdentifiers(t *testing.T) {
 	verifyLexerResults(t, input, expected)
 }
 
+func TestLexerFoldCase(t *testing.T) {
+	input := `#!fold-case lAMbdA
+	#!no-fold-case
+	lAMbdA
+	#!fold-case
+	LAMBDA
+	#!no-fold-case
+	lamBDA`
+	expected := make([]expectedLexerResult, 0)
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "lambda"})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "lAMbdA"})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "lambda"})
+	expected = append(expected, expectedLexerResult{tokenIdentifier, "lamBDA"})
+	verifyLexerResults(t, input, expected)
+}
+
 func TestLexerBadIdentifiers(t *testing.T) {
 	input := make(map[string]string)
 	input[".a"] = "malformed identifier"
