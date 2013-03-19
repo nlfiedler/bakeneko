@@ -28,23 +28,25 @@ const eof = unicode.UpperLower
 
 // token types
 const (
-	_               tokenType = iota // undefined
-	tokenError                       // error occurred
-	tokenComment                     // #; comment of next datum
-	tokenString                      // string literal
-	tokenQuote                       // quoted list
-	tokenCharacter                   // character literal
-	tokenIdentifier                  // identifier token
-	tokenInteger                     // integer literal
-	tokenFloat                       // floating point literal
-	tokenComplex                     // complex number
-	tokenRational                    // rational number
-	tokenBoolean                     // boolean value (#t or #f)
-	tokenOpenParen                   // open parenthesis
-	tokenVector                      // beginning of vector
-	tokenByteVector                  // beginning of byte vector
-	tokenCloseParen                  // close parenthesis
-	tokenEOF                         // end-of-file token
+	_                    tokenType = iota // undefined
+	tokenError                            // error occurred
+	tokenComment                          // #; comment of next datum
+	tokenString                           // string literal
+	tokenQuote                            // quoted list
+	tokenCharacter                        // character literal
+	tokenIdentifier                       // identifier token
+	tokenInteger                          // integer literal
+	tokenFloat                            // floating point literal
+	tokenComplex                          // complex number
+	tokenRational                         // rational number
+	tokenBoolean                          // boolean value (#t or #f)
+	tokenOpenParen                        // open parenthesis
+	tokenVector                           // beginning of vector
+	tokenByteVector                       // beginning of byte vector
+	tokenCloseParen                       // close parenthesis
+	tokenLabelDefinition                  // datum label definition
+	tokenLabelReference                   // datum label reference
+	tokenEOF                              // end-of-file token
 )
 
 // token represents a token returned from the scanner.
@@ -610,7 +612,7 @@ func isAlphaNumeric(r rune) bool {
 	return unicode.IsDigit(r) || unicode.IsLetter(r)
 }
 
-// lexHash process all of the # tokens.
+// lexHash processes all of the # tokens.
 func lexHash(l *lexer) stateFn {
 	r := l.next()
 	switch r {
@@ -623,7 +625,6 @@ func lexHash(l *lexer) stateFn {
 		}
 		l.emit(tokenBoolean)
 		return lexStart
-	// TODO: implement #0-9= and #0-9# labels and references for literal data
 	case '|':
 		return lexBlockComment
 	case '(':
@@ -692,6 +693,16 @@ func lexHash(l *lexer) stateFn {
 			}
 		}
 		return l.errorf("unrecognized hash value: %q", l.input[l.start:l.pos])
+	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		l.acceptRun("0123456789")
+		if r := l.next(); r == '#' {
+			l.emit(tokenLabelReference)
+		} else if r == '=' {
+			l.emit(tokenLabelDefinition)
+		} else {
+			return l.errorf("unrecognized hash value: %q", l.input[l.start:l.pos])
+		}
+		return lexStart
 	case '!':
 		// handle #!fold-case and #!no-fold-case directives (R7RS 2.1)
 		l.acceptRun("no-fldcase")

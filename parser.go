@@ -78,16 +78,43 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 // parse parses a Scheme program and returns the result, which will be a Pair
 // consisting of program elements (i.e. function calls).
 func parse(expr string) (Pair, LispError) {
-	c := lex("parse", expr)
-	defer drainLexer(c)
+	parser := NewParser()
+	return parser.Parse(expr)
+}
+
+// Parser knows how to convert a string represetation of Scheme code into
+// a runnable program, which can be passed to the Eval() function.
+type Parser interface {
+	// Parse will return a collection of Scheme objects parsed from the given
+	// string, returning an error if the lexing or parsing fails.
+	Parse(expr string) (Pair, LispError)
+}
+
+// parserImpl holds the state of the parser during parsing.
+type parserImpl struct {
+	tokens    chan token               // channel of lexer tokens
+	inComment bool                     // true if parsing a datum comment
+	labels    []map[string]interface{} // collection of labeled datum, organized by scope
+}
+
+// NewParser constructs a new Parser instance.
+func NewParser() Parser {
+	labels := make([]map[string]interface{}, 0)
+	return &parserImpl{nil, false, labels}
+}
+
+// Parse is the default implementation the Parse() method of Parser.
+func (p *parserImpl) Parse(expr string) (Pair, LispError) {
+	p.tokens = lex("parse", expr)
+	defer drainLexer(p.tokens)
 	var results Pair = theEmptyList
 	var tail Pair = theEmptyList
 	for {
-		t, ok := <-c
+		t, ok := <-p.tokens
 		if !ok || t.typ == tokenEOF {
-			return results, nil
+			break
 		}
-		elem, err := parserRead(t, c)
+		elem, err := p.parserRead(t)
 		if err != nil {
 			return nil, err
 		}
@@ -98,66 +125,28 @@ func parse(expr string) (Pair, LispError) {
 			tail = tail.Append(elem)
 		}
 	}
-	panic("unreachable code")
+	return results, nil
 }
 
 // parseNext reads a complete expression from the channel of tokens.
-func parseNext(c chan token) (interface{}, LispError) {
-	t, ok := <-c
+func (p *parserImpl) parseNext() (interface{}, LispError) {
+	t, ok := <-p.tokens
 	if !ok {
 		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	}
-	return parserRead(t, c)
+	return p.parserRead(t)
 }
 
 // parserRead reads a complete expression from the channel of tokens,
 // starting with the initial token value provided.
-func parserRead(t token, c chan token) (interface{}, LispError) {
+func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 	switch t.typ {
 	case tokenError:
 		return nil, NewLispError(ESYNTAX, t.val)
 	case tokenEOF:
 		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
-	case tokenOpenParen:
-		t, ok := <-c
-		if !ok {
-			return nil, NewLispError(ESYNTAX, endOfStreamMsg)
-		}
-		return parserReadPair(t, c)
-	case tokenVector:
-		slice := make([]interface{}, 0, 16)
-		for t = range c {
-			if t.typ == tokenCloseParen {
-				return NewVector(slice), nil
-			}
-			val, err := parserRead(t, c)
-			if err != nil {
-				return nil, err
-			}
-			slice = append(slice, val)
-		}
-		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
-	case tokenByteVector:
-		slice := make([]uint8, 0, 16)
-		for t = range c {
-			if t.typ == tokenCloseParen {
-				return NewByteVector(slice), nil
-			} else if t.typ == tokenInteger {
-				val, err := atoi(t.val)
-				if err != nil {
-					return nil, err
-				}
-				if val < 0 || val > 255 {
-					return nil, NewLispErrorf(ESYNTAX,
-						"byte vector value out of range: %s", t.val)
-				}
-				slice = append(slice, uint8(val))
-			} else {
-				return nil, NewLispErrorf(ESYNTAX,
-					"invalid byte vector element: %s", t.val)
-			}
-		}
-		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+	case tokenOpenParen, tokenVector, tokenByteVector:
+		return p.parseWithinScope(t)
 	case tokenCloseParen:
 		return nil, NewLispError(ESYNTAX, "unexpected ')'")
 	case tokenString:
@@ -208,7 +197,7 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 		default:
 			return nil, NewLispErrorf(ESYNTAX, "unrecognized quote symbol: %s", t.val)
 		}
-		pair, err := parseNext(c)
+		pair, err := p.parseNext()
 		if err != nil {
 			return nil, err
 		}
@@ -217,11 +206,36 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 		return Symbol(t.val), nil
 	case tokenComment:
 		// ignore the next datum (r7rs 7.1.2)
-		_, err := parseNext(c)
+		p.inComment = true
+		_, err := p.parseNext()
+		p.inComment = false
 		if err != nil {
 			return nil, err
 		}
 		return theNone, nil
+	case tokenLabelDefinition:
+		// datum label definition
+		datum, err := p.parseNext()
+		if err != nil {
+			return nil, err
+		}
+		if !p.inComment {
+			// disregard datum label definitions while parsing a comment
+			label := t.val[1 : len(t.val)-1]
+			p.labels[len(p.labels)-1][label] = datum
+		}
+		return datum, nil
+	case tokenLabelReference:
+		// datum label reference
+		if p.inComment {
+			// disregard datum label references while parsing a comment
+			return theNone, nil
+		}
+		label := t.val[1 : len(t.val)-1]
+		if datum, ok := p.labels[len(p.labels)-1][label]; ok {
+			return datum, nil
+		}
+		return nil, NewLispErrorf(ESYNTAX, "label reference before assignment: %s", t.val)
 	}
 	panic("unreachable code")
 }
@@ -229,28 +243,28 @@ func parserRead(t token, c chan token) (interface{}, LispError) {
 // parserReadPair expects to read the contents of a list, whether a proper
 // list (one with '.' separating elements) or otherwise. This function assumes
 // that the previous token was an open parenthesis.
-func parserReadPair(t token, c chan token) (interface{}, LispError) {
+func (p *parserImpl) parserReadPair(t token) (interface{}, LispError) {
 	if t.typ == tokenCloseParen {
 		return theEmptyList, nil
 	}
 	// read the first element in the list
-	car_obj, err := parserRead(t, c)
+	car_obj, err := p.parserRead(t)
 	if err != nil {
 		return nil, err
 	}
 	// check if the next token is a dot
-	t, ok := <-c
+	t, ok := <-p.tokens
 	if !ok {
 		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 	}
 	if t.typ == tokenIdentifier && t.val == "." {
 		// read an improper list
 		// skip over the dot and start parsing the next element
-		cdr_obj, err := parseNext(c)
+		cdr_obj, err := p.parseNext()
 		if err != nil {
 			return nil, err
 		}
-		t, ok = <-c
+		t, ok = <-p.tokens
 		if !ok {
 			return nil, NewLispError(ESYNTAX, endOfStreamMsg)
 		}
@@ -260,11 +274,70 @@ func parserReadPair(t token, c chan token) (interface{}, LispError) {
 		return Cons(car_obj, cdr_obj), nil
 	} else {
 		// read a proper list
-		cdr_obj, err := parserReadPair(t, c)
+		cdr_obj, err := p.parserReadPair(t)
 		if err != nil {
 			return nil, err
 		}
 		return Cons(car_obj, cdr_obj), nil
+	}
+	panic("unreachable code")
+}
+
+// parseWithinScope constructs a new datum scope, parses whatever token is
+// given, then tears down the scope upon exit. This is generally done when an
+// open parenthesis (() is encountered, as well as vector and byte vector.
+func (p *parserImpl) parseWithinScope(t token) (interface{}, LispError) {
+	// set up a new scope for datum labels
+	scope := make(map[string]interface{})
+	p.labels = append(p.labels, scope)
+	// defer removal of that scope
+	pop_scope := func() {
+		p.labels = p.labels[:len(p.labels)-1]
+	}
+	defer pop_scope()
+	switch t.typ {
+	case tokenOpenParen:
+		t, ok := <-p.tokens
+		if !ok {
+			return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+		}
+		return p.parserReadPair(t)
+	case tokenVector:
+		slice := make([]interface{}, 0, 16)
+		for t = range p.tokens {
+			if t.typ == tokenCloseParen {
+				return NewVector(slice), nil
+			}
+			val, err := p.parserRead(t)
+			if err != nil {
+				return nil, err
+			}
+			slice = append(slice, val)
+		}
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+	case tokenByteVector:
+		slice := make([]uint8, 0, 16)
+		for t = range p.tokens {
+			if t.typ == tokenCloseParen {
+				return NewByteVector(slice), nil
+			} else if t.typ == tokenInteger {
+				val, err := atoi(t.val)
+				if err != nil {
+					return nil, err
+				}
+				if val < 0 || val > 255 {
+					return nil, NewLispErrorf(ESYNTAX,
+						"byte vector value out of range: %s", t.val)
+				}
+				slice = append(slice, uint8(val))
+			} else {
+				return nil, NewLispErrorf(ESYNTAX,
+					"invalid byte vector element: %s", t.val)
+			}
+		}
+		return nil, NewLispError(ESYNTAX, endOfStreamMsg)
+	default:
+		return nil, NewLispErrorf(ESYNTAX, "unexpected token: %s", t.val)
 	}
 	panic("unreachable code")
 }

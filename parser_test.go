@@ -73,6 +73,18 @@ func verifyParseMap(mapping map[string]string, t *testing.T) {
 	}
 }
 
+func verifyParseError(t *testing.T, expected map[string]string) {
+	for input, errmsg := range expected {
+		_, err := parse(input)
+		if err == nil {
+			t.Fatalf("parse() should have failed with %q", input)
+		}
+		if !strings.Contains(err.String(), errmsg) {
+			t.Errorf("expected [%s] but got [%s] for input %q", errmsg, err, input)
+		}
+	}
+}
+
 func TestParseExprEmptyList(t *testing.T) {
 	input := "()"
 	expected := "()"
@@ -393,4 +405,17 @@ func TestParseSingle(t *testing.T) {
 			t.Error("fourth element not a string: %v(%T)", elem4, elem4)
 		}
 	}
+}
+
+func TestParseDatumLabels(t *testing.T) {
+	mapping := make(map[string]string)
+	mapping[`(foo #1=#\a "bcb" #1#)`] = `(foo #\a "bcb" #\a)`
+	mapping[`(foo #;(#1=#\a "bcb" #1#) 'bar)`] = `(foo  (quote bar))`
+	verifyParseMap(mapping, t)
+}
+
+func TestParseDatumLabelsError(t *testing.T) {
+	mapping := make(map[string]string)
+	mapping[`(foo "bcb" #1#)`] = "label reference before assignment"
+	verifyParseError(t, mapping)
 }
