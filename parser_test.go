@@ -60,7 +60,7 @@ func verifyParse(input, expected string, t *testing.T) {
 		msg := fmt.Sprintf("failed to parse expression '%s', %s", input, err)
 		t.Errorf(msg)
 	} else {
-		actual := stringify(result.First())
+		actual := stringify(result)
 		if actual != expected {
 			t.Errorf("expected <<%s>>, but got <<%s>>", expected, actual)
 		}
@@ -87,24 +87,24 @@ func verifyParseError(t *testing.T, expected map[string]string) {
 
 func TestParseExprEmptyList(t *testing.T) {
 	input := "()"
-	expected := "()"
+	expected := "(())"
 	verifyParse(input, expected, t)
 }
 
 func TestParseExprSingletonList(t *testing.T) {
 	input := "(foo)"
-	expected := "(foo)"
+	expected := "((foo))"
 	verifyParse(input, expected, t)
 }
 
 func TestParseExprList(t *testing.T) {
 	mapping := make(map[string]string)
-	// Input/Output tested with MIT/GNU Scheme
-	mapping["(foo  bar    baz)"] = "(foo bar baz)"
-	mapping["(0 . 1)"] = "(0 . 1)"
-	mapping["(0 1)"] = "(0 1)"
-	mapping["(0 . (1 . ()))"] = "(0 1)"
-	mapping["(0 . (1 . 2))"] = "(0 1 . 2)"
+	// Input/Output tested with MIT/GNU Scheme (prior to simplifying results)
+	mapping["(foo  bar    baz)"] = "((foo bar baz))"
+	mapping["(0 . 1)"] = "((0 . 1))"
+	mapping["(0 1)"] = "((0 1))"
+	mapping["(0 . (1 . ()))"] = "((0 1))"
+	mapping["(0 . (1 . 2))"] = "((0 1 . 2))"
 	verifyParseMap(mapping, t)
 }
 
@@ -112,42 +112,42 @@ func TestParseExprNestedList(t *testing.T) {
 	input := `(foo
   (bar
     baz))`
-	expected := "(foo (bar baz))"
+	expected := "((foo (bar baz)))"
 	verifyParse(input, expected, t)
 }
 
 func TestParseExprBoolean(t *testing.T) {
 	input := "( #t #f #true #false )"
-	expected := "(#t #f #t #f)"
+	expected := "((#t #f #t #f))"
 	verifyParse(input, expected, t)
 }
 
 func TestParseExprString(t *testing.T) {
 	input := `"foo"`
-	expected := `"foo"`
+	expected := `("foo")`
 	verifyParse(input, expected, t)
 }
 
 func TestParseCharacters(t *testing.T) {
 	mapping := make(map[string]string)
-	mapping["#\\a"] = "#\\a"
-	mapping["#\\t"] = "#\\t"
-	mapping["#\\newline"] = "#\\newline"
-	mapping["#\\space"] = "#\\space"
-	mapping["#\\M"] = "#\\M"
-	mapping["#\\z"] = "#\\z"
+	mapping["#\\a"] = "(#\\a)"
+	mapping["#\\t"] = "(#\\t)"
+	mapping["#\\newline"] = "(#\\newline)"
+	mapping["#\\space"] = "(#\\space)"
+	mapping["#\\M"] = "(#\\M)"
+	mapping["#\\z"] = "(#\\z)"
 	verifyParseMap(mapping, t)
 }
 
 func TestParseQuotes(t *testing.T) {
 	mapping := make(map[string]string)
-	mapping["(foo 'x)"] = "(foo (quote x))"
-	mapping["(foo `x)"] = "(foo (quasiquote x))"
-	mapping["(foo ,x)"] = "(foo (unquote x))"
-	mapping["(foo ,@x)"] = "(foo (unquote-splicing x))"
-	mapping["`(list ,(+ 1 2) 4)"] = "(quasiquote (list (unquote (+ 1 2)) 4))"
+	mapping["(foo 'x)"] = "((foo (quote x)))"
+	mapping["(foo `x)"] = "((foo (quasiquote x)))"
+	mapping["(foo ,x)"] = "((foo (unquote x)))"
+	mapping["(foo ,@x)"] = "((foo (unquote-splicing x)))"
+	mapping["`(list ,(+ 1 2) 4)"] = "((quasiquote (list (unquote (+ 1 2)) 4)))"
 	mapping["`(a ,(+ 1 2) ,@(map abs '(4 -5 6)) b)"] =
-		"(quasiquote (a (unquote (+ 1 2)) (unquote-splicing (map abs (quote (4 -5 6)))) b))"
+		"((quasiquote (a (unquote (+ 1 2)) (unquote-splicing (map abs (quote (4 -5 6)))) b)))"
 	// TODO: support `#() vector quasi-quoting
 	// mapping["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] =
 	// 	"(quasiquote #(10 5 (unquote (sqrt 4)) (unquote-splicing (map sqrt (quote (16 9)))) 8))"
@@ -156,11 +156,13 @@ func TestParseQuotes(t *testing.T) {
 
 func TestParseComments(t *testing.T) {
 	mapping := make(map[string]string)
-	mapping["#;(foo 'x)"] = ""
-	mapping["(bar #;(foo 'x) quux)"] = "(bar  quux)"
-	mapping["#; (foo 'x)"] = ""
-	mapping["#;()"] = ""
-	mapping["#;(foo (+ 1 2) 'a)"] = ""
+	mapping["#;(foo 'x)"] = "()"
+	mapping["(bar #;(foo 'x) quux)"] = "((bar  quux))"
+	mapping["#; (foo 'x)"] = "()"
+	mapping[`#1=#\b #; (foo #1=#\a 'x) #1#`] = `(#\b  #\b)`
+	mapping[`#1=#\b #;#1=#\a #1#`] = `(#\b  #\b)`
+	mapping["#;()"] = "()"
+	mapping["#;(foo (+ 1 2) 'a)"] = "()"
 	verifyParseMap(mapping, t)
 }
 
@@ -190,8 +192,7 @@ func TestParseVector(t *testing.T) {
 			t.Errorf("expected slice but got %T", result)
 		}
 	}
-	// This particular input should come back exactly as given.
-	verifyParse(input, input, t)
+	verifyParse(input, fmt.Sprintf("(%s)", input), t)
 }
 
 func TestParseByteVector(t *testing.T) {
@@ -220,48 +221,47 @@ func TestParseByteVector(t *testing.T) {
 			t.Errorf("expected slice but got %T", result)
 		}
 	}
-	// This particular input should come back exactly as given.
-	verifyParse(input, input, t)
+	verifyParse(input, fmt.Sprintf("(%s)", input), t)
 }
 
 func TestParseExprNumbers(t *testing.T) {
 	mapping := make(map[string]string)
-	mapping["1.2345"] = "1.2345"
-	mapping[".1"] = "0.1"
-	mapping["6e4"] = "60000"
-	mapping["12345"] = "12345"
-	mapping["2.1"] = "2.1"
-	// weird test case, parses as float 0.0 but test ignores the rest
-	mapping["0.0.0"] = "0"
-	mapping["3."] = "3"
-	mapping["7.91e+16"] = "7.91e+16"
-	mapping[".000001"] = "1e-06"
-	mapping["#b11111111"] = "255"
-	mapping["#o777"] = "511"
-	mapping["#x4dfCF0"] = "5111024"
-	mapping["#d12345"] = "12345"
-	mapping["#d#i12345"] = "12345"
-	mapping["#d#e12345"] = "12345"
-	mapping["#i#d12345"] = "12345"
-	mapping["#e#d12345"] = "12345"
+	mapping["1.2345"] = "(1.2345)"
+	mapping[".1"] = "(0.1)"
+	mapping["6e4"] = "(60000)"
+	mapping["12345"] = "(12345)"
+	mapping["2.1"] = "(2.1)"
+	// weird test case, not sure this is correct
+	mapping["0.0.0"] = "(0 0)"
+	mapping["3."] = "(3)"
+	mapping["7.91e+16"] = "(7.91e+16)"
+	mapping[".000001"] = "(1e-06)"
+	mapping["#b11111111"] = "(255)"
+	mapping["#o777"] = "(511)"
+	mapping["#x4dfCF0"] = "(5111024)"
+	mapping["#d12345"] = "(12345)"
+	mapping["#d#i12345"] = "(12345)"
+	mapping["#d#e12345"] = "(12345)"
+	mapping["#i#d12345"] = "(12345)"
+	mapping["#e#d12345"] = "(12345)"
 	// note that in Go, -0 is the same as 0, so sign will be lost
-	mapping["3+4i"] = "3+4i"
-	mapping["3-4i"] = "3-4i"
-	mapping["3.0+4.0i"] = "3+4i"
-	mapping["3.0-4.0i"] = "3-4i"
-	mapping["3+i"] = "3+1i"
-	mapping["3-i"] = "3-1i"
-	mapping["+4i"] = "0+4i"
-	mapping["-4i"] = "0-4i"
-	mapping["+i"] = "0+1i"
-	mapping["-i"] = "0-1i"
-	mapping["1/1"] = "1"
-	mapping["1/2"] = "1/2"
-	mapping["1/3"] = "1/3"
-	mapping["1/4"] = "1/4"
-	mapping["3/4"] = "3/4"
-	mapping["6/10"] = "3/5"
-	mapping["100/1000"] = "1/10"
+	mapping["3+4i"] = "(3+4i)"
+	mapping["3-4i"] = "(3-4i)"
+	mapping["3.0+4.0i"] = "(3+4i)"
+	mapping["3.0-4.0i"] = "(3-4i)"
+	mapping["3+i"] = "(3+1i)"
+	mapping["3-i"] = "(3-1i)"
+	mapping["+4i"] = "(0+4i)"
+	mapping["-4i"] = "(0-4i)"
+	mapping["+i"] = "(0+1i)"
+	mapping["-i"] = "(0-1i)"
+	mapping["1/1"] = "(1)"
+	mapping["1/2"] = "(1/2)"
+	mapping["1/3"] = "(1/3)"
+	mapping["1/4"] = "(1/4)"
+	mapping["3/4"] = "(3/4)"
+	mapping["6/10"] = "(3/5)"
+	mapping["100/1000"] = "(1/10)"
 	verifyParseMap(mapping, t)
 }
 
@@ -409,8 +409,11 @@ func TestParseSingle(t *testing.T) {
 
 func TestParseDatumLabels(t *testing.T) {
 	mapping := make(map[string]string)
-	mapping[`(foo #1=#\a "bcb" #1#)`] = `(foo #\a "bcb" #\a)`
-	mapping[`(foo #;(#1=#\a "bcb" #1#) 'bar)`] = `(foo  (quote bar))`
+	mapping[`#1=#\b (foo #1#)`] = `(#\b (foo #\b))`
+	mapping[`(foo #1=#\a "bcb" #1#)`] = `((foo #\a "bcb" #\a))`
+	mapping[`#1=#\b (foo #1=#\a "bcb" #1#) #1#`] = `(#\b (foo #\a "bcb" #\a) #\b)`
+	mapping[`(foo #;(#1=#\a "bcb" #1#) 'bar)`] = `((foo  (quote bar)))`
+	mapping[`#1=#\b (foo "bcb" #1#) #1#`] = `(#\b (foo "bcb" #\b) #\b)`
 	verifyParseMap(mapping, t)
 }
 

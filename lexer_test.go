@@ -275,12 +275,13 @@ func TestLexerBadByteVector(t *testing.T) {
 }
 
 func TestLexerDatumLabels(t *testing.T) {
-	input := "#1=(foo bar baz) #1#"
+	input := "#1=(foo bar #0# baz) #1#"
 	expected := make([]expectedLexerResult, 0)
 	expected = append(expected, expectedLexerResult{tokenLabelDefinition, "#1="})
 	expected = append(expected, expectedLexerResult{tokenOpenParen, "("})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "foo"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "bar"})
+	expected = append(expected, expectedLexerResult{tokenLabelReference, "#0#"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "baz"})
 	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
 	expected = append(expected, expectedLexerResult{tokenLabelReference, "#1#"})
@@ -290,6 +291,7 @@ func TestLexerDatumLabels(t *testing.T) {
 func TestLexerBadDatumLabels(t *testing.T) {
 	input := make(map[string]string)
 	input["#1a"] = "unrecognized hash value"
+	input["#11"] = "unrecognized hash value"
 	verifyLexerErrors(t, input)
 }
 

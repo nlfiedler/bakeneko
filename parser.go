@@ -99,7 +99,10 @@ type parserImpl struct {
 
 // NewParser constructs a new Parser instance.
 func NewParser() Parser {
+	// start with an initial datum label scope
 	labels := make([]map[string]interface{}, 0)
+	scope := make(map[string]interface{})
+	labels = append(labels, scope)
 	return &parserImpl{nil, false, labels}
 }
 
@@ -232,8 +235,10 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 			return theNone, nil
 		}
 		label := t.val[1 : len(t.val)-1]
-		if datum, ok := p.labels[len(p.labels)-1][label]; ok {
-			return datum, nil
+		for idx := len(p.labels) - 1; idx >= 0; idx-- {
+			if datum, ok := p.labels[idx][label]; ok {
+				return datum, nil
+			}
 		}
 		return nil, NewLispErrorf(ESYNTAX, "label reference before assignment: %s", t.val)
 	}
