@@ -30,3 +30,5 @@ Run the `go` tool like so:
 - Macro expansion
 - Quasi-quoting
 - Many standard procedures
+- Defining and using libraries
+- REPL
