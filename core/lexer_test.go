@@ -7,9 +7,127 @@
 package core
 
 import (
+	gc "launchpad.net/gocheck"
 	"strings"
 	"testing"
 )
+
+// Test hooks up gocheck into the 'go test' runner.
+func Test(t *testing.T) {
+	gc.TestingT(t)
+}
+
+type LexerSuite struct {
+}
+
+var _ = gc.Suite(&LexerSuite{})
+
+// TestRowCol ensures that the lexer updates the row and col fields correctly
+// as next(), ignore(), backup(), and rewind() are called.
+func (s *LexerSuite) TestRowCol(c *gc.C) {
+	// TODO: reformulate this with \r\n and \r (and \n)
+	input := `foo
+
+bar baz
+123
+#\a #\space
+(cons 1 2)
+`
+	l := &lexer{
+		name:   "unit",
+		input:  input,
+		tokens: make(chan token),
+		row:    1,
+	}
+	type LexerResult struct {
+		char rune
+		row  int
+		col  int
+	}
+	checker := func(expected []LexerResult) {
+		for i, e := range expected {
+			r := l.next()
+			cm := gc.Commentf("result #%d (%x, %d:%d)", i, r, l.row, l.col)
+			c.Assert(r, gc.Equals, e.char, cm)
+			c.Assert(l.row, gc.Equals, e.row, cm)
+			c.Assert(l.col, gc.Equals, e.col, cm)
+		}
+	}
+	expected := make([]LexerResult, 0)
+	line := 1
+	expected = append(expected, LexerResult{'f', line, 1})
+	expected = append(expected, LexerResult{'o', line, 2})
+	expected = append(expected, LexerResult{'o', line, 3})
+	line++
+	expected = append(expected, LexerResult{'\n', line, 0})
+	checker(expected)
+
+	l.backup()
+	expected = make([]LexerResult, 0)
+	expected = append(expected, LexerResult{'\n', line, 0})
+	line++
+	expected = append(expected, LexerResult{'\n', line, 0})
+	expected = append(expected, LexerResult{'b', line, 1})
+	expected = append(expected, LexerResult{'a', line, 2})
+	checker(expected)
+
+	l.backup()
+	c.Assert(l.row, gc.Equals, line, gc.Commentf("after backup"))
+	c.Assert(l.col, gc.Equals, 1, gc.Commentf("after backup"))
+	expected = make([]LexerResult, 0)
+	expected = append(expected, LexerResult{'a', line, 2})
+	checker(expected)
+
+	// starting all over again...
+	l.rewind()
+	c.Assert(l.row, gc.Equals, 1, gc.Commentf("after first rewind"))
+	c.Assert(l.col, gc.Equals, 0, gc.Commentf("after first rewind"))
+
+	line = 1
+	expected = make([]LexerResult, 0)
+	expected = append(expected, LexerResult{'f', line, 1})
+	expected = append(expected, LexerResult{'o', line, 2})
+	expected = append(expected, LexerResult{'o', line, 3})
+	line++
+	expected = append(expected, LexerResult{'\n', line, 0})
+	line++
+	expected = append(expected, LexerResult{'\n', line, 0})
+	expected = append(expected, LexerResult{'b', line, 1})
+	expected = append(expected, LexerResult{'a', line, 2})
+	expected = append(expected, LexerResult{'r', line, 3})
+	expected = append(expected, LexerResult{' ', line, 4})
+	expected = append(expected, LexerResult{'b', line, 5})
+	expected = append(expected, LexerResult{'a', line, 6})
+	expected = append(expected, LexerResult{'z', line, 7})
+	line++
+	expected = append(expected, LexerResult{'\n', line, 0})
+	expected = append(expected, LexerResult{'1', line, 1})
+	expected = append(expected, LexerResult{'2', line, 2})
+	expected = append(expected, LexerResult{'3', line, 3})
+	line++
+	expected = append(expected, LexerResult{'\n', line, 0})
+	checker(expected)
+
+	l.ignore()
+	expected = make([]LexerResult, 0)
+	expected = append(expected, LexerResult{'#', line, 1})
+	expected = append(expected, LexerResult{'\\', line, 2})
+	expected = append(expected, LexerResult{'a', line, 3})
+	expected = append(expected, LexerResult{' ', line, 4})
+	checker(expected)
+
+	// after getting #\a, backup, rewind, and then verify row/col
+	l.backup()
+	l.rewind()
+	c.Assert(l.row, gc.Equals, line, gc.Commentf("rewind after #\\a"))
+	c.Assert(l.col, gc.Equals, 0, gc.Commentf("rewind after #\\a"))
+	expected = make([]LexerResult, 0)
+	expected = append(expected, LexerResult{'#', line, 1})
+	expected = append(expected, LexerResult{'\\', line, 2})
+	expected = append(expected, LexerResult{'a', line, 3})
+	expected = append(expected, LexerResult{' ', line, 4})
+	checker(expected)
+}
 
 // expectedLexerResult is equivalent to a token and is used in comparing the
 // results from the lexer.
@@ -202,6 +320,7 @@ func TestLexerQuotes(t *testing.T) {
 	expected = append(expected, expectedLexerResult{tokenOpenParen, "("})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "commat"})
 	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -220,6 +339,7 @@ func TestLexerCharacters(t *testing.T) {
 	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\u0000"})
 	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\r"})
 	expected = append(expected, expectedLexerResult{tokenCharacter, "#\\\t"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -230,6 +350,7 @@ func TestLexerBooleans(t *testing.T) {
 	expected = append(expected, expectedLexerResult{tokenBoolean, "#f"})
 	expected = append(expected, expectedLexerResult{tokenBoolean, "#true"})
 	expected = append(expected, expectedLexerResult{tokenBoolean, "#false"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -239,6 +360,8 @@ func TestLexerBadBooleans(t *testing.T) {
 	input["#Falsa"] = "invalid boolean"
 	input["#Tree"] = "invalid boolean"
 	input["#falls"] = "invalid boolean"
+	// These are a good test cases because they are pathological and have
+	// caused the lexer to loop indefinitely.
 	input["#Fawlty"] = "invalid boolean"
 	input["#Trooper"] = "invalid boolean"
 	verifyLexerErrors(t, input)
@@ -253,6 +376,7 @@ func TestLexerVector(t *testing.T) {
 	expected = append(expected, expectedLexerResult{tokenInteger, "2"})
 	expected = append(expected, expectedLexerResult{tokenInteger, "3"})
 	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -264,6 +388,7 @@ func TestLexerByteVector(t *testing.T) {
 	expected = append(expected, expectedLexerResult{tokenInteger, "2"})
 	expected = append(expected, expectedLexerResult{tokenInteger, "3"})
 	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -285,6 +410,7 @@ func TestLexerDatumLabels(t *testing.T) {
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "baz"})
 	expected = append(expected, expectedLexerResult{tokenCloseParen, ")"})
 	expected = append(expected, expectedLexerResult{tokenLabelReference, "#1#"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -395,6 +521,7 @@ func TestLexerIdentifiers(t *testing.T) {
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "..."})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "||"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "|foo @#$! bar|"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 
@@ -411,6 +538,7 @@ func TestLexerFoldCase(t *testing.T) {
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "lAMbdA"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "lambda"})
 	expected = append(expected, expectedLexerResult{tokenIdentifier, "lamBDA"})
+	expected = append(expected, expectedLexerResult{tokenEOF, ""})
 	verifyLexerResults(t, input, expected)
 }
 

@@ -53,6 +53,8 @@ const (
 type token struct {
 	typ tokenType // Type, such as tokenFloat.
 	val string    // Value, such as "23.2".
+	row int       // line of program text where token was found
+	col int       // column where token begins
 }
 
 // String returns the string representation of the lexer token.
@@ -119,6 +121,8 @@ type lexer struct {
 	start   int        // start position of this token
 	pos     int        // current position in the input
 	width   int        // width of last rune read from input
+	row     int        // current line of program text being read
+	col     int        // current column of text being read
 	folding bool       // true if fold-case is enabled
 	tokens  chan token // channel of scanned tokens
 }
@@ -133,15 +137,23 @@ func (l *lexer) String() string {
 // returns the next state.
 type stateFn func(*lexer) stateFn
 
-// lex initializes the lexer to lex the given Tcl command text, returning the
-// channel from which tokens are received. Callers should follow this with a
-// defer drainLexer(chan token) to ensure the channel is drained and the
+// lex initializes the lexer to lex the given Scheme command text, returning
+// the channel from which tokens are received. Callers should follow this with
+// a defer drainLexer(chan token) to ensure the channel is drained and the
 // goroutine emitting tokens can exit.
-func lex(name, input string) chan token {
+func lex(name, input string) chan token { // TODO: change to return an error
+	// simplify end-of-line characters
+	if !utf8.ValidString(input) {
+		// TODO: report an error
+		return nil
+	}
+	input = strings.Replace(input, "\r\n", "\n", -1)
+	input = strings.Replace(input, "\r", "\n", -1)
 	l := &lexer{
 		name:   name,
 		input:  input,
 		tokens: make(chan token),
+		row:    1,
 	}
 	go l.run() // Concurrently run state machine.
 	return l.tokens
@@ -170,18 +182,27 @@ func (l *lexer) emit(t tokenType) {
 
 // emitText passes the given token back to the client via the channel.
 func (l *lexer) emitText(t tokenType, text string) {
-	l.tokens <- token{t, text}
+	l.tokens <- token{t, text, l.row, l.col}
 	l.start = l.pos
 }
 
 // next returns the next rune in the input.
 func (l *lexer) next() (r rune) {
 	if l.pos >= len(l.input) {
+		// signal that nothing was read this time
 		l.width = 0
 		return eof
 	}
 	r, l.width = utf8.DecodeRuneInString(l.input[l.pos:])
 	l.pos += l.width
+	// advance row/col values in lexer
+	if r == '\n' {
+		l.row++
+		l.col = 0
+	} else {
+		// counting characters, not bytes
+		l.col += 1
+	}
 	return r
 }
 
@@ -192,25 +213,49 @@ func (l *lexer) ignore() {
 
 // backup steps back one rune. Can be called only once per call to next.
 func (l *lexer) backup() {
-	l.pos -= l.width
-	l.width = 0
+	// if width is zero, next() reached eof, don't adjust anything this time
+	if l.width > 0 {
+		l.pos -= l.width
+		if l.input[l.pos] == '\n' {
+			// move row/col to end of previously scanned line
+			l.row--
+			l.computeColumn()
+		} else {
+			l.col -= l.width
+		}
+	}
+	_, l.width = utf8.DecodeLastRuneInString(l.input[:l.pos])
 }
 
-// rewind moves the current position back to the start of the current
-// token.
+// rewind moves the current position back to the start of the current token.
 func (l *lexer) rewind() {
+	for ii := l.pos - 1; ii >= l.start; ii-- {
+		// No need to be concerned with rune widths here, any byte in a UTF-8
+		// rune that equals 0x0A is going to be a newline and nothing else.
+		if l.input[ii] == '\n' {
+			l.row--
+		}
+	}
 	l.pos = l.start
-	l.width = 0
+	l.computeColumn()
+	_, l.width = utf8.DecodeLastRuneInString(l.input[:l.pos])
 }
 
 // peek returns but does not consume the next rune in the input.
 func (l *lexer) peek() rune {
-	// save the width so that backup after peek works correctly
-	w := l.width
 	r := l.next()
 	l.backup()
-	l.width = w
 	return r
+}
+
+// computeColumn updates the col field to the correct value after having moved
+// the pos to its new position within the input text.
+func (l *lexer) computeColumn() {
+	nl := strings.LastIndex(l.input[l.start:l.pos], "\n")
+	if nl == -1 {
+		nl = l.start
+	}
+	l.col = utf8.RuneCountInString(l.input[nl:l.pos])
 }
 
 // accept consumes the next rune if it's from the valid set.
@@ -224,18 +269,22 @@ func (l *lexer) accept(valid string) bool {
 
 // acceptRun consumes a run of runes from the valid set.
 func (l *lexer) acceptRun(valid string) bool {
-	pos := l.pos
+	old_pos := l.pos
 	for strings.ContainsRune(valid, l.next()) {
 	}
 	l.backup()
-	return pos < l.pos
+	return old_pos < l.pos
 }
 
 // errorf returns an error token and terminates the scan by passing back
 // a nil pointer that will be the next state.
 func (l *lexer) errorf(format string, args ...interface{}) stateFn {
 	l.emitText(tokenError, fmt.Sprintf(format, args...))
-	return lexStart
+	lexError := func(l *lexer) stateFn {
+		// At this point we just give up.
+		return nil
+	}
+	return lexError
 }
 
 // lexStart reads the next token from the input and determines
@@ -454,7 +503,9 @@ func lexIdentifier(l *lexer) stateFn {
 		// to not appear as the first character, as lexStart would have
 		// sent control to some other state function)
 		if r == eof || strings.ContainsRune("'\",`;() \t\n\r", r) {
-			l.backup()
+			if r != eof {
+				l.backup()
+			}
 			l.emitIdentifier(ident.String())
 			return lexStart
 		}
@@ -520,7 +571,7 @@ func lexNumber(l *lexer) stateFn {
 	acceptUintegerR := func(tentative bool, l *lexer) stateFn {
 		ok := l.acceptRun(digits)
 		if !tentative && !ok {
-			return l.errorf("malformed number: %q", l.input[l.start:l.pos])
+			return l.errorf("malformed unsigned integer: %q", l.input[l.start:l.pos])
 		}
 		if l.acceptRun("#") {
 			exact = false
