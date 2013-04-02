@@ -194,7 +194,6 @@ func TestAppend(t *testing.T) {
 	p.Append(bar)
 	p.Append(baz)
 	p.Append(qux)
-	// TODO: test chained append operations
 	if p.Len() != 4 {
 		t.Errorf("expected 4, but got %d", p.Len())
 	}

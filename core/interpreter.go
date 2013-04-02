@@ -129,7 +129,6 @@ func newNullEnvironment() Environment {
 	mapping[Symbol("/")] = NewBuiltin(builtinDivide)
 	mapping[Symbol("abs")] = NewBuiltin(builtinAbs)
 	mapping[Symbol("quotient")] = NewBuiltin(builtinQuotient)
-	// TODO: add the syntactic bindings for all syntactic keywords in r7rs
 	ne := NewRestrictedEnvironment(nil, mapping)
 	return ne
 }
@@ -141,7 +140,6 @@ var theNullEnvironment Environment = newNullEnvironment()
 // procedures and variables in place for use in a global context.
 func newReportEnvironment() Environment {
 	mapping := make(map[Symbol]interface{})
-	// TODO: add the standard bindings defined in r7rs
 	ge := NewRestrictedEnvironment(theNullEnvironment, mapping)
 	return ge
 }
@@ -230,7 +228,6 @@ func NewClosure(body interface{}, params Pair, env Environment) Closure {
 // Bind evaluates the given values in the closure's associated environment,
 // and returns a new environment suitable for invoking the closure.
 func (c *closure) Bind(values Pair) (Environment, LispError) {
-	// TODO: support arbitrary numbers of arguments (e.g. (list 1 2 3 ...))
 	if c.params.Len() != values.Len() {
 		str := c.params.String()
 		return nil, NewLispErrorf(EARGUMENT,
@@ -327,18 +324,6 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 		// assume that the first is a syntactic keyword until we learn otherwise
 		keyword := true
 		if sym, issym := first.(Symbol); issym {
-			// TODO: handle case syntactic keyword
-			// TODO: handle let syntactic keyword
-			// TODO: handle let* syntactic keyword
-			// TODO: handle letrec syntactic keyword
-			// TODO: for let and letrec, see http://matt.might.net/articles/cesk-machines/
-			// TODO: handle do syntactic keyword
-			// TODO: handle => syntactic keyword
-			// TODO: handle delay syntactic keyword
-			// TODO: handle else syntactic keyword
-			// TODO: handle quasiquote syntactic keyword
-			// TODO: handle unquote syntactic keyword
-			// TODO: handle unquote-splicing syntactic keyword
 			if sym == quoteSym {
 				// (quote exp)
 				return pair.Second(), nil
@@ -614,6 +599,6 @@ func syntaxCond(length int, pair Pair, env Environment) (interface{}, interface{
 
 // syntaxCase implements the syntactic keyword case
 func syntaxCase(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
-	// TODO: implement syntactic case (need Atom.EqualTo() first)
+	// implement syntactic case (need Atom.EqualTo() first)
 	return nil, nil, nil
 }

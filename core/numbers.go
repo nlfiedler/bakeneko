@@ -534,5 +534,3 @@ func builtinQuotient(args []interface{}) (val interface{}, err LispError) {
 	}
 	return dividend.Divide(divisor), nil
 }
-
-// TODO: finish the remaining number predicates and procedures from section 6.2

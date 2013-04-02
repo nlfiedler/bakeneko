@@ -54,5 +54,3 @@ func (b Vector) String() string {
 	buf.WriteString(")")
 	return buf.String()
 }
-
-// TODO: implement procedures for vector

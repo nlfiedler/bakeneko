@@ -9,6 +9,3 @@ package liswat
 //
 // Functions for the input and output ports in Scheme.
 //
-
-// TODO: define (write obj [port])
-// TODO: define (display obj [port])

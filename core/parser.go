@@ -677,7 +677,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 				pair = NewPair(pair)
 			}
 			return nil, nil
-			// TODO: implement macros
+			// pending macro implementation...
 			// result, err := macro.Invoke(pair)
 			// if err != nil {
 			// 	return nil, err

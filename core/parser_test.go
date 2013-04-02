@@ -148,7 +148,7 @@ func TestParseQuotes(t *testing.T) {
 	mapping["`(list ,(+ 1 2) 4)"] = "((quasiquote (list (unquote (+ 1 2)) 4)))"
 	mapping["`(a ,(+ 1 2) ,@(map abs '(4 -5 6)) b)"] =
 		"((quasiquote (a (unquote (+ 1 2)) (unquote-splicing (map abs (quote (4 -5 6)))) b)))"
-	// TODO: support `#() vector quasi-quoting
+	// test support for `#() vector quasi-quoting...
 	// mapping["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] =
 	// 	"(quasiquote #(10 5 (unquote (sqrt 4)) (unquote-splicing (map sqrt (quote (16 9)))) 8))"
 	verifyParseMap(mapping, t)
@@ -284,9 +284,7 @@ func TestExpand(t *testing.T) {
 	mapping[`(foo (if #t (quote bar)))`] = `(foo (if #t (quote bar) ()))`
 	mapping["(foo `x)"] = "(foo (quote x))"
 	mapping["(foo `,x)"] = "(foo x)"
-	// TODO: is this correct for Scheme?
 	mapping["(foo `(,@x y))"] = "(foo (append x (cons (quote y) (quote ()))))"
-	// TODO: test macro invocation
 	verifyExpandMap(mapping, t)
 }
 
