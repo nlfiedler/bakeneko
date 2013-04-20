@@ -32,3 +32,8 @@ Run the `go` tool like so:
 - Many standard procedures
 - Defining and using libraries
 - REPL
+
+## License ##
+
+The bakeneko project is licensed under the
+[New BSD](http://opensource.org/licenses/BSD-3-Clause) license.
