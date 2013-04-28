@@ -12,8 +12,9 @@ import (
 	"testing"
 )
 
-// Test hooks up gocheck into the 'go test' runner.
-func Test(t *testing.T) {
+// TestCore hooks up gocheck into the 'go test' runner. This registration is done
+// exactly once per package. Suites are registered via gocheck.Suite().
+func TestCore(t *testing.T) {
 	gc.TestingT(t)
 }
 
