@@ -153,7 +153,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 	case tokenCloseParen:
 		return nil, NewLispError(ESYNTAX, "unexpected ')'")
 	case tokenString:
-		return NewString(t.contents()), nil
+		return NewParsedString(t.contents(), t.row, t.col), nil
 	case tokenInteger:
 		val, err := atoi(t.val)
 		if err != nil {
@@ -497,7 +497,11 @@ func ator(text string) (int64, int64, LispError) {
 // selected parser token, with the clarifying message.
 func newParserError(err ErrorCode, elem interface{}, msg string) LispError {
 	str := stringify(elem)
-	return NewLispError(err, msg+": "+str)
+	result := NewLispError(err, msg+": "+str)
+	if le, ok := elem.(Locatable); ok {
+		result.SetLocation(le.Location())
+	}
+	return result
 }
 
 // expandListSafely calls expand() on each element of the given list and
@@ -730,3 +734,70 @@ func expandQuasiquote(x interface{}) (interface{}, LispError) {
 	}
 	return NewList(consSym, fexpr, rexpr), nil
 }
+
+// Locatable is a parsed element whose location within the parsed text is
+// known, and is defined by the (1-based) row and column of the input text.
+type Locatable interface {
+	// Location returns the row and column (1-based) of the element.
+	Location() (int, int)
+}
+
+// ParsedString is a Locatable String type.
+type ParsedString struct {
+	str String // String object
+	row int    // line of text where string was encountered
+	col int    // column where string started
+}
+
+// NewParsedString returns a Locatable String object.
+func NewParsedString(val string, row, col int) String {
+	// include quotes when finding the start of the string
+	col -= (len(val) + 2)
+	return &ParsedString{NewString(val), row, col}
+}
+
+func (ps *ParsedString) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(*ParsedString); ok {
+		return ps.str.CompareTo(os.str)
+	}
+	return 0, TypeMismatch
+}
+
+func (ps *ParsedString) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(*ParsedString); ok {
+		return ps.str.EqualTo(os.str)
+	}
+	return false, TypeMismatch
+}
+
+func (ps *ParsedString) Eval() interface{} {
+	return ps.str.Eval()
+}
+
+func (ps *ParsedString) String() string {
+	return ps.str.String()
+}
+
+func (ps *ParsedString) Len() int {
+	return ps.str.Len()
+}
+
+func (ps *ParsedString) Set(pos int, ch rune) {
+	ps.str.Set(pos, ch)
+}
+
+func (ps *ParsedString) Location() (int, int) {
+	return ps.row, ps.col
+}
+
+// TODO: locatable versions of the other atomic types
+// NewParsedInteger(val int64, row, col int) Integer
+// NewParsedFloat(val)
+// NewParsedComplex(val)
+// NewParsedRational(a, b)
+// NewParsedBoolean(t.val)
+// NewParsedCharacter(t.val)
+// NewParsedSymbol(t.val)
+// NewParsedPair(...) ...
+
+// TODO: locatable versions of vector and bytevector

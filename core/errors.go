@@ -35,6 +35,7 @@ const (
 // interface.
 type LispError interface {
 	error
+	Locatable
 	// ErrorCode returns the error code associated with this result.
 	ErrorCode() ErrorCode
 	// ErrorMessage returns the error message associated with this result.
@@ -44,17 +45,21 @@ type LispError interface {
 	Ok() bool
 	// String returns a human readable error message.
 	String() string
+	// SetLocation may be used to specify where in the text the error was found.
+	SetLocation(row, col int)
 }
 
 // lispError is an implemention of the LispError interface.
 type lispError struct {
 	ecode  ErrorCode
 	errmsg string
+	row    int
+	col    int
 }
 
 // NewLispError creates a new LispError based on the given values.
 func NewLispError(err ErrorCode, msg string) LispError {
-	return &lispError{err, msg}
+	return &lispError{err, msg, -1, -1}
 }
 
 // NewLispErrorf creates a new LispError, formatting the message according
@@ -83,6 +88,18 @@ func (e *lispError) ErrorMessage() string {
 		return e.errmsg
 	}
 	return ""
+}
+
+// Location returns the location of the error within the parsed text.
+// The values will be -1 if undefined.
+func (e *lispError) Location() (int, int) {
+	return e.row, e.col
+}
+
+// SetLocation sets the location information for this error.
+func (e *lispError) SetLocation(row, col int) {
+	e.row = row
+	e.col = col
 }
 
 // Ok returns true if the error code is EOK, false otherwise.

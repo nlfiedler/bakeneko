@@ -8,9 +8,15 @@ package core
 
 import (
 	"fmt"
+	gc "launchpad.net/gocheck"
 	"strings"
 	"testing"
 )
+
+type ParserSuite struct {
+}
+
+var _ = gc.Suite(&ParserSuite{})
 
 type expectedExpandError struct {
 	err string // expected error message substring
@@ -419,4 +425,16 @@ func TestParseDatumLabelsError(t *testing.T) {
 	mapping := make(map[string]string)
 	mapping[`(foo "bcb" #1#)`] = "label reference before assignment"
 	verifyParseError(t, mapping)
+}
+
+func (s *ParserSuite) TestErrorLocationString(c *gc.C) {
+	input := `(define "abc" 123)`
+	cm := gc.Commentf("location for %q", input)
+	pair, err := parse(input)
+	c.Assert(err, gc.IsNil, cm)
+	_, err = expand(pair.First(), true)
+	c.Assert(err, gc.NotNil, cm)
+	row, col := err.Location()
+	c.Assert(row, gc.Equals, 1, cm)
+	c.Assert(col, gc.Equals, 8, cm)
 }
