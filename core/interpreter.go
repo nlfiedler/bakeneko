@@ -191,7 +191,7 @@ func (b *builtinProc) Call(values interface{}, env Environment) (interface{}, Li
 
 // lambda is a function body and its set of parameters.
 type lambda struct {
-	body   interface{} // procedure definition
+	body   interface{} // procedure definition TODO: should be a Pair
 	params Pair        // formal parameter list
 }
 
