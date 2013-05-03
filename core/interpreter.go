@@ -493,7 +493,7 @@ func syntaxLambda(pair Pair, env Environment) (interface{}, LispError) {
 func syntaxAnd(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
 	if length == 1 {
 		// (and) => #t
-		return nil, Boolean(true), nil
+		return nil, BooleanTrue, nil
 	}
 	iter := NewPairIterator(pair)
 	iter.Next()
@@ -505,7 +505,7 @@ func syntaxAnd(length int, pair Pair, env Environment) (interface{}, interface{}
 			return nil, nil, err
 		}
 		if !isTrue(result) {
-			return nil, Boolean(false), nil
+			return nil, BooleanFalse, nil
 		}
 	}
 	// the last expression is a tail expression
@@ -516,7 +516,7 @@ func syntaxAnd(length int, pair Pair, env Environment) (interface{}, interface{}
 func syntaxOr(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
 	if length == 1 {
 		// (or) => #f
-		return nil, Boolean(false), nil
+		return nil, BooleanFalse, nil
 	}
 	iter := NewPairIterator(pair)
 	iter.Next()
@@ -528,7 +528,7 @@ func syntaxOr(length int, pair Pair, env Environment) (interface{}, interface{},
 			return nil, nil, err
 		}
 		if isTrue(result) {
-			return nil, Boolean(true), nil
+			return nil, BooleanTrue, nil
 		}
 	}
 	// the last expression is a tail expression

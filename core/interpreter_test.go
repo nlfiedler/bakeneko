@@ -221,20 +221,20 @@ func TestInterpretLambda(t *testing.T) {
 
 func TestInterpretAnd(t *testing.T) {
 	inputs := make(map[string]Boolean)
-	inputs[`(and)`] = Boolean(true)
-	inputs[`(and #t)`] = Boolean(true)
-	inputs[`(and #t #t)`] = Boolean(true)
-	inputs[`(and #t #t #t)`] = Boolean(true)
-	inputs[`(and #f)`] = Boolean(false)
-	inputs[`(and #t #f)`] = Boolean(false)
-	inputs[`(and #t #t #f)`] = Boolean(false)
+	inputs[`(and)`] = BooleanTrue
+	inputs[`(and #t)`] = BooleanTrue
+	inputs[`(and #t #t)`] = BooleanTrue
+	inputs[`(and #t #t #t)`] = BooleanTrue
+	inputs[`(and #f)`] = BooleanFalse
+	inputs[`(and #t #f)`] = BooleanFalse
+	inputs[`(and #t #t #f)`] = BooleanFalse
 	for input, expected := range inputs {
 		result, err := Interpret(input)
 		if err != nil {
 			t.Errorf("Interpret() failed: %v", err)
 		}
 		if b, ok := result.(Boolean); ok {
-			if b != expected {
+			if equal, _ := b.EqualTo(expected); !equal {
 				t.Errorf("expected %s to return %v", input, expected)
 			}
 		} else {
@@ -245,20 +245,20 @@ func TestInterpretAnd(t *testing.T) {
 
 func TestInterpretOr(t *testing.T) {
 	inputs := make(map[string]Boolean)
-	inputs[`(or)`] = Boolean(false)
-	inputs[`(or #t)`] = Boolean(true)
-	inputs[`(or #f #f)`] = Boolean(false)
-	inputs[`(or #f #f #f)`] = Boolean(false)
-	inputs[`(or #f)`] = Boolean(false)
-	inputs[`(or #f #t)`] = Boolean(true)
-	inputs[`(or #f #f #t)`] = Boolean(true)
+	inputs[`(or)`] = BooleanFalse
+	inputs[`(or #t)`] = BooleanTrue
+	inputs[`(or #f #f)`] = BooleanFalse
+	inputs[`(or #f #f #f)`] = BooleanFalse
+	inputs[`(or #f)`] = BooleanFalse
+	inputs[`(or #f #t)`] = BooleanTrue
+	inputs[`(or #f #f #t)`] = BooleanTrue
 	for input, expected := range inputs {
 		result, err := Interpret(input)
 		if err != nil {
 			t.Fatalf("Interpret() failed: %v", err)
 		}
 		if b, ok := result.(Boolean); ok {
-			if b != expected {
+			if equal, _ := b.EqualTo(expected); !equal {
 				t.Errorf("expected %s to return %v", input, expected)
 			}
 		} else {
@@ -279,14 +279,22 @@ func TestInterpretCond(t *testing.T) {
 	inputs[`(cond (#t (define bar 'bar) (set! bar 'foo) bar))`] = foo
 	inputs[`(cond (#f 'bar) (#f 'bar) (else 'foo))`] = foo
 	inputs[`(cond (#f))`] = theEmptyList
-	inputs[`(cond (#t))`] = Boolean(true)
+	inputs[`(cond (#t))`] = BooleanTrue
 	inputs[`(cond (#t => (lambda (x) (if x 'bar 'foo))))`] = Symbol("bar")
 	for input, expected := range inputs {
 		result, err := Interpret(input)
 		if err != nil {
 			t.Fatalf("Interpret() failed: %v", err)
 		}
-		if result != expected {
+		if b, ok := result.(Boolean); ok {
+			atom, ok := expected.(Atom)
+			if !ok {
+				t.Errorf("expected %s to be an Atom", expected)
+			}
+			if equal, _ := b.EqualTo(atom); !equal {
+				t.Errorf("expected %s to return %v", input, expected)
+			}
+		} else if result != expected {
 			t.Errorf("expected %s to return %v", input, expected)
 		}
 	}

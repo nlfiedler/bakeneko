@@ -179,7 +179,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 		}
 		return NewRational(a, b), nil
 	case tokenBoolean:
-		return NewBoolean(t.val), nil
+		return NewParsedBoolean(t.val, t.row, t.col), nil
 	case tokenCharacter:
 		if len(t.val) > 3 {
 			// lexer probably messed up
@@ -759,6 +759,8 @@ func NewParsedString(val string, row, col int) String {
 func (ps *ParsedString) CompareTo(other Atom) (int8, error) {
 	if os, ok := other.(*ParsedString); ok {
 		return ps.str.CompareTo(os.str)
+	} else if s, ok := other.(String); ok {
+		return ps.str.CompareTo(s)
 	}
 	return 0, TypeMismatch
 }
@@ -766,6 +768,8 @@ func (ps *ParsedString) CompareTo(other Atom) (int8, error) {
 func (ps *ParsedString) EqualTo(other Atom) (bool, error) {
 	if os, ok := other.(*ParsedString); ok {
 		return ps.str.EqualTo(os.str)
+	} else if s, ok := other.(String); ok {
+		return ps.str.EqualTo(s)
 	}
 	return false, TypeMismatch
 }
@@ -790,12 +794,58 @@ func (ps *ParsedString) Location() (int, int) {
 	return ps.row, ps.col
 }
 
+// ParsedBoolean is a Locatable Boolean type.
+type ParsedBoolean struct {
+	boole Boolean // Boolean object
+	row   int     // line of text where string was encountered
+	col   int     // column where string started
+}
+
+// NewParsedBoolean returns a Locatable Boolean object.
+func NewParsedBoolean(val string, row, col int) Boolean {
+	col -= len(val)
+	return &ParsedBoolean{NewBoolean(val), row, col}
+}
+
+func (pb *ParsedBoolean) CompareTo(other Atom) (int8, error) {
+	if ob, ok := other.(*ParsedBoolean); ok {
+		return pb.boole.CompareTo(ob.boole)
+	} else if b, ok := other.(Boolean); ok {
+		return pb.boole.CompareTo(b)
+	}
+	return 0, TypeMismatch
+}
+
+func (pb *ParsedBoolean) EqualTo(other Atom) (bool, error) {
+	if ob, ok := other.(*ParsedBoolean); ok {
+		return pb.boole.EqualTo(ob.boole)
+	} else if b, ok := other.(Boolean); ok {
+		return pb.boole.EqualTo(b)
+	}
+	return false, TypeMismatch
+}
+
+func (pb *ParsedBoolean) Eval() interface{} {
+	return pb.boole.Eval()
+}
+
+func (pb *ParsedBoolean) String() string {
+	return pb.boole.String()
+}
+
+func (pb *ParsedBoolean) Value() bool {
+	return pb.boole.Value()
+}
+
+func (pb *ParsedBoolean) Location() (int, int) {
+	return pb.row, pb.col
+}
+
 // TODO: locatable versions of the other atomic types
 // NewParsedInteger(val int64, row, col int) Integer
 // NewParsedFloat(val)
 // NewParsedComplex(val)
 // NewParsedRational(a, b)
-// NewParsedBoolean(t.val)
 // NewParsedCharacter(t.val)
 // NewParsedSymbol(t.val)
 // NewParsedPair(...) ...

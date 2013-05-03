@@ -43,7 +43,20 @@ type Atom interface {
 }
 
 // Boolean represents a true/false value in Scheme.
-type Boolean bool
+type Boolean interface {
+	Atom
+	// Value returns the boolean value.
+	Value() bool
+}
+
+// booleanImpl is simply a bool with functions.
+type booleanImpl bool
+
+// BooleanTrue is the singleton instance of the 'true' value.
+var BooleanTrue Boolean = booleanImpl(true)
+
+// BooleanFalse is the singleton instance of the 'false' value.
+var BooleanFalse Boolean = booleanImpl(false)
 
 // NewBoolean compares the input with the expected values for Scheme booleans
 // (e.g. "#t", "#T", "#f", and "#F") and constructs a new Boolean atom. If val
@@ -52,21 +65,30 @@ func NewBoolean(val string) Boolean {
 	// lexer validated token is authentic boolean, just need value
 	lower := strings.ToLower(val)
 	if lower == "#t" || lower == "#true" {
-		return Boolean(true)
+		return BooleanTrue
 	} else if val == "#f" || val == "#false" {
-		return Boolean(false)
+		return BooleanFalse
 	}
 	panic(fmt.Sprintf("lexer/parser bug: '%s' is not boolean", val))
+}
+
+// BooleanFromBool returns the singleton instance of the Boolean value that
+// matches the value given (i.e. BooleanTrue or BooleanFalse).
+func BooleanFromBool(val bool) Boolean {
+	if val {
+		return BooleanTrue
+	}
+	return BooleanFalse
 }
 
 // CompareTo returns zero if this object represents the same boolean value as
 // the argument; a positive value if this object represents true and the
 // argument represents false; and a negative value if this object represents
 // false and the argument represents true.
-func (b Boolean) CompareTo(other Atom) (int8, error) {
+func (b booleanImpl) CompareTo(other Atom) (int8, error) {
 	if ob, ok := other.(Boolean); ok {
 		bb := bool(b)
-		obb := bool(ob)
+		obb := ob.Value()
 		if bb == obb {
 			return 0, nil
 		} else if bb {
@@ -78,28 +100,28 @@ func (b Boolean) CompareTo(other Atom) (int8, error) {
 	return 0, TypeMismatch
 }
 
-func (b Boolean) EqualTo(other Atom) (bool, error) {
+func (b booleanImpl) EqualTo(other Atom) (bool, error) {
 	if ob, ok := other.(Boolean); ok {
-		return bool(b) == bool(ob), nil
+		return bool(b) == ob.Value(), nil
 	}
 	return false, TypeMismatch
 }
 
 // Eval returns true or false depending on the value of the Boolean.
-func (b Boolean) Eval() interface{} {
+func (b booleanImpl) Eval() interface{} {
 	return bool(b)
 }
 
 // String returns "#t" or "#f" depending on the value of the Boolean.
-func (b Boolean) String() string {
+func (b booleanImpl) String() string {
 	if bool(b) {
 		return "#t"
 	}
 	return "#f"
 }
 
-// Returns the boolean value.
-func (b Boolean) Value() bool {
+// Value returns the boolean value.
+func (b booleanImpl) Value() bool {
 	return bool(b)
 }
 

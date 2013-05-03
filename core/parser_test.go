@@ -438,3 +438,15 @@ func (s *ParserSuite) TestErrorLocationString(c *gc.C) {
 	c.Assert(row, gc.Equals, 1, cm)
 	c.Assert(col, gc.Equals, 8, cm)
 }
+
+func (s *ParserSuite) TestErrorLocationBoolean(c *gc.C) {
+	input := `(define #false 123)`
+	cm := gc.Commentf("location for %q", input)
+	pair, err := parse(input)
+	c.Assert(err, gc.IsNil, cm)
+	_, err = expand(pair.First(), true)
+	c.Assert(err, gc.NotNil, cm)
+	row, col := err.Location()
+	c.Assert(row, gc.Equals, 1, cm)
+	c.Assert(col, gc.Equals, 8, cm)
+}

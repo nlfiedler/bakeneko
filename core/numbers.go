@@ -45,7 +45,7 @@ func builtinIsNumber(args []interface{}) (interface{}, LispError) {
 			"number? called with %d argument(s), takes only one", len(args))
 	}
 	_, ok := args[0].(Number)
-	return Boolean(ok), nil
+	return BooleanFromBool(ok), nil
 }
 
 // builtinIsComplex implements the complex? predicate.
@@ -56,7 +56,7 @@ func builtinIsComplex(args []interface{}) (interface{}, LispError) {
 	}
 	// Treat all numbers as complex
 	_, ok := args[0].(Number)
-	return Boolean(ok), nil
+	return BooleanFromBool(ok), nil
 }
 
 // builtinIsReal implements the real? predicate.
@@ -67,17 +67,17 @@ func builtinIsReal(args []interface{}) (interface{}, LispError) {
 	}
 	_, ok := args[0].(Float)
 	if ok {
-		return Boolean(ok), nil
+		return BooleanFromBool(ok), nil
 	}
 	_, ok = args[0].(Integer)
 	if ok {
-		return Boolean(ok), nil
+		return BooleanFromBool(ok), nil
 	}
 	c, ok := args[0].(Complex)
 	if ok {
 		ok = c.ImagPart() == 0.0
 	}
-	return Boolean(ok), nil
+	return BooleanFromBool(ok), nil
 }
 
 // builtinIsRational implements the rational? predicate.
@@ -91,7 +91,7 @@ func builtinIsRational(args []interface{}) (interface{}, LispError) {
 		// Otherwise, real numbers are also rational.
 		return builtinIsReal(args)
 	}
-	return Boolean(ok), nil
+	return BooleanFromBool(ok), nil
 }
 
 // builtinIsInteger implements the integer? predicate.
@@ -106,10 +106,10 @@ func builtinIsInteger(args []interface{}) (interface{}, LispError) {
 		if math.IsNaN(fr) {
 			return nil, NewLispError(EARGUMENT, "integer? argument out of range")
 		}
-		return Boolean(fr == 0.0), nil
+		return BooleanFromBool(fr == 0.0), nil
 	}
 	_, ok = args[0].(Integer)
-	return Boolean(ok), nil
+	return BooleanFromBool(ok), nil
 }
 
 // builtinIsExact implements the exact? predicate.
@@ -119,7 +119,7 @@ func builtinIsExact(args []interface{}) (interface{}, LispError) {
 			"exact? called with %d argument(s), takes only one", len(args))
 	}
 	// All of our numbers are inexact
-	return Boolean(false), nil
+	return BooleanFalse, nil
 }
 
 // builtinIsInexact implements the exact? predicate.
@@ -130,7 +130,7 @@ func builtinIsInexact(args []interface{}) (interface{}, LispError) {
 	}
 	// All of our numbers are inexact
 	_, ok := args[0].(Number)
-	return Boolean(ok), nil
+	return BooleanFromBool(ok), nil
 }
 
 // coerceNumbers coerces the given arguments into compatible types. Order is
@@ -202,11 +202,11 @@ func compareNumbersequence(args []interface{}, op string, fn compareNumbersFn) (
 			return nil, NewLispError(EARGUMENT, err.Error())
 		}
 		if !fn(cmp) {
-			return Boolean(false), nil
+			return BooleanFalse, nil
 		}
 		prev = curr
 	}
-	return Boolean(true), nil
+	return BooleanTrue, nil
 }
 
 // builtinIsEqual implements the = predicate.
@@ -264,7 +264,7 @@ func builtinIsZero(args []interface{}) (interface{}, LispError) {
 	if err != nil {
 		return nil, NewLispError(EARGUMENT, err.Error())
 	}
-	return Boolean(cmp == 0), nil
+	return BooleanFromBool(cmp == 0), nil
 }
 
 // builtinIsPositive implements the positive? predicate.
@@ -282,7 +282,7 @@ func builtinIsPositive(args []interface{}) (interface{}, LispError) {
 	if err != nil {
 		return nil, NewLispError(EARGUMENT, err.Error())
 	}
-	return Boolean(cmp < 0), nil
+	return BooleanFromBool(cmp < 0), nil
 }
 
 // builtinIsNegative implements the negative? predicate.
@@ -300,7 +300,7 @@ func builtinIsNegative(args []interface{}) (interface{}, LispError) {
 	if err != nil {
 		return nil, NewLispError(EARGUMENT, err.Error())
 	}
-	return Boolean(cmp > 0), nil
+	return BooleanFromBool(cmp > 0), nil
 }
 
 // builtinIsOdd implements the odd? predicate.
@@ -320,7 +320,7 @@ func builtinIsOdd(args []interface{}) (interface{}, LispError) {
 	if err != nil {
 		return nil, NewLispError(EARGUMENT, err.Error())
 	}
-	return Boolean(cmp != 0), nil
+	return BooleanFromBool(cmp != 0), nil
 }
 
 // builtinIsEven implements the even? predicate.
@@ -340,7 +340,7 @@ func builtinIsEven(args []interface{}) (interface{}, LispError) {
 	if err != nil {
 		return nil, NewLispError(EARGUMENT, err.Error())
 	}
-	return Boolean(cmp == 0), nil
+	return BooleanFromBool(cmp == 0), nil
 }
 
 // reduceNumbersFn performs a reduction on two numbers, returning the result.

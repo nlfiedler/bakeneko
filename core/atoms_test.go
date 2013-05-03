@@ -63,10 +63,10 @@ func TestSymbol(t *testing.T) {
 	if s.String() != "" {
 		t.Error("empty Symbol.String() should return empty string")
 	}
-	if _, err := s.EqualTo(Boolean(true)); err == nil {
+	if _, err := s.EqualTo(BooleanTrue); err == nil {
 		t.Error("Symbol.EqualTo() wrong type should fail")
 	}
-	if _, err := s.CompareTo(Boolean(true)); err == nil {
+	if _, err := s.CompareTo(BooleanTrue); err == nil {
 		t.Error("Symbol.CompareTo() wrong type should fail")
 	}
 	if eq, err := s.EqualTo(Symbol("")); err != nil || !eq {
@@ -158,7 +158,7 @@ func TestString(t *testing.T) {
 	if !result {
 		t.Error("empty String.EqualTo() should return true")
 	}
-	if _, err = s.EqualTo(Boolean(true)); err == nil {
+	if _, err = s.EqualTo(BooleanTrue); err == nil {
 		t.Error("String.EqualTo() wrong type should have failed")
 	}
 	// non-empty String
@@ -256,7 +256,7 @@ func TestCharacter(t *testing.T) {
 	if !eq {
 		t.Error("Character.EqualTo() should have returned true")
 	}
-	if _, err = ch.EqualTo(Boolean(true)); err == nil {
+	if _, err = ch.EqualTo(BooleanTrue); err == nil {
 		t.Error("Character.EqualTo() wrong type should have failed")
 	}
 	// test CompareTo()
@@ -267,7 +267,7 @@ func TestCharacter(t *testing.T) {
 	if cmp != 0 {
 		t.Error("Character.CompareTo() should have returned zero")
 	}
-	if _, err = ch.CompareTo(Boolean(true)); err == nil {
+	if _, err = ch.CompareTo(BooleanTrue); err == nil {
 		t.Error("Character.CompareTo() wrong type should have failed")
 	}
 	oc = NewCharacter("#\\b")
@@ -294,13 +294,13 @@ func TestVoid(t *testing.T) {
 	if theVoid.String() != "" {
 		t.Error("Void.String() should return the empty string")
 	}
-	if _, err := theVoid.EqualTo(Boolean(true)); err == nil {
+	if _, err := theVoid.EqualTo(BooleanTrue); err == nil {
 		t.Error("Void.EqualTo() wrong type should have failed")
 	}
 	if eq, err := theVoid.EqualTo(Void(1)); err != nil || !eq {
 		t.Error("Void.EqualTo() should have worked")
 	}
-	if _, err := theVoid.CompareTo(Boolean(true)); err == nil {
+	if _, err := theVoid.CompareTo(BooleanTrue); err == nil {
 		t.Error("Void.CompareTo() wrong type should have failed")
 	}
 	if eq, err := theVoid.CompareTo(Void(1)); err != nil || eq != 0 {
@@ -311,7 +311,7 @@ func TestVoid(t *testing.T) {
 func TestInteger(t *testing.T) {
 	i := NewInteger(123)
 	// test EqualTo()
-	if _, err := i.EqualTo(Boolean(true)); err == nil {
+	if _, err := i.EqualTo(BooleanTrue); err == nil {
 		t.Error("Integer.EqualTo() wrong type should fail")
 	}
 	if eq, err := i.EqualTo(Integer(123)); err != nil || !eq {
@@ -321,7 +321,7 @@ func TestInteger(t *testing.T) {
 		t.Error("Integer.EqualTo() different value should be false")
 	}
 	// test CompareTo()
-	if _, err := i.CompareTo(Boolean(true)); err == nil {
+	if _, err := i.CompareTo(BooleanTrue); err == nil {
 		t.Error("Integer.CompareTo() wrong type should fail")
 	}
 	if cmp, err := i.CompareTo(Integer(123)); err != nil || cmp != 0 {
@@ -355,7 +355,7 @@ func TestInteger(t *testing.T) {
 func TestFloat(t *testing.T) {
 	f := NewFloat(1.2)
 	// test EqualTo()
-	if _, err := f.EqualTo(Boolean(true)); err == nil {
+	if _, err := f.EqualTo(BooleanTrue); err == nil {
 		t.Error("Float.EqualTo() wrong type should fail")
 	}
 	if eq, err := f.EqualTo(Float(1.2)); err != nil || !eq {
@@ -365,7 +365,7 @@ func TestFloat(t *testing.T) {
 		t.Error("Float.EqualTo() different value should be false")
 	}
 	// test CompareTo()
-	if _, err := f.CompareTo(Boolean(true)); err == nil {
+	if _, err := f.CompareTo(BooleanTrue); err == nil {
 		t.Error("Float.CompareTo() wrong type should fail")
 	}
 	if cmp, err := f.CompareTo(Float(1.2)); err != nil || cmp != 0 {
@@ -399,7 +399,7 @@ func TestFloat(t *testing.T) {
 func TestComplex(t *testing.T) {
 	f := NewComplex(complex(1.2, 1.0))
 	// test EqualTo()
-	if _, err := f.EqualTo(Boolean(true)); err == nil {
+	if _, err := f.EqualTo(BooleanTrue); err == nil {
 		t.Error("Complex.EqualTo() wrong type should fail")
 	}
 	if eq, err := f.EqualTo(Complex(complex(1.2, 1.0))); err != nil || !eq {
@@ -409,7 +409,7 @@ func TestComplex(t *testing.T) {
 		t.Error("Complex.EqualTo() different value should be false")
 	}
 	// test CompareTo()
-	if _, err := f.CompareTo(Boolean(true)); err == nil {
+	if _, err := f.CompareTo(BooleanTrue); err == nil {
 		t.Error("Complex.CompareTo() wrong type should fail")
 	}
 	if cmp, err := f.CompareTo(Complex(complex(1.2, 1.0))); err != nil || cmp != 0 {
@@ -446,7 +446,7 @@ func TestComplex(t *testing.T) {
 func TestRational(t *testing.T) {
 	r := NewRational(1, 4)
 	// test EqualTo()
-	if _, err := r.EqualTo(Boolean(true)); err == nil {
+	if _, err := r.EqualTo(BooleanTrue); err == nil {
 		t.Error("Rational.EqualTo() wrong type should fail")
 	}
 	if eq, err := r.EqualTo(NewRational(1, 4)); err != nil || !eq {
@@ -456,7 +456,7 @@ func TestRational(t *testing.T) {
 		t.Error("Rational.EqualTo() different value should be false")
 	}
 	// test CompareTo()
-	if _, err := r.CompareTo(Boolean(true)); err == nil {
+	if _, err := r.CompareTo(BooleanTrue); err == nil {
 		t.Error("Rational.CompareTo() wrong type should fail")
 	}
 	if cmp, err := r.CompareTo(NewRational(1, 4)); err != nil || cmp != 0 {
