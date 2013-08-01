@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file.
 //
 
-package liswat
+package core
 
 //
 // This lexer is fashioned after that which was presented by Rob Pike in the

@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file.
 //
 
-package liswat
+package core
 
 //
 // Interpreter for our Scheme-like language, which turns a tree of expressions

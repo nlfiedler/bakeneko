@@ -4,17 +4,17 @@
 // license that can be found in the LICENSE file.
 //
 
-package liswat
+package core
 
 import (
 	"errors"
 	"fmt"
 )
 
-var NumberOutOfRange = errors.New("liswat: number value of out range")
-var OutOfBounds = errors.New("liswat: index out of bounds")
-var ParserError = errors.New("liswat: unexpected parser error")
-var TypeMismatch = errors.New("liswat: type mismatch in atom comparison")
+var NumberOutOfRange = errors.New("number value of out range")
+var OutOfBounds = errors.New("index out of bounds")
+var ParserError = errors.New("unexpected parser error")
+var TypeMismatch = errors.New("type mismatch in atom comparison")
 
 // ErrorCode indicates the error status of the Scheme evaluation, with EOK
 // representing no error.

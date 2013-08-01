@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file.
 //
 
-package liswat
+package core
 
 //
 // Set of built-in procedures for handling pairs and lists.
