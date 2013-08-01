@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -49,10 +49,10 @@ func TestEnvironment(t *testing.T) {
 	if e == nil {
 		t.Fatalf("constructing new environment failed")
 	}
-	foo := Symbol("foo")
+	foo := NewSymbol("foo")
 	v := e.Find(foo)
 	if v != nil {
-		t.Errorf("unexpected undefined var to return nil")
+		t.Errorf("expected undefined var to return nil")
 	}
 	err := e.Set(foo, "bar")
 	if err == nil {
@@ -61,13 +61,13 @@ func TestEnvironment(t *testing.T) {
 	e.Define(foo, "bar")
 	v = e.Find(foo)
 	if v != "bar" {
-		t.Errorf("expected defined var to return 'bar'")
+		t.Errorf("expected defined var to return 'bar', but got %s", v)
 	}
 }
 
 func TestEnvironmentParent(t *testing.T) {
 	p := NewEnvironment(nil)
-	foo := Symbol("foo")
+	foo := NewSymbol("foo")
 	p.Define(foo, "bar")
 	e := NewEnvironment(p)
 	if e == nil {
@@ -95,7 +95,7 @@ func TestEnvironmentParent(t *testing.T) {
 
 func TestEnvironmentOverride(t *testing.T) {
 	p := NewEnvironment(nil)
-	foo := Symbol("foo")
+	foo := NewSymbol("foo")
 	p.Define(foo, "bar")
 	e := NewEnvironment(p)
 	if e == nil {
@@ -187,7 +187,7 @@ func TestInterpretQuote(t *testing.T) {
 		t.Errorf("Interpret() failed: %v", err)
 	}
 	if num, ok := result.(Symbol); ok {
-		if num != "foo" {
+		if num.String() != "foo" {
 			t.Errorf("result wrong value: %v", num)
 		}
 	} else {
@@ -214,8 +214,13 @@ func TestInterpretLambda(t *testing.T) {
 	if err != nil {
 		t.Errorf("Interpret() failed: %v", err)
 	}
-	if result != Symbol("foo") {
-		t.Error("expected lambda 'fun' to return symbol foo")
+	expected := NewSymbol("foo")
+	if sym, ok := result.(Symbol); ok {
+		if equal, _ := sym.EqualTo(expected); !equal {
+			t.Error("expected lambda 'fun' to return symbol foo")
+		}
+	} else {
+		t.Errorf("expected lambda 'fun' to return symbol, got %T", result)
 	}
 }
 
@@ -268,7 +273,7 @@ func TestInterpretOr(t *testing.T) {
 }
 
 func TestInterpretCond(t *testing.T) {
-	foo := Symbol("foo")
+	foo := NewSymbol("foo")
 	inputs := make(map[string]interface{})
 	inputs[`(cond (else 'foo))`] = foo
 	inputs[`(cond (#t 'foo))`] = foo
@@ -280,22 +285,32 @@ func TestInterpretCond(t *testing.T) {
 	inputs[`(cond (#f 'bar) (#f 'bar) (else 'foo))`] = foo
 	inputs[`(cond (#f))`] = theEmptyList
 	inputs[`(cond (#t))`] = BooleanTrue
-	inputs[`(cond (#t => (lambda (x) (if x 'bar 'foo))))`] = Symbol("bar")
+	inputs[`(cond (#t => (lambda (x) (if x 'bar 'foo))))`] = NewSymbol("bar")
 	for input, expected := range inputs {
 		result, err := Interpret(input)
 		if err != nil {
 			t.Fatalf("Interpret() failed: %v", err)
 		}
-		if b, ok := result.(Boolean); ok {
-			atom, ok := expected.(Atom)
-			if !ok {
-				t.Errorf("expected %s to be an Atom", expected)
+		switch thing := result.(type) {
+		case Atom:
+			if expectedAtom, ok := expected.(Atom); ok {
+				if equal, _ := thing.EqualTo(expectedAtom); !equal {
+					t.Errorf("expected %s to return %v", input, expected)
+				}
+			} else {
+				t.Errorf("unexpected Atom result for %s", input)
 			}
-			if equal, _ := b.EqualTo(atom); !equal {
-				t.Errorf("expected %s to return %v", input, expected)
+		case Pair:
+			if expectedPair, ok := expected.(Pair); ok {
+				// Directly comparing Pair instances...
+				if thing != expectedPair {
+					t.Errorf("expected %s to return %v", input, expected)
+				}
+			} else {
+				t.Errorf("unexpected Pair result for %s", input)
 			}
-		} else if result != expected {
-			t.Errorf("expected %s to return %v", input, expected)
+		default:
+			t.Errorf("unexpected result type %T for %s", result, input)
 		}
 	}
 	// test error cases

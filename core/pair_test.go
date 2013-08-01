@@ -35,7 +35,7 @@ func TestPairNil(t *testing.T) {
 }
 
 func TestPairSingle(t *testing.T) {
-	foo := Symbol("foo")
+	foo := NewSymbol("foo")
 	p := NewPair(foo)
 	if p.Len() != 1 {
 		t.Errorf("expected 1, but got %d", p.Len())
@@ -71,8 +71,8 @@ func TestPairSingle(t *testing.T) {
 }
 
 func TestCons(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
 	p := Cons(foo, bar)
 	if p.Len() != 2 {
 		t.Errorf("expected 2, but got %d", p.Len())
@@ -108,8 +108,8 @@ func TestCons(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
 	p := List(foo, bar)
 	if p.Len() != 2 {
 		t.Errorf("expected 2, but got %d", p.Len())
@@ -145,10 +145,10 @@ func TestList(t *testing.T) {
 }
 
 func TestConsMultiple(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
-	baz := Symbol("baz")
-	qux := Symbol("qux")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
+	baz := NewSymbol("baz")
+	qux := NewSymbol("qux")
 	p := Cons(baz, qux)
 	p = Cons(bar, p)
 	p = Cons(foo, p)
@@ -186,10 +186,10 @@ func TestConsMultiple(t *testing.T) {
 }
 
 func TestAppend(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
-	baz := Symbol("baz")
-	qux := Symbol("qux")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
+	baz := NewSymbol("baz")
+	qux := NewSymbol("qux")
 	p := NewPair(foo)
 	p.Append(bar)
 	p.Append(baz)
@@ -228,10 +228,10 @@ func TestAppend(t *testing.T) {
 }
 
 func TestAppendChain(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
-	baz := Symbol("baz")
-	qux := Symbol("qux")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
+	baz := NewSymbol("baz")
+	qux := NewSymbol("qux")
 	p := NewPair(foo)
 	p.Append(bar).Append(baz).Append(qux)
 	if p.Len() != 4 {
@@ -274,7 +274,7 @@ func TestCar(t *testing.T) {
 	if Car("foo") != nil {
 		t.Errorf("Car(\"foo\") should be nil")
 	}
-	foo := Symbol("foo")
+	foo := NewSymbol("foo")
 	p := NewPair(foo)
 	if Car(p) != foo {
 		t.Errorf("Car() on non-empty pair should return first element")
@@ -288,12 +288,12 @@ func TestCdr(t *testing.T) {
 	if Cdr("foo") != nil {
 		t.Errorf("Cdr(\"foo\") should be nil")
 	}
-	foo := Symbol("foo")
+	foo := NewSymbol("foo")
 	p := NewPair(foo)
 	if Cdr(p) != nil {
 		t.Errorf("Cdr() of singleton pair should be nil")
 	}
-	bar := Symbol("bar")
+	bar := NewSymbol("bar")
 	p.Append(bar)
 	if r, ok := Cdr(p).(Pair); ok {
 		if r.First() != bar {
@@ -337,12 +337,12 @@ func verifyCxrTree(t *testing.T, expected map[string]string, input string) {
 }
 
 func TestCxr(t *testing.T) {
-	p := NewPair(Symbol("a"))
-	p.Append(Symbol("b"))
-	p.Append(Symbol("c"))
-	p.Append(Symbol("d"))
-	p.Append(Symbol("e"))
-	p.Append(Symbol("f"))
+	p := NewPair(NewSymbol("a"))
+	p.Append(NewSymbol("b"))
+	p.Append(NewSymbol("c"))
+	p.Append(NewSymbol("d"))
+	p.Append(NewSymbol("e"))
+	p.Append(NewSymbol("f"))
 	expected := make(map[string]string)
 	expected["car"] = "a"
 	expected["cdr"] = "(b c d e f)"
@@ -373,10 +373,10 @@ func TestCxr(t *testing.T) {
 }
 
 func TestPairMap(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
-	baz := Symbol("baz")
-	qux := Symbol("qux")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
+	baz := NewSymbol("baz")
+	qux := NewSymbol("qux")
 	p := NewPair(foo)
 	p.Append(bar)
 	p.Append(baz)
@@ -391,10 +391,10 @@ func TestPairMap(t *testing.T) {
 }
 
 func TestNewList(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
-	baz := Symbol("baz")
-	qux := Symbol("qux")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
+	baz := NewSymbol("baz")
+	qux := NewSymbol("qux")
 	p := NewList(foo, bar, baz, qux)
 	if p.Len() != 4 {
 		t.Errorf("expected 4, but got %d", p.Len())
@@ -414,10 +414,10 @@ func TestNewList(t *testing.T) {
 }
 
 func TestNestedList(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
-	baz := Symbol("baz")
-	qux := Symbol("qux")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
+	baz := NewSymbol("baz")
+	qux := NewSymbol("qux")
 	s := NewList(bar, baz)
 	p := NewList(foo, s, qux)
 	if p.Len() != 3 {
@@ -447,10 +447,10 @@ func TestNestedList(t *testing.T) {
 }
 
 func TestPairIterator(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
-	baz := Symbol("baz")
-	qux := Symbol("qux")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
+	baz := NewSymbol("baz")
+	qux := NewSymbol("qux")
 	p := NewList(foo, bar, baz, qux)
 	iter := NewPairIterator(p)
 	assert.T(t, iter.HasNext())
@@ -469,8 +469,8 @@ func TestPairIterator(t *testing.T) {
 }
 
 func TestPairIteratorImproper(t *testing.T) {
-	foo := Symbol("foo")
-	bar := Symbol("bar")
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
 	p := Cons(foo, bar)
 	iter := NewPairIterator(p)
 	assert.T(t, iter.HasNext())

@@ -20,24 +20,24 @@ import (
 
 var endOfStreamMsg = "unexpectedly reached end of expression"
 
-var eofObject = Symbol("#<eof-object>")
-var andSym = Symbol("and")
-var arrowSym = Symbol("=>")
-var beginSym = Symbol("begin")
-var condSym = Symbol("cond")
-var defineSym = Symbol("define")
-var definesyntaxSym = Symbol("define-syntax")
-var elseSym = Symbol("else")
-var ifSym = Symbol("if")
-var lambdaSym = Symbol("lambda")
-var orSym = Symbol("or")
-var quasiquoteSym = Symbol("quasiquote")
-var quoteSym = Symbol("quote")
-var setSym = Symbol("set!")
-var unquoteSym = Symbol("unquote")
-var unquotesplicingSym = Symbol("unquote-splicing")
-var appendSym = Symbol("append")
-var consSym = Symbol("cons")
+var eofObject = NewSymbol("#<eof-object>")
+var andSym = NewSymbol("and")
+var arrowSym = NewSymbol("=>")
+var beginSym = NewSymbol("begin")
+var condSym = NewSymbol("cond")
+var defineSym = NewSymbol("define")
+var definesyntaxSym = NewSymbol("define-syntax")
+var elseSym = NewSymbol("else")
+var ifSym = NewSymbol("if")
+var lambdaSym = NewSymbol("lambda")
+var orSym = NewSymbol("or")
+var quasiquoteSym = NewSymbol("quasiquote")
+var quoteSym = NewSymbol("quote")
+var setSym = NewSymbol("set!")
+var unquoteSym = NewSymbol("unquote")
+var unquotesplicingSym = NewSymbol("unquote-splicing")
+var appendSym = NewSymbol("append")
+var consSym = NewSymbol("cons")
 
 // None represents the result of a line comment, or other results of parsing
 // that resolve to nothing.
@@ -206,7 +206,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 		}
 		return NewList(quote, pair), nil
 	case tokenIdentifier:
-		return Symbol(t.val), nil
+		return NewParsedSymbol(t.val, t.row, t.col), nil
 	case tokenComment:
 		// ignore the next datum (r7rs 7.1.2)
 		p.inComment = true
@@ -546,13 +546,13 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 		}
 	}
 	if sym, issym := token.(Symbol); issym {
-		if sym == quoteSym {
+		if atomsEqual(sym, quoteSym) {
 			if pair.Len() != 2 {
 				return nil, newParserError(ESYNTAX, pair, "quote requires datum")
 			}
 			return x, nil
 
-		} else if sym == ifSym {
+		} else if atomsEqual(sym, ifSym) {
 			if pair.Len() == 3 {
 				// (if t c) => (if t c ())
 				pair.Append(theEmptyList)
@@ -562,7 +562,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 			}
 			return expandListSafely(pair, false)
 
-		} else if sym == setSym {
+		} else if atomsEqual(sym, setSym) {
 			if pair.Len() != 3 {
 				return nil, newParserError(ESYNTAX, pair, "set requires 2 arguments")
 			}
@@ -577,7 +577,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 			}
 			return NewList(setSym, name, val), nil
 
-		} else if sym == defineSym || sym == definesyntaxSym {
+		} else if atomsEqual(sym, defineSym) || atomsEqual(sym, definesyntaxSym) {
 			if pair.Len() < 3 {
 				return nil, newParserError(ESYNTAX, pair, "define/define-syntax require 2+ arguments")
 			}
@@ -600,7 +600,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 				if err != nil {
 					return nil, err
 				}
-				if sym == definesyntaxSym {
+				if atomsEqual(sym, definesyntaxSym) {
 					if !toplevel {
 						return nil, newParserError(ESYNTAX, pair,
 							"define-syntax only allowed at top level")
@@ -622,14 +622,14 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 				return result, nil
 			}
 
-		} else if sym == beginSym {
+		} else if atomsEqual(sym, beginSym) {
 			if pair.Len() == 1 {
 				// (begin) => None
 				return nil, nil
 			}
 			return expandListSafely(pair, toplevel)
 
-		} else if sym == lambdaSym {
+		} else if atomsEqual(sym, lambdaSym) {
 			// (lambda (x) e1 e2) => (lambda (x) (begin e1 e2))
 			if pair.Len() < 3 {
 				return nil, newParserError(ESYNTAX, pair, "lambda requires 2+ arguments")
@@ -668,7 +668,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 			}
 			return NewList(lambdaSym, vlist, body), nil
 
-		} else if sym == quasiquoteSym {
+		} else if atomsEqual(sym, quasiquoteSym) {
 			// `x => expand quasiquote of x
 			if pair.Len() != 2 {
 				return nil, newParserError(ESYNTAX, pair, "quasiquote (`) require 2 arguments")
@@ -703,17 +703,17 @@ func expandQuasiquote(x interface{}) (interface{}, LispError) {
 	}
 	token := pair.First()
 	sym, issym := token.(Symbol)
-	if issym && sym == unquotesplicingSym {
+	if issym && atomsEqual(sym, unquotesplicingSym) {
 		return nil, newParserError(ESYNTAX, pair, "can't splice here")
 	}
-	if issym && sym == unquoteSym {
+	if issym && atomsEqual(sym, unquoteSym) {
 		if pair.Len() != 2 {
 			return nil, newParserError(ESYNTAX, pair, "unquote requires 1 argument")
 		}
 		return pair.Second(), nil
 	}
 	if npair, ispair := token.(Pair); ispair && npair.Len() > 0 {
-		if sym, issym := npair.First().(Symbol); issym && sym == unquotesplicingSym {
+		if sym, issym := npair.First().(Symbol); issym && atomsEqual(sym, unquotesplicingSym) {
 			if npair.Len() != 2 {
 				return nil, newParserError(ESYNTAX, pair, "unquote splicing requires 1 argument")
 			}
@@ -841,13 +841,59 @@ func (pb *ParsedBoolean) Location() (int, int) {
 	return pb.row, pb.col
 }
 
+// ParsedSymbol is a Locatable Symbol type.
+type ParsedSymbol struct {
+	sym Symbol // Symbol object
+	row int    // line of text where string was encountered
+	col int    // column where string started
+}
+
+// NewParsedSymbol returns a Locatable Symbol object.
+func NewParsedSymbol(val string, row, col int) Symbol {
+	col -= len(val)
+	return &ParsedSymbol{NewSymbol(val), row, col}
+}
+
+func (ps *ParsedSymbol) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(*ParsedSymbol); ok {
+		return ps.sym.CompareTo(os.sym)
+	} else if s, ok := other.(Symbol); ok {
+		return ps.sym.CompareTo(s)
+	}
+	return 0, TypeMismatch
+}
+
+func (ps *ParsedSymbol) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(*ParsedSymbol); ok {
+		return ps.sym.EqualTo(os.sym)
+	} else if s, ok := other.(Symbol); ok {
+		return ps.sym.EqualTo(s)
+	}
+	return false, TypeMismatch
+}
+
+func (ps *ParsedSymbol) Eval() interface{} {
+	return ps.sym.Eval()
+}
+
+func (ps *ParsedSymbol) IsSymbol() bool {
+	return true
+}
+
+func (ps *ParsedSymbol) String() string {
+	return ps.sym.String()
+}
+
+func (ps *ParsedSymbol) Location() (int, int) {
+	return ps.row, ps.col
+}
+
 // TODO: locatable versions of the other atomic types
 // NewParsedInteger(val int64, row, col int) Integer
 // NewParsedFloat(val)
 // NewParsedComplex(val)
 // NewParsedRational(a, b)
 // NewParsedCharacter(t.val)
-// NewParsedSymbol(t.val)
 // NewParsedPair(...) ...
 
 // TODO: locatable versions of vector and bytevector

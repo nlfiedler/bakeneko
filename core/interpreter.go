@@ -1,10 +1,14 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
 
 package core
+
+import (
+	"github.com/petar/GoLLRB/llrb"
+)
 
 //
 // Interpreter for our Scheme-like language, which turns a tree of expressions
@@ -24,6 +28,10 @@ type Environment interface {
 	// Find looks for the given symbol in this environment, and the parent
 	// environment, if one is associated with this environment.
 	Find(sym Symbol) interface{}
+	// Lookup looks for the given symbol pairing (where the value is ignored)
+	// and retrieves the value found in this environment. This has little
+	// practical value outside of Environment implementations.
+	Lookup(key SymbolPair) interface{}
 	// Define sets the value for a symbol in this environment, creating
 	// a new mapping if one does not already exist.
 	Define(sym Symbol, val interface{})
@@ -32,13 +40,50 @@ type Environment interface {
 	Set(sym Symbol, val interface{}) LispError
 }
 
+// SymbolPair represents an item stored in an Environment, containing the
+// symbol used as the key, and its associated value.
+type SymbolPair interface {
+	llrb.Item
+	Symbol() Symbol
+	Value() interface{}
+}
+
 // environment is an implementation of the Environment interface, which
 // supports mapping symbols to values, as well as delegating to a parent when
 // a symbol is not found in this environment.
 type environment struct {
-	writable bool                   // true if environment allows changes
-	vars     map[Symbol]interface{} // mapping of variable names to values
-	parent   Environment            // environment to delegate to
+	writable bool        // true if environment allows changes
+	vars     *llrb.LLRB  // mapping of variable names to values
+	parent   Environment // environment to delegate to
+}
+
+type environmentItem struct {
+	sym Symbol
+	val interface{}
+}
+
+// Less returns true if this item is less than the other item.
+func (e *environmentItem) Less(than llrb.Item) bool {
+	if ti, ok := than.(*environmentItem); ok {
+		less, _ := e.sym.CompareTo(ti.sym)
+		return less < 0
+	}
+	return false
+}
+
+// Symbol returns the symbol associated with this item.
+func (e *environmentItem) Symbol() Symbol {
+	return e.sym
+}
+
+// Symbol returns the symbol associated with this item.
+func (e *environmentItem) Value() interface{} {
+	return e.val
+}
+
+// newEnvItem returns a new environment symbol<->value mapping.
+func newEnvItem(sym Symbol, val interface{}) *environmentItem {
+	return &environmentItem{sym, val}
 }
 
 // NewEnvironment constructs an Environment with the given parent to provide a
@@ -46,7 +91,7 @@ type environment struct {
 func NewEnvironment(parent Environment) Environment {
 	e := new(environment)
 	e.writable = true
-	e.vars = make(map[Symbol]interface{})
+	e.vars = llrb.New()
 	e.parent = parent
 	return e
 }
@@ -56,7 +101,11 @@ func NewEnvironment(parent Environment) Environment {
 func NewRestrictedEnvironment(parent Environment, mapping map[Symbol]interface{}) Environment {
 	e := new(environment)
 	e.writable = false
-	e.vars = mapping
+	e.vars = llrb.New()
+	for sym, val := range mapping {
+		item := newEnvItem(sym, val)
+		e.vars.ReplaceOrInsert(item)
+	}
 	e.parent = parent
 	return e
 }
@@ -65,20 +114,29 @@ func NewRestrictedEnvironment(parent Environment, mapping map[Symbol]interface{}
 // environment, the parent environment will be consulted. If no value is
 // found, nil is returned.
 func (e *environment) Find(sym Symbol) interface{} {
-	val, ok := e.vars[sym]
-	if !ok {
-		if e.parent != nil {
-			return e.parent.Find(sym)
+	key := newEnvItem(sym, nil)
+	return e.Lookup(key)
+}
+
+// Lookup retrieves the value for the given environment item. If it is not
+// found in this environment, the parent environment will be consulted. If no
+// value is found, nil is returned.
+func (e *environment) Lookup(key SymbolPair) interface{} {
+	item := e.vars.Get(key)
+	if item == nil {
+		if e.parent == nil {
+			return nil
 		}
-		return nil
+		return e.parent.Lookup(key)
 	}
-	return val
+	return item.(SymbolPair).Value()
 }
 
 // Define assigns the given value to the symbol in this environment.
 func (e *environment) Define(sym Symbol, val interface{}) {
 	if e.writable {
-		e.vars[sym] = val
+		item := newEnvItem(sym, val)
+		e.vars.ReplaceOrInsert(item)
 	}
 }
 
@@ -89,8 +147,9 @@ func (e *environment) Set(sym Symbol, val interface{}) LispError {
 	if !e.writable {
 		return NewLispError(ESUPPORT, "restricted environment not writable")
 	}
-	if _, ok := e.vars[sym]; ok {
-		e.vars[sym] = val
+	item := newEnvItem(sym, val)
+	if e.vars.Has(item) {
+		e.vars.ReplaceOrInsert(item)
 		return nil
 	} else if e.parent != nil {
 		return e.parent.Set(sym, val)
@@ -101,34 +160,34 @@ func (e *environment) Set(sym Symbol, val interface{}) LispError {
 // newNullEnvironment constructs the "null" environment as defined in R7RS.
 func newNullEnvironment() Environment {
 	mapping := make(map[Symbol]interface{})
-	mapping[Symbol("append")] = NewBuiltin(builtinAppend)
-	mapping[Symbol("cons")] = NewBuiltin(builtinCons)
+	mapping[NewSymbol("append")] = NewBuiltin(builtinAppend)
+	mapping[NewSymbol("cons")] = NewBuiltin(builtinCons)
 	// number support
-	mapping[Symbol("number?")] = NewBuiltin(builtinIsNumber)
-	mapping[Symbol("complex?")] = NewBuiltin(builtinIsComplex)
-	mapping[Symbol("real?")] = NewBuiltin(builtinIsReal)
-	mapping[Symbol("rational?")] = NewBuiltin(builtinIsRational)
-	mapping[Symbol("integer?")] = NewBuiltin(builtinIsInteger)
-	mapping[Symbol("exact?")] = NewBuiltin(builtinIsExact)
-	mapping[Symbol("inexact?")] = NewBuiltin(builtinIsInexact)
-	mapping[Symbol("=")] = NewBuiltin(builtinIsEqual)
-	mapping[Symbol("<")] = NewBuiltin(builtinIsLess)
-	mapping[Symbol("<=")] = NewBuiltin(builtinIsLessEqual)
-	mapping[Symbol(">")] = NewBuiltin(builtinIsGreater)
-	mapping[Symbol(">=")] = NewBuiltin(builtinIsGreaterEqual)
-	mapping[Symbol("zero?")] = NewBuiltin(builtinIsZero)
-	mapping[Symbol("positive?")] = NewBuiltin(builtinIsPositive)
-	mapping[Symbol("negative?")] = NewBuiltin(builtinIsNegative)
-	mapping[Symbol("odd?")] = NewBuiltin(builtinIsOdd)
-	mapping[Symbol("even?")] = NewBuiltin(builtinIsEven)
-	mapping[Symbol("max")] = NewBuiltin(builtinMax)
-	mapping[Symbol("min")] = NewBuiltin(builtinMin)
-	mapping[Symbol("+")] = NewBuiltin(builtinAdd)
-	mapping[Symbol("-")] = NewBuiltin(builtinSubtract)
-	mapping[Symbol("*")] = NewBuiltin(builtinMultiply)
-	mapping[Symbol("/")] = NewBuiltin(builtinDivide)
-	mapping[Symbol("abs")] = NewBuiltin(builtinAbs)
-	mapping[Symbol("quotient")] = NewBuiltin(builtinQuotient)
+	mapping[NewSymbol("number?")] = NewBuiltin(builtinIsNumber)
+	mapping[NewSymbol("complex?")] = NewBuiltin(builtinIsComplex)
+	mapping[NewSymbol("real?")] = NewBuiltin(builtinIsReal)
+	mapping[NewSymbol("rational?")] = NewBuiltin(builtinIsRational)
+	mapping[NewSymbol("integer?")] = NewBuiltin(builtinIsInteger)
+	mapping[NewSymbol("exact?")] = NewBuiltin(builtinIsExact)
+	mapping[NewSymbol("inexact?")] = NewBuiltin(builtinIsInexact)
+	mapping[NewSymbol("=")] = NewBuiltin(builtinIsEqual)
+	mapping[NewSymbol("<")] = NewBuiltin(builtinIsLess)
+	mapping[NewSymbol("<=")] = NewBuiltin(builtinIsLessEqual)
+	mapping[NewSymbol(">")] = NewBuiltin(builtinIsGreater)
+	mapping[NewSymbol(">=")] = NewBuiltin(builtinIsGreaterEqual)
+	mapping[NewSymbol("zero?")] = NewBuiltin(builtinIsZero)
+	mapping[NewSymbol("positive?")] = NewBuiltin(builtinIsPositive)
+	mapping[NewSymbol("negative?")] = NewBuiltin(builtinIsNegative)
+	mapping[NewSymbol("odd?")] = NewBuiltin(builtinIsOdd)
+	mapping[NewSymbol("even?")] = NewBuiltin(builtinIsEven)
+	mapping[NewSymbol("max")] = NewBuiltin(builtinMax)
+	mapping[NewSymbol("min")] = NewBuiltin(builtinMin)
+	mapping[NewSymbol("+")] = NewBuiltin(builtinAdd)
+	mapping[NewSymbol("-")] = NewBuiltin(builtinSubtract)
+	mapping[NewSymbol("*")] = NewBuiltin(builtinMultiply)
+	mapping[NewSymbol("/")] = NewBuiltin(builtinDivide)
+	mapping[NewSymbol("abs")] = NewBuiltin(builtinAbs)
+	mapping[NewSymbol("quotient")] = NewBuiltin(builtinQuotient)
 	ne := NewRestrictedEnvironment(nil, mapping)
 	return ne
 }
@@ -275,8 +334,10 @@ func Interpret(prog string) (interface{}, LispError) {
 	// By ensuring that the program is wrapped inside a (begin ...) we
 	// create what constitutes the "halt" continuation, as well as the
 	// "step" function.
-	if body.Len() >= 1 && body.First() != beginSym {
-		body = Cons(beginSym, body)
+	if body.Len() >= 1 {
+		if sym, ok := body.First().(Symbol); !ok || !atomsEqual(sym, beginSym) {
+			body = Cons(beginSym, body)
+		}
 	}
 	expr, err := expand(body, true)
 	if err != nil {
@@ -324,10 +385,10 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 		// assume that the first is a syntactic keyword until we learn otherwise
 		keyword := true
 		if sym, issym := first.(Symbol); issym {
-			if sym == quoteSym {
+			if atomsEqual(sym, quoteSym) {
 				// (quote exp)
 				return pair.Second(), nil
-			} else if sym == ifSym {
+			} else if atomsEqual(sym, ifSym) {
 				// (if test conseq alt)
 				test := pair.Second()
 				result, err := Eval(test, env)
@@ -339,23 +400,23 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				} else {
 					expr = Cxr("cadddr", pair)
 				}
-			} else if sym == setSym {
+			} else if atomsEqual(sym, setSym) {
 				// (set! var exp)
 				return syntaxSet(pair, env)
-			} else if sym == defineSym {
+			} else if atomsEqual(sym, defineSym) {
 				// (define var exp)
 				return syntaxDefine(pair, env)
-			} else if sym == lambdaSym {
+			} else if atomsEqual(sym, lambdaSym) {
 				// (lambda (var*) exp)
 				return syntaxLambda(pair, env)
-			} else if sym == beginSym {
+			} else if atomsEqual(sym, beginSym) {
 				// (begin exp+)
 				exp, err := evalForTail(pair.Rest(), env)
 				if err != nil {
 					return nil, err
 				}
 				expr = exp
-			} else if sym == andSym {
+			} else if atomsEqual(sym, andSym) {
 				// (and exp*)
 				exp, val, err := syntaxAnd(length, pair, env)
 				if exp != nil {
@@ -363,7 +424,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				} else {
 					return val, err
 				}
-			} else if sym == orSym {
+			} else if atomsEqual(sym, orSym) {
 				// (or exp*)
 				exp, val, err := syntaxOr(length, pair, env)
 				if exp != nil {
@@ -371,7 +432,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				} else {
 					return val, err
 				}
-			} else if sym == condSym {
+			} else if atomsEqual(sym, condSym) {
 				// (cond <clause>+)
 				val, exp, err := syntaxCond(length, pair, env)
 				if exp != nil {
@@ -546,7 +607,7 @@ func syntaxCond(length int, pair Pair, env Environment) (interface{}, interface{
 		// we assume this is not an 'else' clause and that there are
 		// non-zero expressions to be evaluated
 		if epair, ok := expr.(Pair); ok {
-			if epair.First() == arrowSym {
+			if sym, ok := epair.First().(Symbol); ok && atomsEqual(sym, arrowSym) {
 				// rest of expression is assumed to be a unary procedure,
 				// return it as a procedure invocation to be evaluated
 				expr = extractFirst(epair.Rest())
@@ -568,7 +629,7 @@ func syntaxCond(length int, pair Pair, env Environment) (interface{}, interface{
 					"cond clause must not be empty: %v", clause)
 			}
 			test := clair.First()
-			if test == elseSym {
+			if sym, ok := test.(Symbol); ok && atomsEqual(sym, elseSym) {
 				if clair.Len() < 2 {
 					return nil, nil, NewLispErrorf(EARGUMENT,
 						"cond else clause must not be empty: %v", clause)

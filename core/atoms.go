@@ -127,13 +127,35 @@ func (b booleanImpl) Value() bool {
 
 // Symbol represents a variable or procedure name in a Scheme expression. It
 // is essentially a string but is treated differently.
-type Symbol string
+type Symbol interface {
+	Atom
+	// IsSymbol always returns true, it exists to distinquish this type from
+	// Atom, otherwise the compiler treats all Atoms as Symbols.
+	IsSymbol() bool
+}
 
-func (s Symbol) CompareTo(other Atom) (int8, error) {
+// atomsEqual compares two atoms for equality and returns true or false.
+// Any type mismatch is ignored and false is returned.
+func atomsEqual(a, b Atom) bool {
+	eq, _ := a.EqualTo(b)
+	return eq
+}
+
+// symbolImpl is an implementation of the Symbol interface.
+type symbolImpl string
+
+// NewSymbol wraps the given string in a Symbol implementation.
+func NewSymbol(val string) Symbol {
+	return symbolImpl(val)
+}
+
+func (s symbolImpl) CompareTo(other Atom) (int8, error) {
 	if os, ok := other.(Symbol); ok {
-		if s == os {
+		ss := string(s)
+		oss := os.String()
+		if ss == oss {
 			return 0, nil
-		} else if s > os {
+		} else if ss > oss {
 			return 1, nil
 		} else {
 			return -1, nil
@@ -142,20 +164,26 @@ func (s Symbol) CompareTo(other Atom) (int8, error) {
 	return 0, TypeMismatch
 }
 
-func (s Symbol) EqualTo(other Atom) (bool, error) {
+func (s symbolImpl) EqualTo(other Atom) (bool, error) {
 	if os, ok := other.(Symbol); ok {
-		return s == os, nil
+		ss := string(s)
+		oss := os.String()
+		return ss == oss, nil
 	}
 	return false, TypeMismatch
 }
 
 // Eval returns the name of the symbol as a string.
-func (s Symbol) Eval() interface{} {
+func (s symbolImpl) Eval() interface{} {
 	return string(s)
 }
 
+func (s symbolImpl) IsSymbol() bool {
+	return true
+}
+
 // String returns the name of the symbol.
-func (s Symbol) String() string {
+func (s symbolImpl) String() string {
 	return string(s)
 }
 

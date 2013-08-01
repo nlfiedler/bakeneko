@@ -378,7 +378,7 @@ func TestParseSingle(t *testing.T) {
 		}
 		elem1 := pair.First()
 		if sym, ok := elem1.(Symbol); ok {
-			if sym != ifSym {
+			if !atomsEqual(sym, ifSym) {
 				t.Error("first element expected to be 'if'")
 			}
 		} else {
@@ -449,4 +449,12 @@ func (s *ParserSuite) TestErrorLocationBoolean(c *gc.C) {
 	row, col := err.Location()
 	c.Assert(row, gc.Equals, 1, cm)
 	c.Assert(col, gc.Equals, 8, cm)
+}
+
+func (s *ParserSuite) TestParsedSymbol(c *gc.C) {
+	ps := NewParsedSymbol("foo", 1, 1)
+	c.Assert(ps, gc.NotNil)
+	sym := NewSymbol("eff")
+	cmp, _ := sym.CompareTo(ps)
+	c.Assert(cmp, gc.Equals, int8(-1))
 }

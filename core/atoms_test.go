@@ -56,7 +56,7 @@ func TestBoolean(t *testing.T) {
 }
 
 func TestSymbol(t *testing.T) {
-	s := Symbol("")
+	s := NewSymbol("")
 	if s.Eval() != "" {
 		t.Error("empty Symbol should evaluate to empty string")
 	}
@@ -69,35 +69,35 @@ func TestSymbol(t *testing.T) {
 	if _, err := s.CompareTo(BooleanTrue); err == nil {
 		t.Error("Symbol.CompareTo() wrong type should fail")
 	}
-	if eq, err := s.EqualTo(Symbol("")); err != nil || !eq {
+	if eq, err := s.EqualTo(NewSymbol("")); err != nil || !eq {
 		t.Error("Symbol.EqualTo() did not work")
 	}
-	if eq, err := s.EqualTo(Symbol("foo")); err != nil || eq {
+	if eq, err := s.EqualTo(NewSymbol("foo")); err != nil || eq {
 		t.Error("Symbol.EqualTo() did not work")
 	}
-	if cmp, err := s.CompareTo(Symbol("")); err != nil || cmp != 0 {
+	if cmp, err := s.CompareTo(NewSymbol("")); err != nil || cmp != 0 {
 		t.Error("Symbol.CompareTo() did not work")
 	}
-	if cmp, err := s.CompareTo(Symbol("foo")); err != nil || cmp == 0 {
+	if cmp, err := s.CompareTo(NewSymbol("foo")); err != nil || cmp == 0 {
 		t.Error("Symbol.CompareTo() did not work")
 	}
-	s = Symbol("foo")
-	if eq, err := s.EqualTo(Symbol("")); err != nil || eq {
+	s = NewSymbol("foo")
+	if eq, err := s.EqualTo(NewSymbol("")); err != nil || eq {
 		t.Error("Symbol.EqualTo() did not work")
 	}
-	if eq, err := s.EqualTo(Symbol("foo")); err != nil || !eq {
+	if eq, err := s.EqualTo(NewSymbol("foo")); err != nil || !eq {
 		t.Error("Symbol.EqualTo() did not work")
 	}
-	if cmp, err := s.CompareTo(Symbol("")); err != nil || cmp == 0 {
+	if cmp, err := s.CompareTo(NewSymbol("")); err != nil || cmp == 0 {
 		t.Error("Symbol.CompareTo() did not work")
 	}
-	if cmp, err := s.CompareTo(Symbol("foo")); err != nil || cmp != 0 {
+	if cmp, err := s.CompareTo(NewSymbol("foo")); err != nil || cmp != 0 {
 		t.Error("Symbol.CompareTo() did not work")
 	}
-	if cmp, err := s.CompareTo(Symbol("bar")); err != nil || cmp <= 0 {
+	if cmp, err := s.CompareTo(NewSymbol("bar")); err != nil || cmp <= 0 {
 		t.Error("Symbol.CompareTo() did not work")
 	}
-	if cmp, err := s.CompareTo(Symbol("qux")); err != nil || cmp >= 0 {
+	if cmp, err := s.CompareTo(NewSymbol("qux")); err != nil || cmp >= 0 {
 		t.Error("Symbol.CompareTo() did not work")
 	}
 }
