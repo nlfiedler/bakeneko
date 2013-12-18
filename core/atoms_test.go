@@ -314,36 +314,36 @@ func TestInteger(t *testing.T) {
 	if _, err := i.EqualTo(BooleanTrue); err == nil {
 		t.Error("Integer.EqualTo() wrong type should fail")
 	}
-	if eq, err := i.EqualTo(Integer(123)); err != nil || !eq {
+	if eq, err := i.EqualTo(NewInteger(123)); err != nil || !eq {
 		t.Error("Integer.EqualTo() same value should be true")
 	}
-	if eq, err := i.EqualTo(Integer(234)); err != nil || eq {
+	if eq, err := i.EqualTo(NewInteger(234)); err != nil || eq {
 		t.Error("Integer.EqualTo() different value should be false")
 	}
 	// test CompareTo()
 	if _, err := i.CompareTo(BooleanTrue); err == nil {
 		t.Error("Integer.CompareTo() wrong type should fail")
 	}
-	if cmp, err := i.CompareTo(Integer(123)); err != nil || cmp != 0 {
+	if cmp, err := i.CompareTo(NewInteger(123)); err != nil || cmp != 0 {
 		t.Error("Integer.CompareTo() same value should be zero")
 	}
-	if cmp, err := i.CompareTo(Integer(234)); err != nil || cmp >= 0 {
+	if cmp, err := i.CompareTo(NewInteger(234)); err != nil || cmp >= 0 {
 		t.Error("Integer.CompareTo() greater value should be negative")
 	}
-	if cmp, err := i.CompareTo(Integer(12)); err != nil || cmp <= 0 {
+	if cmp, err := i.CompareTo(NewInteger(12)); err != nil || cmp <= 0 {
 		t.Error("Integer.CompareTo() lesser value should be positive")
 	}
 	// test Add(), Divide(), Eval(), Multiply(), Subtract()
-	if num, ok := i.Add(Integer(10)).Eval().(int64); !ok || num != 133 {
+	if num, ok := i.Add(NewInteger(10)).Eval().(int64); !ok || num != 133 {
 		t.Errorf("Integer.Add(10) yielded wrong result: %v", num)
 	}
-	if num, ok := i.Subtract(Integer(10)).Eval().(int64); !ok || num != 113 {
+	if num, ok := i.Subtract(NewInteger(10)).Eval().(int64); !ok || num != 113 {
 		t.Errorf("Integer.Subtract(10) yielded wrong result: %v", num)
 	}
-	if num, ok := i.Multiply(Integer(10)).Eval().(int64); !ok || num != 1230 {
+	if num, ok := i.Multiply(NewInteger(10)).Eval().(int64); !ok || num != 1230 {
 		t.Errorf("Integer.Multiply(10) yielded wrong result: %v", num)
 	}
-	if num, ok := i.Divide(Integer(10)).Eval().(int64); !ok || num != 12 {
+	if num, ok := i.Divide(NewInteger(10)).Eval().(int64); !ok || num != 12 {
 		t.Errorf("Integer.Divide(10) yielded wrong result: %v", num)
 	}
 	// test String()

@@ -117,7 +117,8 @@ func TestInterpretIfTrue(t *testing.T) {
 		t.Errorf("Interpret() failed: %v", err)
 	}
 	if num, ok := result.(Integer); ok {
-		if num != 1 {
+		ii := num.ToInteger()
+		if ii != 1 {
 			t.Errorf("result wrong value: %v", num)
 		}
 	} else {
@@ -132,7 +133,8 @@ func TestInterpreterIfFalse(t *testing.T) {
 		t.Errorf("Interpret() failed: %v", err)
 	}
 	if num, ok := result.(Integer); ok {
-		if num != 2 {
+		ii := num.ToInteger()
+		if ii != 2 {
 			t.Errorf("result wrong value: %v", num)
 		}
 	} else {
@@ -157,7 +159,8 @@ func TestInterpretBegin(t *testing.T) {
 		t.Errorf("Interpret() failed: %v", err)
 	}
 	if num, ok := result.(Integer); ok {
-		if num != 456 {
+		ii := num.ToInteger()
+		if ii != 456 {
 			t.Errorf("result wrong value: %v", num)
 		}
 	} else {
@@ -172,7 +175,8 @@ func TestInterpretDefine(t *testing.T) {
 		t.Errorf("Interpret() failed: %v", err)
 	}
 	if num, ok := result.(Integer); ok {
-		if num != 123 {
+		ii := num.ToInteger()
+		if ii != 123 {
 			t.Errorf("result wrong value: %v", num)
 		}
 	} else {

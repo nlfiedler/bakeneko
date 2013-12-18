@@ -159,7 +159,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 		if err != nil {
 			return nil, err
 		}
-		return NewInteger(val), nil
+		return NewParsedInteger(val, t.row, t.col-len(t.val)), nil
 	case tokenFloat:
 		val, err := atof(t.val)
 		if err != nil {
@@ -888,8 +888,89 @@ func (ps *ParsedSymbol) Location() (int, int) {
 	return ps.row, ps.col
 }
 
+// ParsedInteger is a Locatable Integer type.
+type ParsedInteger struct {
+	val Integer // Integer object
+	row int     // line of text where string was encountered
+	col int     // column where string started
+}
+
+// NewParsedInteger returns a Locatable Integer object.
+func NewParsedInteger(val int64, row, col int) Integer {
+	return &ParsedInteger{NewInteger(val), row, col}
+}
+
+func (pi *ParsedInteger) Add(value Number) Number {
+	return pi.val.Add(value)
+}
+
+func (pi *ParsedInteger) Divide(divisor Number) Number {
+	return pi.val.Divide(divisor)
+}
+
+func (pi *ParsedInteger) Mod(modulus Integer) Integer {
+	return pi.val.Mod(modulus)
+}
+
+func (pi *ParsedInteger) Multiply(muliplier Number) Number {
+	return pi.val.Multiply(muliplier)
+}
+
+func (pi *ParsedInteger) Subtract(value Number) Number {
+	return pi.val.Subtract(value)
+}
+
+func (pi *ParsedInteger) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(*ParsedInteger); ok {
+		return pi.val.CompareTo(os.val)
+	} else if s, ok := other.(Integer); ok {
+		return pi.val.CompareTo(s)
+	}
+	return 0, TypeMismatch
+}
+
+func (pi *ParsedInteger) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(*ParsedInteger); ok {
+		return pi.val.EqualTo(os.val)
+	} else if s, ok := other.(Integer); ok {
+		return pi.val.EqualTo(s)
+	}
+	return false, TypeMismatch
+}
+
+func (pi *ParsedInteger) Eval() interface{} {
+	return pi.val.Eval()
+}
+
+func (pi *ParsedInteger) String() string {
+	return pi.val.String()
+}
+
+func (pi *ParsedInteger) ComplexValue() Complex {
+	return pi.val.ComplexValue()
+}
+
+func (pi *ParsedInteger) IntegerValue() Integer {
+	return pi.val.IntegerValue()
+}
+
+func (pi *ParsedInteger) FloatValue() Float {
+	return pi.val.FloatValue()
+}
+
+func (pi *ParsedInteger) RationalValue() Rational {
+	return pi.val.RationalValue()
+}
+
+func (pi *ParsedInteger) ToInteger() int64 {
+	return pi.val.ToInteger()
+}
+
+func (pi *ParsedInteger) Location() (int, int) {
+	return pi.row, pi.col
+}
+
 // TODO: locatable versions of the other atomic types
-// NewParsedInteger(val int64, row, col int) Integer
 // NewParsedFloat(val)
 // NewParsedComplex(val)
 // NewParsedRational(a, b)

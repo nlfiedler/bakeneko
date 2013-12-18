@@ -183,12 +183,17 @@ func TestParseVector(t *testing.T) {
 		if slice, ok := result.(Vector); ok {
 			if slice.Length() == 3 {
 				expected := new([3]Integer)
-				expected[0] = Integer(1)
-				expected[1] = Integer(2)
-				expected[2] = Integer(3)
+				expected[0] = NewInteger(1)
+				expected[1] = NewInteger(2)
+				expected[2] = NewInteger(3)
 				for i, e := range expected {
-					if slice.Get(i) != e {
-						t.Errorf("expected %v in vector, but got %s", e, slice.Get(i))
+					thing := slice.Get(i)
+					if num, ok := thing.(Integer); ok {
+						if eq, _ := num.EqualTo(e); !eq {
+							t.Errorf("expected %v in vector, but got %s", e, thing)
+						}
+					} else {
+						t.Errorf("expected Integer but got %T", thing)
 					}
 				}
 			} else {
@@ -441,6 +446,18 @@ func (s *ParserSuite) TestErrorLocationString(c *gc.C) {
 
 func (s *ParserSuite) TestErrorLocationBoolean(c *gc.C) {
 	input := `(define #false 123)`
+	cm := gc.Commentf("location for %q", input)
+	pair, err := parse(input)
+	c.Assert(err, gc.IsNil, cm)
+	_, err = expand(pair.First(), true)
+	c.Assert(err, gc.NotNil, cm)
+	row, col := err.Location()
+	c.Assert(row, gc.Equals, 1, cm)
+	c.Assert(col, gc.Equals, 8, cm)
+}
+
+func (s *ParserSuite) TestErrorLocationInteger(c *gc.C) {
+	input := `(define 123 "abc")`
 	cm := gc.Commentf("location for %q", input)
 	pair, err := parse(input)
 	c.Assert(err, gc.IsNil, cm)

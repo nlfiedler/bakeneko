@@ -16,7 +16,7 @@ import (
 
 //
 // Definition of atom types in our Scheme-like language, which includes
-// (mutable) strings, numbers, booleans, and characters.
+// symbols, (mutable) strings, numbers, booleans, and characters.
 //
 
 // Atom represents all things in our Scheme implementation which can be
@@ -403,42 +403,49 @@ type Number interface {
 	RationalValue() Rational
 }
 
-type Integer int64
-
-func NewInteger(val int64) Integer {
-	return Integer(val)
+type Integer interface {
+	Number
+	// Mod finds the remainder of dividing this number by the argument.
+	Mod(modulus Integer) Integer
+	// ToInteger converts the integer to an int64 value.
+	ToInteger() int64
 }
 
-func (i Integer) Add(value Number) Number {
-	vi := value.IntegerValue()
+type integerImpl int64
+
+func NewInteger(val int64) Integer {
+	return integerImpl(val)
+}
+
+func (i integerImpl) Add(value Number) Number {
+	vi := value.IntegerValue().ToInteger()
 	return NewInteger(int64(i) + int64(vi))
 }
 
-func (i Integer) Divide(divisor Number) Number {
-	vi := divisor.IntegerValue()
+func (i integerImpl) Divide(divisor Number) Number {
+	vi := divisor.IntegerValue().ToInteger()
 	return NewInteger(int64(i) / int64(vi))
 }
 
-// Mod finds the remainder of dividing this number by the argument.
-func (i Integer) Mod(modulus Integer) Integer {
-	vi := modulus.IntegerValue()
+func (i integerImpl) Mod(modulus Integer) Integer {
+	vi := modulus.IntegerValue().ToInteger()
 	return NewInteger(int64(i) % int64(vi))
 }
 
-func (i Integer) Multiply(muliplier Number) Number {
-	vi := muliplier.IntegerValue()
+func (i integerImpl) Multiply(muliplier Number) Number {
+	vi := muliplier.IntegerValue().ToInteger()
 	return NewInteger(int64(i) * int64(vi))
 }
 
-func (i Integer) Subtract(value Number) Number {
-	vi := value.IntegerValue()
+func (i integerImpl) Subtract(value Number) Number {
+	vi := value.IntegerValue().ToInteger()
 	return NewInteger(int64(i) - int64(vi))
 }
 
-func (i Integer) CompareTo(other Atom) (int8, error) {
+func (i integerImpl) CompareTo(other Atom) (int8, error) {
 	if oi, ok := other.(Integer); ok {
 		ii := int64(i)
-		ioi := int64(oi)
+		ioi := oi.ToInteger()
 		if ii < ioi {
 			return -1, nil
 		} else if ii > ioi {
@@ -449,38 +456,39 @@ func (i Integer) CompareTo(other Atom) (int8, error) {
 	return 0, TypeMismatch
 }
 
-func (i Integer) EqualTo(other Atom) (bool, error) {
+func (i integerImpl) EqualTo(other Atom) (bool, error) {
 	if oi, ok := other.(Integer); ok {
-		return int64(i) == int64(oi), nil
+		ioi := oi.ToInteger()
+		return int64(i) == int64(ioi), nil
 	}
 	return false, TypeMismatch
 }
 
-func (i Integer) Eval() interface{} {
+func (i integerImpl) Eval() interface{} {
 	return int64(i)
 }
 
-func (i Integer) ComplexValue() Complex {
+func (i integerImpl) ComplexValue() Complex {
 	return NewComplex(complex(float64(i), 0.0))
 }
 
-func (i Integer) IntegerValue() Integer {
+func (i integerImpl) IntegerValue() Integer {
 	return i
 }
 
-func (i Integer) FloatValue() Float {
+func (i integerImpl) FloatValue() Float {
 	return NewFloat(float64(i))
 }
 
-func (i Integer) RationalValue() Rational {
+func (i integerImpl) RationalValue() Rational {
 	return NewRational(int64(i), 1)
 }
 
-func (i Integer) String() string {
+func (i integerImpl) String() string {
 	return fmt.Sprint(int64(i))
 }
 
-func (i Integer) ToInteger() int64 {
+func (i integerImpl) ToInteger() int64 {
 	return int64(i)
 }
 
