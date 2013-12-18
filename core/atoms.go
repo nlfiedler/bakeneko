@@ -403,6 +403,7 @@ type Number interface {
 	RationalValue() Rational
 }
 
+// Integer represents an integral numeric value.
 type Integer interface {
 	Number
 	// Mod finds the remainder of dividing this number by the argument.
@@ -411,8 +412,10 @@ type Integer interface {
 	ToInteger() int64
 }
 
+// integerImpl is the internal implementation of an Integer.
 type integerImpl int64
 
+// NewInteger creates an Integer object for the given int64 value.
 func NewInteger(val int64) Integer {
 	return integerImpl(val)
 }
@@ -492,36 +495,45 @@ func (i integerImpl) ToInteger() int64 {
 	return int64(i)
 }
 
-type Float float64
-
-func NewFloat(val float64) Float {
-	return Float(val)
+// Float represents a floating point numerical value.
+type Float interface {
+	Number
+	// ToFloat converts the float to a float64 value.
+	ToFloat() float64
 }
 
-func (f Float) Add(value Number) Number {
-	vf := value.FloatValue()
+// floatImpl is the internal implementation of a Float.
+type floatImpl float64
+
+// NewFloat creates an Integer object for the given float64 value.
+func NewFloat(val float64) Float {
+	return floatImpl(val)
+}
+
+func (f floatImpl) Add(value Number) Number {
+	vf := value.FloatValue().ToFloat()
 	return NewFloat(float64(f) + float64(vf))
 }
 
-func (f Float) Divide(divisor Number) Number {
-	vf := divisor.FloatValue()
+func (f floatImpl) Divide(divisor Number) Number {
+	vf := divisor.FloatValue().ToFloat()
 	return NewFloat(float64(f) / float64(vf))
 }
 
-func (f Float) Multiply(muliplier Number) Number {
-	vf := muliplier.FloatValue()
+func (f floatImpl) Multiply(muliplier Number) Number {
+	vf := muliplier.FloatValue().ToFloat()
 	return NewFloat(float64(f) * float64(vf))
 }
 
-func (f Float) Subtract(value Number) Number {
-	vf := value.FloatValue()
+func (f floatImpl) Subtract(value Number) Number {
+	vf := value.FloatValue().ToFloat()
 	return NewFloat(float64(f) - float64(vf))
 }
 
-func (f Float) CompareTo(other Atom) (int8, error) {
+func (f floatImpl) CompareTo(other Atom) (int8, error) {
 	if of, ok := other.(Float); ok {
 		ff := float64(f)
-		off := float64(of)
+		off := of.ToFloat()
 		if ff == off {
 			return 0, nil
 		} else if ff > off {
@@ -533,38 +545,38 @@ func (f Float) CompareTo(other Atom) (int8, error) {
 	return 0, TypeMismatch
 }
 
-func (f Float) EqualTo(other Atom) (bool, error) {
+func (f floatImpl) EqualTo(other Atom) (bool, error) {
 	if of, ok := other.(Float); ok {
-		return float64(f) == float64(of), nil
+		return float64(f) == of.ToFloat(), nil
 	}
 	return false, TypeMismatch
 }
 
-func (f Float) Eval() interface{} {
+func (f floatImpl) Eval() interface{} {
 	return float64(f)
 }
 
-func (f Float) ComplexValue() Complex {
+func (f floatImpl) ComplexValue() Complex {
 	return NewComplex(complex(f, 0.0))
 }
 
-func (f Float) IntegerValue() Integer {
+func (f floatImpl) IntegerValue() Integer {
 	return NewInteger(int64(f))
 }
 
-func (f Float) FloatValue() Float {
+func (f floatImpl) FloatValue() Float {
 	return f
 }
 
-func (f Float) RationalValue() Rational {
+func (f floatImpl) RationalValue() Rational {
 	return NewRational(int64(f), 1)
 }
 
-func (f Float) String() string {
+func (f floatImpl) String() string {
 	return fmt.Sprint(float64(f))
 }
 
-func (f Float) ToFloat() float64 {
+func (f floatImpl) ToFloat() float64 {
 	return float64(f)
 }
 
@@ -625,7 +637,7 @@ func (c Complex) IntegerValue() Integer {
 }
 
 func (c Complex) FloatValue() Float {
-	return Float(real(complex128(c)))
+	return NewFloat(real(complex128(c)))
 }
 
 func (c Complex) ComplexValue() Complex {
@@ -738,7 +750,7 @@ func (r *rational) IntegerValue() Integer {
 }
 
 func (r *rational) FloatValue() Float {
-	return Float(r.toFloat())
+	return NewFloat(r.toFloat())
 }
 
 func (r *rational) ComplexValue() Complex {

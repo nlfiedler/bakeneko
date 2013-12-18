@@ -358,36 +358,36 @@ func TestFloat(t *testing.T) {
 	if _, err := f.EqualTo(BooleanTrue); err == nil {
 		t.Error("Float.EqualTo() wrong type should fail")
 	}
-	if eq, err := f.EqualTo(Float(1.2)); err != nil || !eq {
+	if eq, err := f.EqualTo(NewFloat(1.2)); err != nil || !eq {
 		t.Error("Float.EqualTo() same value should be true")
 	}
-	if eq, err := f.EqualTo(Float(1.1)); err != nil || eq {
+	if eq, err := f.EqualTo(NewFloat(1.1)); err != nil || eq {
 		t.Error("Float.EqualTo() different value should be false")
 	}
 	// test CompareTo()
 	if _, err := f.CompareTo(BooleanTrue); err == nil {
 		t.Error("Float.CompareTo() wrong type should fail")
 	}
-	if cmp, err := f.CompareTo(Float(1.2)); err != nil || cmp != 0 {
+	if cmp, err := f.CompareTo(NewFloat(1.2)); err != nil || cmp != 0 {
 		t.Error("Float.CompareTo() same value should be zero")
 	}
-	if cmp, err := f.CompareTo(Float(2.0)); err != nil || cmp >= 0 {
+	if cmp, err := f.CompareTo(NewFloat(2.0)); err != nil || cmp >= 0 {
 		t.Error("Float.CompareTo() greater value should be negative")
 	}
-	if cmp, err := f.CompareTo(Float(1.1)); err != nil || cmp <= 0 {
+	if cmp, err := f.CompareTo(NewFloat(1.1)); err != nil || cmp <= 0 {
 		t.Error("Float.CompareTo() lesser value should be positive")
 	}
 	// test Add(), Divide(), Eval(), Multiply(), Subtract()
-	if num, ok := f.Add(Float(0.1)).Eval().(float64); !ok || num != 1.3 {
+	if num, ok := f.Add(NewFloat(0.1)).Eval().(float64); !ok || num != 1.3 {
 		t.Errorf("Float.Add(0.1) yielded wrong result: %v", num)
 	}
-	if num, ok := f.Subtract(Float(0.2)).Eval().(float64); !ok || num != 1.0 {
+	if num, ok := f.Subtract(NewFloat(0.2)).Eval().(float64); !ok || num != 1.0 {
 		t.Errorf("Float.Subtract(0.2) yielded wrong result: %v", num)
 	}
-	if num, ok := f.Multiply(Float(0.2)).Eval().(float64); !ok || num != 0.24 {
+	if num, ok := f.Multiply(NewFloat(0.2)).Eval().(float64); !ok || num != 0.24 {
 		t.Errorf("Float.Multiply(0.2) yielded wrong result: %v", num)
 	}
-	if num, ok := f.Divide(Float(0.3)).Eval().(float64); !ok || num != 4.0 {
+	if num, ok := f.Divide(NewFloat(0.3)).Eval().(float64); !ok || num != 4.0 {
 		t.Errorf("Float.Divide(0.3) yielded wrong result: %v", num)
 	}
 	// test String()

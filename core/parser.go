@@ -165,7 +165,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 		if err != nil {
 			return nil, err
 		}
-		return NewFloat(val), nil
+		return NewParsedFloat(val, t.row, t.col-len(t.val)), nil
 	case tokenComplex:
 		val, err := atoc(t.val)
 		if err != nil {
@@ -968,6 +968,84 @@ func (pi *ParsedInteger) ToInteger() int64 {
 
 func (pi *ParsedInteger) Location() (int, int) {
 	return pi.row, pi.col
+}
+
+// ParsedFloat is a Locatable Float type.
+type ParsedFloat struct {
+	val Float // Float object
+	row int   // line of text where string was encountered
+	col int   // column where string started
+}
+
+// NewParsedFloat returns a Locatable Float object.
+func NewParsedFloat(val float64, row, col int) Float {
+	return &ParsedFloat{NewFloat(val), row, col}
+}
+
+func (pf *ParsedFloat) Add(value Number) Number {
+	return pf.val.Add(value)
+}
+
+func (pf *ParsedFloat) Divide(divisor Number) Number {
+	return pf.val.Divide(divisor)
+}
+
+func (pf *ParsedFloat) Multiply(muliplier Number) Number {
+	return pf.val.Multiply(muliplier)
+}
+
+func (pf *ParsedFloat) Subtract(value Number) Number {
+	return pf.val.Subtract(value)
+}
+
+func (pf *ParsedFloat) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(*ParsedFloat); ok {
+		return pf.val.CompareTo(os.val)
+	} else if s, ok := other.(Float); ok {
+		return pf.val.CompareTo(s)
+	}
+	return 0, TypeMismatch
+}
+
+func (pf *ParsedFloat) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(*ParsedFloat); ok {
+		return pf.val.EqualTo(os.val)
+	} else if s, ok := other.(Float); ok {
+		return pf.val.EqualTo(s)
+	}
+	return false, TypeMismatch
+}
+
+func (pf *ParsedFloat) Eval() interface{} {
+	return pf.val.Eval()
+}
+
+func (pf *ParsedFloat) String() string {
+	return pf.val.String()
+}
+
+func (pf *ParsedFloat) ComplexValue() Complex {
+	return pf.val.ComplexValue()
+}
+
+func (pf *ParsedFloat) IntegerValue() Integer {
+	return pf.val.IntegerValue()
+}
+
+func (pf *ParsedFloat) FloatValue() Float {
+	return pf.val.FloatValue()
+}
+
+func (pf *ParsedFloat) RationalValue() Rational {
+	return pf.val.RationalValue()
+}
+
+func (pf *ParsedFloat) ToFloat() float64 {
+	return pf.val.ToFloat()
+}
+
+func (pf *ParsedFloat) Location() (int, int) {
+	return pf.row, pf.col
 }
 
 // TODO: locatable versions of the other atomic types
