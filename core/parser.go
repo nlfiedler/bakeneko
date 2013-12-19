@@ -153,7 +153,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 	case tokenCloseParen:
 		return nil, NewLispError(ESYNTAX, "unexpected ')'")
 	case tokenString:
-		return NewParsedString(t.contents(), t.row, t.col), nil
+		return NewParsedString(t.contents(), t.row, t.col-len(t.val)), nil
 	case tokenInteger:
 		val, err := atoi(t.val)
 		if err != nil {
@@ -179,7 +179,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 		}
 		return NewRational(a, b), nil
 	case tokenBoolean:
-		return NewParsedBoolean(t.val, t.row, t.col), nil
+		return NewParsedBoolean(t.val, t.row, t.col-len(t.val)), nil
 	case tokenCharacter:
 		if len(t.val) > 3 {
 			// lexer probably messed up
@@ -206,7 +206,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 		}
 		return NewList(quote, pair), nil
 	case tokenIdentifier:
-		return NewParsedSymbol(t.val, t.row, t.col), nil
+		return NewParsedSymbol(t.val, t.row, t.col-len(t.val)), nil
 	case tokenComment:
 		// ignore the next datum (r7rs 7.1.2)
 		p.inComment = true
@@ -744,6 +744,8 @@ type Locatable interface {
 
 // ParsedString is a Locatable String type.
 type ParsedString struct {
+	// embedding String would have been nice, but having the same name for
+	// the type and a method confuses the compiler
 	str String // String object
 	row int    // line of text where string was encountered
 	col int    // column where string started
@@ -751,8 +753,6 @@ type ParsedString struct {
 
 // NewParsedString returns a Locatable String object.
 func NewParsedString(val string, row, col int) String {
-	// include quotes when finding the start of the string
-	col -= (len(val) + 2)
 	return &ParsedString{NewString(val), row, col}
 }
 
@@ -796,45 +796,32 @@ func (ps *ParsedString) Location() (int, int) {
 
 // ParsedBoolean is a Locatable Boolean type.
 type ParsedBoolean struct {
-	boole Boolean // Boolean object
-	row   int     // line of text where string was encountered
-	col   int     // column where string started
+	Boolean     // Boolean object
+	row     int // line of text where string was encountered
+	col     int // column where string started
 }
 
 // NewParsedBoolean returns a Locatable Boolean object.
 func NewParsedBoolean(val string, row, col int) Boolean {
-	col -= len(val)
 	return &ParsedBoolean{NewBoolean(val), row, col}
 }
 
 func (pb *ParsedBoolean) CompareTo(other Atom) (int8, error) {
 	if ob, ok := other.(*ParsedBoolean); ok {
-		return pb.boole.CompareTo(ob.boole)
+		return pb.Boolean.CompareTo(ob.Boolean)
 	} else if b, ok := other.(Boolean); ok {
-		return pb.boole.CompareTo(b)
+		return pb.Boolean.CompareTo(b)
 	}
 	return 0, TypeMismatch
 }
 
 func (pb *ParsedBoolean) EqualTo(other Atom) (bool, error) {
 	if ob, ok := other.(*ParsedBoolean); ok {
-		return pb.boole.EqualTo(ob.boole)
+		return pb.Boolean.EqualTo(ob.Boolean)
 	} else if b, ok := other.(Boolean); ok {
-		return pb.boole.EqualTo(b)
+		return pb.Boolean.EqualTo(b)
 	}
 	return false, TypeMismatch
-}
-
-func (pb *ParsedBoolean) Eval() interface{} {
-	return pb.boole.Eval()
-}
-
-func (pb *ParsedBoolean) String() string {
-	return pb.boole.String()
-}
-
-func (pb *ParsedBoolean) Value() bool {
-	return pb.boole.Value()
 }
 
 func (pb *ParsedBoolean) Location() (int, int) {
@@ -843,45 +830,36 @@ func (pb *ParsedBoolean) Location() (int, int) {
 
 // ParsedSymbol is a Locatable Symbol type.
 type ParsedSymbol struct {
-	sym Symbol // Symbol object
-	row int    // line of text where string was encountered
-	col int    // column where string started
+	Symbol     // Symbol object
+	row    int // line of text where string was encountered
+	col    int // column where string started
 }
 
 // NewParsedSymbol returns a Locatable Symbol object.
 func NewParsedSymbol(val string, row, col int) Symbol {
-	col -= len(val)
 	return &ParsedSymbol{NewSymbol(val), row, col}
 }
 
 func (ps *ParsedSymbol) CompareTo(other Atom) (int8, error) {
 	if os, ok := other.(*ParsedSymbol); ok {
-		return ps.sym.CompareTo(os.sym)
+		return ps.Symbol.CompareTo(os.Symbol)
 	} else if s, ok := other.(Symbol); ok {
-		return ps.sym.CompareTo(s)
+		return ps.Symbol.CompareTo(s)
 	}
 	return 0, TypeMismatch
 }
 
 func (ps *ParsedSymbol) EqualTo(other Atom) (bool, error) {
 	if os, ok := other.(*ParsedSymbol); ok {
-		return ps.sym.EqualTo(os.sym)
+		return ps.Symbol.EqualTo(os.Symbol)
 	} else if s, ok := other.(Symbol); ok {
-		return ps.sym.EqualTo(s)
+		return ps.Symbol.EqualTo(s)
 	}
 	return false, TypeMismatch
 }
 
-func (ps *ParsedSymbol) Eval() interface{} {
-	return ps.sym.Eval()
-}
-
 func (ps *ParsedSymbol) IsSymbol() bool {
 	return true
-}
-
-func (ps *ParsedSymbol) String() string {
-	return ps.sym.String()
 }
 
 func (ps *ParsedSymbol) Location() (int, int) {
@@ -890,9 +868,9 @@ func (ps *ParsedSymbol) Location() (int, int) {
 
 // ParsedInteger is a Locatable Integer type.
 type ParsedInteger struct {
-	val Integer // Integer object
-	row int     // line of text where string was encountered
-	col int     // column where string started
+	Integer     // Integer object
+	row     int // line of text where string was encountered
+	col     int // column where string started
 }
 
 // NewParsedInteger returns a Locatable Integer object.
@@ -900,70 +878,22 @@ func NewParsedInteger(val int64, row, col int) Integer {
 	return &ParsedInteger{NewInteger(val), row, col}
 }
 
-func (pi *ParsedInteger) Add(value Number) Number {
-	return pi.val.Add(value)
-}
-
-func (pi *ParsedInteger) Divide(divisor Number) Number {
-	return pi.val.Divide(divisor)
-}
-
-func (pi *ParsedInteger) Mod(modulus Integer) Integer {
-	return pi.val.Mod(modulus)
-}
-
-func (pi *ParsedInteger) Multiply(muliplier Number) Number {
-	return pi.val.Multiply(muliplier)
-}
-
-func (pi *ParsedInteger) Subtract(value Number) Number {
-	return pi.val.Subtract(value)
-}
-
 func (pi *ParsedInteger) CompareTo(other Atom) (int8, error) {
 	if os, ok := other.(*ParsedInteger); ok {
-		return pi.val.CompareTo(os.val)
+		return pi.Integer.CompareTo(os.Integer)
 	} else if s, ok := other.(Integer); ok {
-		return pi.val.CompareTo(s)
+		return pi.Integer.CompareTo(s)
 	}
 	return 0, TypeMismatch
 }
 
 func (pi *ParsedInteger) EqualTo(other Atom) (bool, error) {
 	if os, ok := other.(*ParsedInteger); ok {
-		return pi.val.EqualTo(os.val)
+		return pi.Integer.EqualTo(os.Integer)
 	} else if s, ok := other.(Integer); ok {
-		return pi.val.EqualTo(s)
+		return pi.Integer.EqualTo(s)
 	}
 	return false, TypeMismatch
-}
-
-func (pi *ParsedInteger) Eval() interface{} {
-	return pi.val.Eval()
-}
-
-func (pi *ParsedInteger) String() string {
-	return pi.val.String()
-}
-
-func (pi *ParsedInteger) ComplexValue() Complex {
-	return pi.val.ComplexValue()
-}
-
-func (pi *ParsedInteger) IntegerValue() Integer {
-	return pi.val.IntegerValue()
-}
-
-func (pi *ParsedInteger) FloatValue() Float {
-	return pi.val.FloatValue()
-}
-
-func (pi *ParsedInteger) RationalValue() Rational {
-	return pi.val.RationalValue()
-}
-
-func (pi *ParsedInteger) ToInteger() int64 {
-	return pi.val.ToInteger()
 }
 
 func (pi *ParsedInteger) Location() (int, int) {
@@ -972,9 +902,9 @@ func (pi *ParsedInteger) Location() (int, int) {
 
 // ParsedFloat is a Locatable Float type.
 type ParsedFloat struct {
-	val Float // Float object
-	row int   // line of text where string was encountered
-	col int   // column where string started
+	Float     // Float object
+	row   int // line of text where string was encountered
+	col   int // column where string started
 }
 
 // NewParsedFloat returns a Locatable Float object.
@@ -982,66 +912,22 @@ func NewParsedFloat(val float64, row, col int) Float {
 	return &ParsedFloat{NewFloat(val), row, col}
 }
 
-func (pf *ParsedFloat) Add(value Number) Number {
-	return pf.val.Add(value)
-}
-
-func (pf *ParsedFloat) Divide(divisor Number) Number {
-	return pf.val.Divide(divisor)
-}
-
-func (pf *ParsedFloat) Multiply(muliplier Number) Number {
-	return pf.val.Multiply(muliplier)
-}
-
-func (pf *ParsedFloat) Subtract(value Number) Number {
-	return pf.val.Subtract(value)
-}
-
 func (pf *ParsedFloat) CompareTo(other Atom) (int8, error) {
 	if os, ok := other.(*ParsedFloat); ok {
-		return pf.val.CompareTo(os.val)
+		return pf.Float.CompareTo(os.Float)
 	} else if s, ok := other.(Float); ok {
-		return pf.val.CompareTo(s)
+		return pf.Float.CompareTo(s)
 	}
 	return 0, TypeMismatch
 }
 
 func (pf *ParsedFloat) EqualTo(other Atom) (bool, error) {
 	if os, ok := other.(*ParsedFloat); ok {
-		return pf.val.EqualTo(os.val)
+		return pf.Float.EqualTo(os.Float)
 	} else if s, ok := other.(Float); ok {
-		return pf.val.EqualTo(s)
+		return pf.Float.EqualTo(s)
 	}
 	return false, TypeMismatch
-}
-
-func (pf *ParsedFloat) Eval() interface{} {
-	return pf.val.Eval()
-}
-
-func (pf *ParsedFloat) String() string {
-	return pf.val.String()
-}
-
-func (pf *ParsedFloat) ComplexValue() Complex {
-	return pf.val.ComplexValue()
-}
-
-func (pf *ParsedFloat) IntegerValue() Integer {
-	return pf.val.IntegerValue()
-}
-
-func (pf *ParsedFloat) FloatValue() Float {
-	return pf.val.FloatValue()
-}
-
-func (pf *ParsedFloat) RationalValue() Rational {
-	return pf.val.RationalValue()
-}
-
-func (pf *ParsedFloat) ToFloat() float64 {
-	return pf.val.ToFloat()
 }
 
 func (pf *ParsedFloat) Location() (int, int) {
@@ -1050,9 +936,9 @@ func (pf *ParsedFloat) Location() (int, int) {
 
 // ParsedComplex is a Locatable Complex type.
 type ParsedComplex struct {
-	val Complex // Complex object
-	row int     // line of text where string was encountered
-	col int     // column where string started
+	Complex     // Complex object
+	row     int // line of text where string was encountered
+	col     int // column where string started
 }
 
 // NewParsedComplex returns a Locatable Complex object.
@@ -1060,74 +946,22 @@ func NewParsedComplex(val complex128, row, col int) Complex {
 	return &ParsedComplex{NewComplex(val), row, col}
 }
 
-func (pc *ParsedComplex) Add(value Number) Number {
-	return pc.val.Add(value)
-}
-
-func (pc *ParsedComplex) Divide(divisor Number) Number {
-	return pc.val.Divide(divisor)
-}
-
-func (pc *ParsedComplex) Multiply(muliplier Number) Number {
-	return pc.val.Multiply(muliplier)
-}
-
-func (pc *ParsedComplex) Subtract(value Number) Number {
-	return pc.val.Subtract(value)
-}
-
 func (pc *ParsedComplex) CompareTo(other Atom) (int8, error) {
 	if os, ok := other.(*ParsedComplex); ok {
-		return pc.val.CompareTo(os.val)
+		return pc.Complex.CompareTo(os.Complex)
 	} else if s, ok := other.(Complex); ok {
-		return pc.val.CompareTo(s)
+		return pc.Complex.CompareTo(s)
 	}
 	return 0, TypeMismatch
 }
 
 func (pc *ParsedComplex) EqualTo(other Atom) (bool, error) {
 	if os, ok := other.(*ParsedComplex); ok {
-		return pc.val.EqualTo(os.val)
+		return pc.Complex.EqualTo(os.Complex)
 	} else if s, ok := other.(Complex); ok {
-		return pc.val.EqualTo(s)
+		return pc.Complex.EqualTo(s)
 	}
 	return false, TypeMismatch
-}
-
-func (pc *ParsedComplex) Eval() interface{} {
-	return pc.val.Eval()
-}
-
-func (pc *ParsedComplex) String() string {
-	return pc.val.String()
-}
-
-func (pc *ParsedComplex) ComplexValue() Complex {
-	return pc.val.ComplexValue()
-}
-
-func (pc *ParsedComplex) IntegerValue() Integer {
-	return pc.val.IntegerValue()
-}
-
-func (pc *ParsedComplex) FloatValue() Float {
-	return pc.val.FloatValue()
-}
-
-func (pc *ParsedComplex) RationalValue() Rational {
-	return pc.val.RationalValue()
-}
-
-func (pc *ParsedComplex) ToComplex() complex128 {
-	return pc.val.ToComplex()
-}
-
-func (pc *ParsedComplex) RealPart() float64 {
-	return pc.val.RealPart()
-}
-
-func (pc *ParsedComplex) ImagPart() float64 {
-	return pc.val.ImagPart()
 }
 
 func (pc *ParsedComplex) Location() (int, int) {
