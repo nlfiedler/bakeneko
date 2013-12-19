@@ -171,7 +171,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 		if err != nil {
 			return nil, err
 		}
-		return NewComplex(val), nil
+		return NewParsedComplex(val, t.row, t.col-len(t.val)), nil
 	case tokenRational:
 		a, b, err := ator(t.val)
 		if err != nil {
@@ -1048,9 +1048,93 @@ func (pf *ParsedFloat) Location() (int, int) {
 	return pf.row, pf.col
 }
 
+// ParsedComplex is a Locatable Complex type.
+type ParsedComplex struct {
+	val Complex // Complex object
+	row int     // line of text where string was encountered
+	col int     // column where string started
+}
+
+// NewParsedComplex returns a Locatable Complex object.
+func NewParsedComplex(val complex128, row, col int) Complex {
+	return &ParsedComplex{NewComplex(val), row, col}
+}
+
+func (pc *ParsedComplex) Add(value Number) Number {
+	return pc.val.Add(value)
+}
+
+func (pc *ParsedComplex) Divide(divisor Number) Number {
+	return pc.val.Divide(divisor)
+}
+
+func (pc *ParsedComplex) Multiply(muliplier Number) Number {
+	return pc.val.Multiply(muliplier)
+}
+
+func (pc *ParsedComplex) Subtract(value Number) Number {
+	return pc.val.Subtract(value)
+}
+
+func (pc *ParsedComplex) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(*ParsedComplex); ok {
+		return pc.val.CompareTo(os.val)
+	} else if s, ok := other.(Complex); ok {
+		return pc.val.CompareTo(s)
+	}
+	return 0, TypeMismatch
+}
+
+func (pc *ParsedComplex) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(*ParsedComplex); ok {
+		return pc.val.EqualTo(os.val)
+	} else if s, ok := other.(Complex); ok {
+		return pc.val.EqualTo(s)
+	}
+	return false, TypeMismatch
+}
+
+func (pc *ParsedComplex) Eval() interface{} {
+	return pc.val.Eval()
+}
+
+func (pc *ParsedComplex) String() string {
+	return pc.val.String()
+}
+
+func (pc *ParsedComplex) ComplexValue() Complex {
+	return pc.val.ComplexValue()
+}
+
+func (pc *ParsedComplex) IntegerValue() Integer {
+	return pc.val.IntegerValue()
+}
+
+func (pc *ParsedComplex) FloatValue() Float {
+	return pc.val.FloatValue()
+}
+
+func (pc *ParsedComplex) RationalValue() Rational {
+	return pc.val.RationalValue()
+}
+
+func (pc *ParsedComplex) ToComplex() complex128 {
+	return pc.val.ToComplex()
+}
+
+func (pc *ParsedComplex) RealPart() float64 {
+	return pc.val.RealPart()
+}
+
+func (pc *ParsedComplex) ImagPart() float64 {
+	return pc.val.ImagPart()
+}
+
+func (pc *ParsedComplex) Location() (int, int) {
+	return pc.row, pc.col
+}
+
 // TODO: locatable versions of the other atomic types
-// NewParsedFloat(val)
-// NewParsedComplex(val)
 // NewParsedRational(a, b)
 // NewParsedCharacter(t.val)
 // NewParsedPair(...) ...

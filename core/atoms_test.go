@@ -402,38 +402,38 @@ func TestComplex(t *testing.T) {
 	if _, err := f.EqualTo(BooleanTrue); err == nil {
 		t.Error("Complex.EqualTo() wrong type should fail")
 	}
-	if eq, err := f.EqualTo(Complex(complex(1.2, 1.0))); err != nil || !eq {
+	if eq, err := f.EqualTo(NewComplex(complex(1.2, 1.0))); err != nil || !eq {
 		t.Error("Complex.EqualTo() same value should be true")
 	}
-	if eq, err := f.EqualTo(Complex(complex(1.1, 1.0))); err != nil || eq {
+	if eq, err := f.EqualTo(NewComplex(complex(1.1, 1.0))); err != nil || eq {
 		t.Error("Complex.EqualTo() different value should be false")
 	}
 	// test CompareTo()
 	if _, err := f.CompareTo(BooleanTrue); err == nil {
 		t.Error("Complex.CompareTo() wrong type should fail")
 	}
-	if cmp, err := f.CompareTo(Complex(complex(1.2, 1.0))); err != nil || cmp != 0 {
+	if cmp, err := f.CompareTo(NewComplex(complex(1.2, 1.0))); err != nil || cmp != 0 {
 		t.Error("Complex.CompareTo() same value should be zero")
 	}
-	if cmp, err := f.CompareTo(Complex(complex(2.0, 1.0))); err != nil || cmp >= 0 {
+	if cmp, err := f.CompareTo(NewComplex(complex(2.0, 1.0))); err != nil || cmp >= 0 {
 		t.Error("Complex.CompareTo() greater value should be negative")
 	}
-	if cmp, err := f.CompareTo(Complex(complex(1.1, 1.0))); err != nil || cmp <= 0 {
+	if cmp, err := f.CompareTo(NewComplex(complex(1.1, 1.0))); err != nil || cmp <= 0 {
 		t.Error("Complex.CompareTo() lesser value should be positive")
 	}
 	// test Add(), Divide(), Eval(), Multiply(), Subtract()
-	if num, ok := f.Add(Complex(complex(0.1, 1.0))).Eval().(complex128); !ok ||
+	if num, ok := f.Add(NewComplex(complex(0.1, 1.0))).Eval().(complex128); !ok ||
 		num != complex(1.3, 2.0) {
 		t.Errorf("Complex.Add(0.1) yielded wrong result: %v", num)
 	}
-	if num, ok := f.Subtract(Complex(complex(0.2, 1.0))).Eval().(complex128); !ok || num != 1.0 {
+	if num, ok := f.Subtract(NewComplex(complex(0.2, 1.0))).Eval().(complex128); !ok || num != 1.0 {
 		t.Errorf("Complex.Subtract(0.2) yielded wrong result: %v", num)
 	}
-	if num, ok := f.Multiply(Complex(complex(0.2, 1.0))).Eval().(complex128); !ok ||
+	if num, ok := f.Multiply(NewComplex(complex(0.2, 1.0))).Eval().(complex128); !ok ||
 		num != complex(-0.76, 1.4) {
 		t.Errorf("Complex.Multiply(0.2) yielded wrong result: %v", num)
 	}
-	if num, ok := f.Divide(Complex(complex(0.3, 1.0))).Eval().(complex128); !ok ||
+	if num, ok := f.Divide(NewComplex(complex(0.3, 1.0))).Eval().(complex128); !ok ||
 		num != complex(1.2477064220183485, -0.8256880733944952) {
 		t.Errorf("Complex.Divide(0.3) yielded wrong result: %v", num)
 	}

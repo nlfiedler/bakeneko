@@ -580,36 +580,48 @@ func (f floatImpl) ToFloat() float64 {
 	return float64(f)
 }
 
-type Complex complex128
-
-func NewComplex(val complex128) Complex {
-	return Complex(val)
+// Complex represents a complex number, with real and imaginary parts.
+type Complex interface {
+	Number
+	// ToComplex converts this Complex to a complex128 value.
+	ToComplex() complex128
+	// RealPart returns the floating-point real part of the complex number.
+	RealPart() float64
+	// ImagPart returns the floating-point imaginary part of the complex number.
+	ImagPart() float64
 }
 
-func (c Complex) Add(value Number) Number {
-	vc := value.ComplexValue()
+// complexImpl is the internal representation of a Complex.
+type complexImpl complex128
+
+func NewComplex(val complex128) Complex {
+	return complexImpl(val)
+}
+
+func (c complexImpl) Add(value Number) Number {
+	vc := value.ComplexValue().ToComplex()
 	return NewComplex(complex128(c) + complex128(vc))
 }
 
-func (c Complex) Divide(divisor Number) Number {
-	vc := divisor.ComplexValue()
+func (c complexImpl) Divide(divisor Number) Number {
+	vc := divisor.ComplexValue().ToComplex()
 	return NewComplex(complex128(c) / complex128(vc))
 }
 
-func (c Complex) Multiply(muliplier Number) Number {
-	vc := muliplier.ComplexValue()
+func (c complexImpl) Multiply(muliplier Number) Number {
+	vc := muliplier.ComplexValue().ToComplex()
 	return NewComplex(complex128(c) * complex128(vc))
 }
 
-func (c Complex) Subtract(value Number) Number {
-	vc := value.ComplexValue()
+func (c complexImpl) Subtract(value Number) Number {
+	vc := value.ComplexValue().ToComplex()
 	return NewComplex(complex128(c) - complex128(vc))
 }
 
-func (c Complex) CompareTo(other Atom) (int8, error) {
+func (c complexImpl) CompareTo(other Atom) (int8, error) {
 	if oc, ok := other.(Complex); ok {
 		cc := complex128(c)
-		occ := complex128(oc)
+		occ := oc.ToComplex()
 		if cc == occ {
 			return 0, nil
 		} else if real(cc) > real(occ) {
@@ -621,50 +633,48 @@ func (c Complex) CompareTo(other Atom) (int8, error) {
 	return 0, TypeMismatch
 }
 
-func (c Complex) EqualTo(other Atom) (bool, error) {
+func (c complexImpl) EqualTo(other Atom) (bool, error) {
 	if oc, ok := other.(Complex); ok {
-		return complex128(c) == complex128(oc), nil
+		return complex128(c) == oc.ToComplex(), nil
 	}
 	return false, TypeMismatch
 }
 
-func (c Complex) Eval() interface{} {
+func (c complexImpl) Eval() interface{} {
 	return complex128(c)
 }
 
-func (c Complex) IntegerValue() Integer {
+func (c complexImpl) IntegerValue() Integer {
 	return NewInteger(int64(real(complex128(c))))
 }
 
-func (c Complex) FloatValue() Float {
+func (c complexImpl) FloatValue() Float {
 	return NewFloat(real(complex128(c)))
 }
 
-func (c Complex) ComplexValue() Complex {
+func (c complexImpl) ComplexValue() Complex {
 	return c
 }
 
-func (c Complex) RationalValue() Rational {
+func (c complexImpl) RationalValue() Rational {
 	return NewRational(int64(real(complex128(c))), 1)
 }
 
-func (c Complex) String() string {
+func (c complexImpl) String() string {
 	// return the number without the parentheses
 	str := fmt.Sprint(complex128(c))
 	return str[1 : len(str)-1]
 }
 
-func (c Complex) ToComplex() complex128 {
+func (c complexImpl) ToComplex() complex128 {
 	return complex128(c)
 }
 
-// RealPart returns the floating-point real part of the complex number.
-func (c Complex) RealPart() float64 {
+func (c complexImpl) RealPart() float64 {
 	return real(complex128(c))
 }
 
-// ImagPart returns the floating-point imaginary part of the complex number.
-func (c Complex) ImagPart() float64 {
+func (c complexImpl) ImagPart() float64 {
 	return imag(complex128(c))
 }
 
