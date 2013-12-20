@@ -301,7 +301,14 @@ func (s *StringImpl) String() string {
 }
 
 // Character represents a single character (e.g. '#\\a' or '#\\space') in Scheme.
-type Character rune
+type Character interface {
+	Atom
+	// ToRune returns the rune this character represents.
+	ToRune() rune
+}
+
+// characterImpl is the default implementation of a Character.
+type characterImpl rune
 
 // NewCharacter creates an instance of Character to represent the given Scheme
 // character. Characters are prefixed with #\, as in #\a for the letter 'a'.
@@ -309,22 +316,25 @@ type Character rune
 // character. Invalid input, such as a short string, will result in the
 // uf8.RuneError character.
 func NewCharacter(val string) Character {
+	// TODO: what about the other special Scheme characters (e.g. #\alarm)?
 	if val == "#\\space" {
-		return Character(' ')
+		return characterImpl(' ')
 	} else if val == "#\\newline" {
-		return Character('\n')
+		return characterImpl('\n')
 	} else if len(val) != 3 {
-		return Character(utf8.RuneError)
+		return characterImpl(utf8.RuneError)
 	}
 	// take whatever follows the #\ prefix
-	return Character(val[2])
+	return characterImpl(val[2])
 }
 
-func (c Character) CompareTo(other Atom) (int8, error) {
+func (c characterImpl) CompareTo(other Atom) (int8, error) {
 	if oc, ok := other.(Character); ok {
-		if c == oc {
+		roc := oc.ToRune()
+		rc := rune(c)
+		if rc == roc {
 			return 0, nil
-		} else if c < oc {
+		} else if rc < roc {
 			return -1, nil
 		}
 		return 1, nil
@@ -332,7 +342,7 @@ func (c Character) CompareTo(other Atom) (int8, error) {
 	return 0, TypeMismatch
 }
 
-func (c Character) EqualTo(other Atom) (bool, error) {
+func (c characterImpl) EqualTo(other Atom) (bool, error) {
 	if oc, ok := other.(Character); ok {
 		return c == oc, nil
 	}
@@ -340,12 +350,17 @@ func (c Character) EqualTo(other Atom) (bool, error) {
 }
 
 // Eval returns the character itself as a rune.
-func (c Character) Eval() interface{} {
+func (c characterImpl) Eval() interface{} {
+	return rune(c)
+}
+
+func (c characterImpl) ToRune() rune {
 	return rune(c)
 }
 
 // String returns the Scheme representation of the character.
-func (c Character) String() string {
+func (c characterImpl) String() string {
+	// TODO: what about the other special Scheme characters (e.g. #\alarm)?
 	if c == ' ' {
 		return "#\\space"
 	} else if c == '\n' {

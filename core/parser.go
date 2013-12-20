@@ -185,7 +185,9 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 			// lexer probably messed up
 			return nil, NewLispErrorf(ESYNTAX, "unrecognized character: %s", t.val)
 		}
-		return NewCharacter(t.val), nil
+		// fmt.Printf("char: %s %d:%d %d len\n", t.val, t.row, t.col, len(t.val))
+		// char: #\z 1:3 3 len
+		return NewParsedCharacter(t.val, t.row, t.col-len(t.val)), nil
 	case tokenQuote:
 		var quote Symbol
 		switch t.val {
@@ -1002,8 +1004,36 @@ func (pc *ParsedRational) Location() (int, int) {
 	return pc.row, pc.col
 }
 
-// TODO: locatable versions of the other atomic types
-// NewParsedCharacter(t.val)
-// NewParsedPair(...) ...
+// ParsedCharacter is a Locatable Character type.
+type ParsedCharacter struct {
+	Character     // Character object
+	row       int // line of text where character was encountered
+	col       int // column where character started
+}
 
-// TODO: locatable versions of vector and bytevector
+// NewParsedCharacter returns a Locatable Character object.
+func NewParsedCharacter(val string, row, col int) Character {
+	return &ParsedCharacter{NewCharacter(val), row, col}
+}
+
+func (pc *ParsedCharacter) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(*ParsedCharacter); ok {
+		return pc.Character.CompareTo(os.Character)
+	} else if s, ok := other.(Character); ok {
+		return pc.Character.CompareTo(s)
+	}
+	return 0, TypeMismatch
+}
+
+func (pc *ParsedCharacter) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(*ParsedCharacter); ok {
+		return pc.Character.EqualTo(os.Character)
+	} else if s, ok := other.(Character); ok {
+		return pc.Character.EqualTo(s)
+	}
+	return false, TypeMismatch
+}
+
+func (pc *ParsedCharacter) Location() (int, int) {
+	return pc.row, pc.col
+}

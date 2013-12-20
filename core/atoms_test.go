@@ -26,7 +26,7 @@ func TestBoolean(t *testing.T) {
 	if _, err := b.EqualTo(nil); err == nil {
 		t.Error("Boolean.EqualTo(nil) should return error")
 	}
-	if _, err := b.EqualTo(Character('a')); err == nil {
+	if _, err := b.EqualTo(NewCharacter("a")); err == nil {
 		t.Error("Boolean.EqualTo(rune) should return error")
 	}
 	bt := NewBoolean("#t")
@@ -41,7 +41,7 @@ func TestBoolean(t *testing.T) {
 	if _, err := b.CompareTo(nil); err == nil {
 		t.Error("Boolean.CompareTo(nil) should return error")
 	}
-	if _, err := b.CompareTo(Character('a')); err == nil {
+	if _, err := b.CompareTo(NewCharacter("a")); err == nil {
 		t.Error("Boolean.CompareTo(rune) should return error")
 	}
 	if cmp, err := b.CompareTo(bt); err != nil || cmp != 0 {

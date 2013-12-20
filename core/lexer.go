@@ -250,9 +250,12 @@ func (l *lexer) peek() rune {
 // computeColumn updates the col field to the correct value after having moved
 // the pos to its new position within the input text.
 func (l *lexer) computeColumn() {
-	nl := strings.LastIndex(l.input[l.start:l.pos], "\n")
+	nl := strings.LastIndex(l.input[:l.pos], "\n")
 	if nl == -1 {
-		nl = l.start
+		nl = 0
+	} else {
+		// don't count the newline itself
+		nl++
 	}
 	l.col = utf8.RuneCountInString(l.input[nl:l.pos])
 }

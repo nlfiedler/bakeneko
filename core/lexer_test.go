@@ -23,6 +23,22 @@ type LexerSuite struct {
 
 var _ = gc.Suite(&LexerSuite{})
 
+type LocationResult struct {
+	char rune // expected character
+	row  int  // expected row value
+	col  int  // expected column value
+}
+
+func locationChecker(c *gc.C, l *lexer, expected []LocationResult) {
+	for i, e := range expected {
+		r := l.next()
+		cm := gc.Commentf("result #%d (%q, %d:%d)", i, r, l.row, l.col)
+		c.Assert(r, gc.Equals, e.char, cm)
+		c.Assert(l.row, gc.Equals, e.row, cm)
+		c.Assert(l.col, gc.Equals, e.col, cm)
+	}
+}
+
 // TestRowCol ensures that the lexer updates the row and col fields correctly
 // as next(), ignore(), backup(), and rewind() are called.
 func (s *LexerSuite) TestRowCol(c *gc.C) {
@@ -31,7 +47,7 @@ func (s *LexerSuite) TestRowCol(c *gc.C) {
 
 bar baz
 123
-#\a #\space
+(a #\a #\space)
 (cons 1 2)
 `
 	l := &lexer{
@@ -40,44 +56,30 @@ bar baz
 		tokens: make(chan token),
 		row:    1,
 	}
-	type LexerResult struct {
-		char rune
-		row  int
-		col  int
-	}
-	checker := func(expected []LexerResult) {
-		for i, e := range expected {
-			r := l.next()
-			cm := gc.Commentf("result #%d (%x, %d:%d)", i, r, l.row, l.col)
-			c.Assert(r, gc.Equals, e.char, cm)
-			c.Assert(l.row, gc.Equals, e.row, cm)
-			c.Assert(l.col, gc.Equals, e.col, cm)
-		}
-	}
-	expected := make([]LexerResult, 0)
+	expected := make([]LocationResult, 0)
 	line := 1
-	expected = append(expected, LexerResult{'f', line, 1})
-	expected = append(expected, LexerResult{'o', line, 2})
-	expected = append(expected, LexerResult{'o', line, 3})
+	expected = append(expected, LocationResult{'f', line, 1})
+	expected = append(expected, LocationResult{'o', line, 2})
+	expected = append(expected, LocationResult{'o', line, 3})
 	line++
-	expected = append(expected, LexerResult{'\n', line, 0})
-	checker(expected)
+	expected = append(expected, LocationResult{'\n', line, 0})
+	locationChecker(c, l, expected)
 
 	l.backup()
-	expected = make([]LexerResult, 0)
-	expected = append(expected, LexerResult{'\n', line, 0})
+	expected = make([]LocationResult, 0)
+	expected = append(expected, LocationResult{'\n', line, 0})
 	line++
-	expected = append(expected, LexerResult{'\n', line, 0})
-	expected = append(expected, LexerResult{'b', line, 1})
-	expected = append(expected, LexerResult{'a', line, 2})
-	checker(expected)
+	expected = append(expected, LocationResult{'\n', line, 0})
+	expected = append(expected, LocationResult{'b', line, 1})
+	expected = append(expected, LocationResult{'a', line, 2})
+	locationChecker(c, l, expected)
 
 	l.backup()
 	c.Assert(l.row, gc.Equals, line, gc.Commentf("after backup"))
 	c.Assert(l.col, gc.Equals, 1, gc.Commentf("after backup"))
-	expected = make([]LexerResult, 0)
-	expected = append(expected, LexerResult{'a', line, 2})
-	checker(expected)
+	expected = make([]LocationResult, 0)
+	expected = append(expected, LocationResult{'a', line, 2})
+	locationChecker(c, l, expected)
 
 	// starting all over again...
 	l.rewind()
@@ -85,49 +87,122 @@ bar baz
 	c.Assert(l.col, gc.Equals, 0, gc.Commentf("after first rewind"))
 
 	line = 1
-	expected = make([]LexerResult, 0)
-	expected = append(expected, LexerResult{'f', line, 1})
-	expected = append(expected, LexerResult{'o', line, 2})
-	expected = append(expected, LexerResult{'o', line, 3})
+	expected = make([]LocationResult, 0)
+	expected = append(expected, LocationResult{'f', line, 1})
+	expected = append(expected, LocationResult{'o', line, 2})
+	expected = append(expected, LocationResult{'o', line, 3})
 	line++
-	expected = append(expected, LexerResult{'\n', line, 0})
+	expected = append(expected, LocationResult{'\n', line, 0})
 	line++
-	expected = append(expected, LexerResult{'\n', line, 0})
-	expected = append(expected, LexerResult{'b', line, 1})
-	expected = append(expected, LexerResult{'a', line, 2})
-	expected = append(expected, LexerResult{'r', line, 3})
-	expected = append(expected, LexerResult{' ', line, 4})
-	expected = append(expected, LexerResult{'b', line, 5})
-	expected = append(expected, LexerResult{'a', line, 6})
-	expected = append(expected, LexerResult{'z', line, 7})
+	expected = append(expected, LocationResult{'\n', line, 0})
+	expected = append(expected, LocationResult{'b', line, 1})
+	expected = append(expected, LocationResult{'a', line, 2})
+	expected = append(expected, LocationResult{'r', line, 3})
+	expected = append(expected, LocationResult{' ', line, 4})
+	expected = append(expected, LocationResult{'b', line, 5})
+	expected = append(expected, LocationResult{'a', line, 6})
+	expected = append(expected, LocationResult{'z', line, 7})
 	line++
-	expected = append(expected, LexerResult{'\n', line, 0})
-	expected = append(expected, LexerResult{'1', line, 1})
-	expected = append(expected, LexerResult{'2', line, 2})
-	expected = append(expected, LexerResult{'3', line, 3})
+	expected = append(expected, LocationResult{'\n', line, 0})
+	expected = append(expected, LocationResult{'1', line, 1})
+	expected = append(expected, LocationResult{'2', line, 2})
+	expected = append(expected, LocationResult{'3', line, 3})
 	line++
-	expected = append(expected, LexerResult{'\n', line, 0})
-	checker(expected)
+	expected = append(expected, LocationResult{'\n', line, 0})
+	locationChecker(c, l, expected)
 
 	l.ignore()
-	expected = make([]LexerResult, 0)
-	expected = append(expected, LexerResult{'#', line, 1})
-	expected = append(expected, LexerResult{'\\', line, 2})
-	expected = append(expected, LexerResult{'a', line, 3})
-	expected = append(expected, LexerResult{' ', line, 4})
-	checker(expected)
+	expected = make([]LocationResult, 0)
+	expected = append(expected, LocationResult{'(', line, 1})
+	expected = append(expected, LocationResult{'a', line, 2})
+	expected = append(expected, LocationResult{' ', line, 3})
+	expected = append(expected, LocationResult{'#', line, 4})
+	expected = append(expected, LocationResult{'\\', line, 5})
+	expected = append(expected, LocationResult{'a', line, 6})
+	expected = append(expected, LocationResult{' ', line, 7})
+	locationChecker(c, l, expected)
 
-	// after getting #\a, backup, rewind, and then verify row/col
+	// after getting (a ...), backup, rewind, and then verify row/col
 	l.backup()
 	l.rewind()
 	c.Assert(l.row, gc.Equals, line, gc.Commentf("rewind after #\\a"))
 	c.Assert(l.col, gc.Equals, 0, gc.Commentf("rewind after #\\a"))
-	expected = make([]LexerResult, 0)
-	expected = append(expected, LexerResult{'#', line, 1})
-	expected = append(expected, LexerResult{'\\', line, 2})
-	expected = append(expected, LexerResult{'a', line, 3})
-	expected = append(expected, LexerResult{' ', line, 4})
+	expected = make([]LocationResult, 0)
+	expected = append(expected, LocationResult{'(', line, 1})
+	expected = append(expected, LocationResult{'a', line, 2})
+	expected = append(expected, LocationResult{' ', line, 3})
+	expected = append(expected, LocationResult{'#', line, 4})
+	expected = append(expected, LocationResult{'\\', line, 5})
+	expected = append(expected, LocationResult{'a', line, 6})
+	expected = append(expected, LocationResult{' ', line, 7})
+	locationChecker(c, l, expected)
+}
+
+func (s *LexerSuite) TestRowColDefine(c *gc.C) {
+	input := `(define #\z "abc")`
+	l := &lexer{
+		name:   "unit",
+		input:  input,
+		tokens: make(chan token),
+		row:    1,
+	}
+	expected := make([]LocationResult, 0)
+	line := 1
+	expected = append(expected, LocationResult{'(', line, 1})
+	expected = append(expected, LocationResult{'d', line, 2})
+	expected = append(expected, LocationResult{'e', line, 3})
+	expected = append(expected, LocationResult{'f', line, 4})
+	expected = append(expected, LocationResult{'i', line, 5})
+	expected = append(expected, LocationResult{'n', line, 6})
+	expected = append(expected, LocationResult{'e', line, 7})
+	expected = append(expected, LocationResult{' ', line, 8})
+	expected = append(expected, LocationResult{'#', line, 9})
+	expected = append(expected, LocationResult{'\\', line, 10})
+	expected = append(expected, LocationResult{'z', line, 11})
+	expected = append(expected, LocationResult{' ', line, 12})
+	expected = append(expected, LocationResult{'"', line, 13})
+	expected = append(expected, LocationResult{'a', line, 14})
+	expected = append(expected, LocationResult{'b', line, 15})
+	expected = append(expected, LocationResult{'c', line, 16})
+	expected = append(expected, LocationResult{'"', line, 17})
+	expected = append(expected, LocationResult{')', line, 18})
+	locationChecker(c, l, expected)
+}
+
+func (s *LexerSuite) TestLexerTokenLocation(c *gc.C) {
+	input := `(define #\z "abc" .123 +123)`
+	ch := lex("unit", input)
+
+	type LocationStrResult struct {
+		typ tokenType // expected token type
+		val string    // expected string
+		row int       // expected row value
+		col int       // expected column value
+	}
+	checker := func(expected []LocationStrResult) {
+		for i, e := range expected {
+			tok, ok := <-ch
+			if !ok {
+				c.Errorf("reached end of lexer output, expected %s", e)
+			}
+			cm := gc.Commentf("result #%d (%s, %d:%d)", i, tok.val, tok.row, tok.col)
+			c.Assert(tok.val, gc.Equals, e.val, cm)
+			c.Assert(tok.row, gc.Equals, e.row, cm)
+			c.Assert(tok.col, gc.Equals, e.col, cm)
+		}
+	}
+
+	expected := make([]LocationStrResult, 0)
+	line := 1
+	expected = append(expected, LocationStrResult{tokenOpenParen, "(", line, 1})
+	expected = append(expected, LocationStrResult{tokenIdentifier, "define", line, 7})
+	expected = append(expected, LocationStrResult{tokenCharacter, "#\\z", line, 11})
+	expected = append(expected, LocationStrResult{tokenString, `"abc"`, line, 17})
+	expected = append(expected, LocationStrResult{tokenFloat, ".123", line, 22})
+	expected = append(expected, LocationStrResult{tokenFloat, "+123", line, 27})
+	expected = append(expected, LocationStrResult{tokenCloseParen, ")", line, 28})
 	checker(expected)
+	drainLexer(ch)
 }
 
 // expectedLexerResult is equivalent to a token and is used in comparing the
