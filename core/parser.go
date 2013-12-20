@@ -177,7 +177,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 		if err != nil {
 			return nil, err
 		}
-		return NewRational(a, b), nil
+		return NewParsedRational(a, b, t.row, t.col-len(t.val)), nil
 	case tokenBoolean:
 		return NewParsedBoolean(t.val, t.row, t.col-len(t.val)), nil
 	case tokenCharacter:
@@ -968,8 +968,41 @@ func (pc *ParsedComplex) Location() (int, int) {
 	return pc.row, pc.col
 }
 
+// ParsedRational is a Locatable Rational type.
+type ParsedRational struct {
+	Rational     // Rational object
+	row      int // line of text where string was encountered
+	col      int // column where string started
+}
+
+// NewParsedRational returns a Locatable Rational object.
+func NewParsedRational(a, b int64, row, col int) Rational {
+	return &ParsedRational{NewRational(a, b), row, col}
+}
+
+func (pc *ParsedRational) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(*ParsedRational); ok {
+		return pc.Rational.CompareTo(os.Rational)
+	} else if s, ok := other.(Rational); ok {
+		return pc.Rational.CompareTo(s)
+	}
+	return 0, TypeMismatch
+}
+
+func (pc *ParsedRational) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(*ParsedRational); ok {
+		return pc.Rational.EqualTo(os.Rational)
+	} else if s, ok := other.(Rational); ok {
+		return pc.Rational.EqualTo(s)
+	}
+	return false, TypeMismatch
+}
+
+func (pc *ParsedRational) Location() (int, int) {
+	return pc.row, pc.col
+}
+
 // TODO: locatable versions of the other atomic types
-// NewParsedRational(a, b)
 // NewParsedCharacter(t.val)
 // NewParsedPair(...) ...
 
