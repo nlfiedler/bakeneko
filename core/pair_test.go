@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -8,9 +8,14 @@ package core
 
 import (
 	"fmt"
-	"github.com/bmizerany/assert"
+	gc "launchpad.net/gocheck"
 	"testing"
 )
+
+type PairSuite struct {
+}
+
+var _ = gc.Suite(&PairSuite{})
 
 func TestPairNil(t *testing.T) {
 	var p *pair = nil
@@ -446,53 +451,53 @@ func TestNestedList(t *testing.T) {
 	}
 }
 
-func TestPairIterator(t *testing.T) {
+func (ps *PairSuite) TestPairIterator(c *gc.C) {
 	foo := NewSymbol("foo")
 	bar := NewSymbol("bar")
 	baz := NewSymbol("baz")
 	qux := NewSymbol("qux")
 	p := NewList(foo, bar, baz, qux)
 	iter := NewPairIterator(p)
-	assert.T(t, iter.HasNext())
-	assert.Equal(t, foo, iter.Next())
-	assert.T(t, iter.IsProper())
-	assert.T(t, iter.HasNext())
-	assert.Equal(t, bar, iter.Next())
-	assert.T(t, iter.IsProper())
-	assert.T(t, iter.HasNext())
-	assert.Equal(t, baz, iter.Next())
-	assert.T(t, iter.IsProper())
-	assert.T(t, iter.HasNext())
-	assert.Equal(t, qux, iter.Next())
-	assert.T(t, iter.IsProper())
-	assert.T(t, !iter.HasNext())
+	c.Assert(iter.HasNext(), gc.Equals, true)
+	c.Assert(iter.Next(), gc.Equals, foo)
+	c.Assert(iter.IsProper(), gc.Equals, true)
+	c.Assert(iter.HasNext(), gc.Equals, true)
+	c.Assert(iter.Next(), gc.Equals, bar)
+	c.Assert(iter.IsProper(), gc.Equals, true)
+	c.Assert(iter.HasNext(), gc.Equals, true)
+	c.Assert(iter.Next(), gc.Equals, baz)
+	c.Assert(iter.IsProper(), gc.Equals, true)
+	c.Assert(iter.HasNext(), gc.Equals, true)
+	c.Assert(iter.Next(), gc.Equals, qux)
+	c.Assert(iter.IsProper(), gc.Equals, true)
+	c.Assert(iter.HasNext(), gc.Equals, false)
 }
 
-func TestPairIteratorImproper(t *testing.T) {
+func (ps *PairSuite) TestPairIteratorImproper(c *gc.C) {
 	foo := NewSymbol("foo")
 	bar := NewSymbol("bar")
 	p := Cons(foo, bar)
 	iter := NewPairIterator(p)
-	assert.T(t, iter.HasNext())
-	assert.T(t, iter.IsProper())
-	assert.Equal(t, foo, iter.Next())
-	assert.T(t, iter.IsProper())
-	assert.T(t, iter.HasNext())
-	assert.Equal(t, bar, iter.Next())
-	assert.T(t, !iter.HasNext())
-	assert.T(t, !iter.IsProper())
+	c.Assert(iter.IsProper(), gc.Equals, true)
+	c.Assert(iter.HasNext(), gc.Equals, true)
+	c.Assert(iter.Next(), gc.Equals, foo)
+	c.Assert(iter.IsProper(), gc.Equals, true)
+	c.Assert(iter.HasNext(), gc.Equals, true)
+	c.Assert(iter.Next(), gc.Equals, bar)
+	c.Assert(iter.IsProper(), gc.Equals, false)
+	c.Assert(iter.HasNext(), gc.Equals, false)
 }
 
-func TestPairIteratorEmpty(t *testing.T) {
+func (ps *PairSuite) TestPairIteratorEmpty(c *gc.C) {
 	iter := NewPairIterator(theEmptyList)
-	assert.T(t, !iter.HasNext())
-	assert.T(t, iter.IsProper())
-	assert.Equal(t, nil, iter.Next())
+	c.Assert(iter.HasNext(), gc.Equals, false)
+	c.Assert(iter.IsProper(), gc.Equals, true)
+	c.Assert(iter.Next(), gc.IsNil)
 }
 
-func TestPairIteratorNil(t *testing.T) {
+func (ps *PairSuite) TestPairIteratorNil(c *gc.C) {
 	iter := NewPairIterator(nil)
-	assert.T(t, !iter.HasNext())
-	assert.T(t, iter.IsProper())
-	assert.Equal(t, nil, iter.Next())
+	c.Assert(iter.HasNext(), gc.Equals, false)
+	c.Assert(iter.IsProper(), gc.Equals, true)
+	c.Assert(iter.Next(), gc.IsNil)
 }
