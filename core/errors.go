@@ -12,6 +12,7 @@ import (
 )
 
 var NumberOutOfRange = errors.New("number value of out range")
+var InvalidUtf8String = errors.New("input contains invalid UTF-8 bytes")
 var OutOfBounds = errors.New("index out of bounds")
 var ParserError = errors.New("unexpected parser error")
 var TypeMismatch = errors.New("type mismatch in atom comparison")
@@ -28,6 +29,7 @@ const (
 	ESUPPORT                   // feature unsupported
 	ESYNTAX                    // e.g. invalid number syntax
 	ESYMBOL                    // e.g. undefined
+	ELEXER                     // lexer error
 )
 
 // LispError is used to provide information on the type of error that occurred

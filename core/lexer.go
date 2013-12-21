@@ -141,10 +141,10 @@ type stateFn func(*lexer) stateFn
 // the channel from which tokens are received. Callers should follow this with
 // a defer drainLexer(chan token) to ensure the channel is drained and the
 // goroutine emitting tokens can exit.
-func lex(name, input string) chan token {
+func lex(name, input string) (chan token, error) {
 	// simplify end-of-line characters
 	if !utf8.ValidString(input) {
-		return nil
+		return nil, InvalidUtf8String
 	}
 	input = strings.Replace(input, "\r\n", "\n", -1)
 	input = strings.Replace(input, "\r", "\n", -1)
@@ -155,7 +155,7 @@ func lex(name, input string) chan token {
 		row:    1,
 	}
 	go l.run() // Concurrently run state machine.
-	return l.tokens
+	return l.tokens, nil
 }
 
 // drainLexer reads from the lexer channel until nothing is left, allowing the

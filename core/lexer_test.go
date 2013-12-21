@@ -171,7 +171,10 @@ func (s *LexerSuite) TestRowColDefine(c *gc.C) {
 
 func (s *LexerSuite) TestLexerTokenLocation(c *gc.C) {
 	input := `(define #\z "abc" .123 +123)`
-	ch := lex("unit", input)
+	ch, err := lex("unit", input)
+	if err != nil {
+		c.Fatal("lexer failed!")
+	}
 
 	type LocationStrResult struct {
 		typ tokenType // expected token type
@@ -215,7 +218,10 @@ type expectedLexerResult struct {
 // verifyLexerResults calls lex() and checks that the resulting tokens
 // match the expected results.
 func verifyLexerResults(t *testing.T, input string, expected []expectedLexerResult) {
-	c := lex("unit", input)
+	c, err := lex("unit", input)
+	if err != nil {
+		t.Fatal("lexer failed!")
+	}
 	failed := false
 	for i, e := range expected {
 		tok, ok := <-c
@@ -242,7 +248,10 @@ func verifyLexerResults(t *testing.T, input string, expected []expectedLexerResu
 // that the resulting tokens match the expected results.
 func verifyLexerResultsMap(t *testing.T, expected map[string]tokenType) {
 	for input, tipe := range expected {
-		c := lex("unit", input)
+		c, err := lex("unit", input)
+		if err != nil {
+			t.Fatal("lexer failed!")
+		}
 		tok, ok := <-c
 		if !ok {
 			t.Errorf("lexer channel closed?")
@@ -261,7 +270,10 @@ func verifyLexerResultsMap(t *testing.T, expected map[string]tokenType) {
 // resulted in an error, and (optionally) verifies the error message.
 func verifyLexerErrors(t *testing.T, input map[string]string) {
 	for i, e := range input {
-		c := lex("unit", i)
+		c, err := lex("unit", i)
+		if err != nil {
+			t.Fatal("lexer failed!")
+		}
 		tok, ok := <-c
 		if !ok {
 			t.Errorf("lexer channel closed?")

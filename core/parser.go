@@ -108,7 +108,11 @@ func NewParser() Parser {
 
 // Parse is the default implementation the Parse() method of Parser.
 func (p *parserImpl) Parse(expr string) (Pair, LispError) {
-	p.tokens = lex("parse", expr)
+	var err error
+	p.tokens, err = lex("parse", expr)
+	if err != nil {
+		return nil, NewLispError(ELEXER, err.Error())
+	}
 	defer drainLexer(p.tokens)
 	var results Pair = theEmptyList
 	var tail Pair = theEmptyList
