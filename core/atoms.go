@@ -196,6 +196,8 @@ type String interface {
 	// Set changes the rune at the given zero-based position within the
 	// string. If the position is out of bounds, panic ensues.
 	Set(pos int, ch rune)
+	// Value returns the string value itself, without quotes.
+	Value() string
 }
 
 // StringImpl is an implementation of the String interface.
@@ -298,6 +300,14 @@ func (s *StringImpl) String() string {
 		return ""
 	}
 	return fmt.Sprintf("\"%s\"", s.toString())
+}
+
+// Value returns the String as a Go string.
+func (s *StringImpl) Value() string {
+	if s == nil {
+		return ""
+	}
+	return s.toString()
 }
 
 // Character represents a single character (e.g. '#\\a' or '#\\space') in Scheme.

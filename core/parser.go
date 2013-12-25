@@ -14,6 +14,8 @@ package core
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"path"
 	"strconv"
 	"strings"
 )
@@ -29,6 +31,8 @@ var defineSym = NewSymbol("define")
 var definesyntaxSym = NewSymbol("define-syntax")
 var elseSym = NewSymbol("else")
 var ifSym = NewSymbol("if")
+var includeSym = NewSymbol("include")
+var includeCaseSym = NewSymbol("include-ci")
 var lambdaSym = NewSymbol("lambda")
 var orSym = NewSymbol("or")
 var quasiquoteSym = NewSymbol("quasiquote")
@@ -75,19 +79,18 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 	}
 }
 
-// parse parses a Scheme program and returns the result, which will be a Pair
-// consisting of program elements (i.e. function calls).
-func parse(expr string) (Pair, LispError) {
-	parser := NewParser()
-	return parser.Parse(expr)
-}
-
 // Parser knows how to convert a string represetation of Scheme code into
 // a runnable program, which can be passed to the Eval() function.
 type Parser interface {
 	// Parse will return a collection of Scheme objects parsed from the given
 	// string, returning an error if the lexing or parsing fails.
 	Parse(expr string) (Pair, LispError)
+	// ParseFile reads the named file as a Scheme program, returning the
+	// parsed results, or an error if anything went wrong.
+	ParseFile(filename string) (Pair, LispError)
+	// Expand takes the parsed results and performs some basic validation
+	// and expands the results into the canoncial form.
+	Expand(x interface{}) (interface{}, LispError)
 }
 
 // parserImpl holds the state of the parser during parsing.
@@ -95,6 +98,9 @@ type parserImpl struct {
 	tokens    chan token               // channel of lexer tokens
 	inComment bool                     // true if parsing a datum comment
 	labels    []map[string]interface{} // collection of labeled datum, organized by scope
+	name      string                   // name of input; usually a file name
+	include   string                   // path for file includes, may be '.'
+	foldcase  bool                     // if true, implicitly #!fold-case next Parse()
 }
 
 // NewParser constructs a new Parser instance.
@@ -103,13 +109,16 @@ func NewParser() Parser {
 	labels := make([]map[string]interface{}, 0)
 	scope := make(map[string]interface{})
 	labels = append(labels, scope)
-	return &parserImpl{nil, false, labels}
+	return &parserImpl{nil, false, labels, "<input>", ".", false}
 }
 
 // Parse is the default implementation the Parse() method of Parser.
 func (p *parserImpl) Parse(expr string) (Pair, LispError) {
 	var err error
-	p.tokens, err = lex("parse", expr)
+	if p.foldcase {
+		expr = "#!fold-case\n" + expr
+	}
+	p.tokens, err = lex(p.name, expr)
 	if err != nil {
 		return nil, NewLispError(ELEXER, err.Error())
 	}
@@ -133,6 +142,18 @@ func (p *parserImpl) Parse(expr string) (Pair, LispError) {
 		}
 	}
 	return results, nil
+}
+
+// ParseFile is the default implementation the ParseFile() method of Parser.
+func (p *parserImpl) ParseFile(filename string) (Pair, LispError) {
+	bytes, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, NewLispError(EIO, err.Error())
+	}
+	expr := string(bytes)
+	p.include = path.Dir(filename)
+	p.name = path.Base(filename)
+	return p.Parse(expr)
 }
 
 // parseNext reads a complete expression from the channel of tokens.
@@ -353,6 +374,11 @@ func (p *parserImpl) parseWithinScope(t token) (interface{}, LispError) {
 	panic("unreachable code")
 }
 
+// Expand is the default implementation the Expand() method of Parser.
+func (p *parserImpl) Expand(x interface{}) (interface{}, LispError) {
+	return p.expand(x, true)
+}
+
 // atof attempts to coerce the given text into a floating point value,
 // returning an error if unsuccessful.
 func atof(text string) (float64, LispError) {
@@ -512,9 +538,9 @@ func newParserError(err ErrorCode, elem interface{}, msg string) LispError {
 
 // expandListSafely calls expand() on each element of the given list and
 // returns any error that occurs.
-func expandListSafely(list Pair, toplevel bool) (val Pair, err LispError) {
+func (p *parserImpl) expandListSafely(list Pair, toplevel bool) (val Pair, err LispError) {
 	expandWithPanic := func(x interface{}) interface{} {
-		val, err := expand(x, toplevel)
+		val, err := p.expand(x, toplevel)
 		if err != nil {
 			panic(err)
 		}
@@ -532,7 +558,7 @@ func expandListSafely(list Pair, toplevel bool) (val Pair, err LispError) {
 // Walk the tree of parser tokens, making optimizations and obvious
 // fixes to enable easier interpretation, possibly signaling a syntax
 // error if appropriate.
-func expand(x interface{}, toplevel bool) (interface{}, LispError) {
+func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispError) {
 	if x == nil {
 		return nil, NewLispError(ESYNTAX, "empty input")
 	}
@@ -566,7 +592,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 			if pair.Len() != 4 {
 				return nil, newParserError(ESYNTAX, pair, "if too many/few arguments")
 			}
-			return expandListSafely(pair, false)
+			return p.expandListSafely(pair, false)
 
 		} else if atomsEqual(sym, setSym) {
 			if pair.Len() != 3 {
@@ -577,7 +603,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 			if _, ok := name.(Symbol); !ok {
 				return nil, newParserError(ESYNTAX, name, "can only set! a symbol")
 			}
-			val, err := expand(pair.Third(), false)
+			val, err := p.expand(pair.Third(), false)
 			if err != nil {
 				return nil, err
 			}
@@ -595,14 +621,14 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 				lambda := NewList(lambdaSym, args)
 				lambda.Join(body)
 				pair = NewList(sym, f, lambda)
-				return expandListSafely(pair, false)
+				return p.expandListSafely(pair, false)
 			} else {
 				// (define non-var/list exp) => Error
 				sym2, issym := v.(Symbol)
 				if !issym {
 					return nil, newParserError(ESYNTAX, v, "can define only a symbol")
 				}
-				val, err := expand(pair.Third(), false)
+				val, err := p.expand(pair.Third(), false)
 				if err != nil {
 					return nil, err
 				}
@@ -633,7 +659,18 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 				// (begin) => None
 				return nil, nil
 			}
-			return expandListSafely(pair, toplevel)
+			return p.expandListSafely(pair, toplevel)
+
+		} else if atomsEqual(sym, includeSym) {
+			return p.parseInclude(pair, toplevel)
+
+		} else if atomsEqual(sym, includeCaseSym) {
+			save_case := p.foldcase
+			p.foldcase = true
+			defer func() {
+				p.foldcase = save_case
+			}()
+			return p.parseInclude(pair, toplevel)
 
 		} else if atomsEqual(sym, lambdaSym) {
 			// (lambda (x) e1 e2) => (lambda (x) (begin e1 e2))
@@ -668,7 +705,7 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 			} else {
 				return nil, newParserError(ESYNTAX, pair, "lambda body must be a list")
 			}
-			body, err := expand(body, false)
+			body, err := p.expand(body, false)
 			if err != nil {
 				return nil, err
 			}
@@ -692,12 +729,49 @@ func expand(x interface{}, toplevel bool) (interface{}, LispError) {
 			// if err != nil {
 			// 	return nil, err
 			// }
-			// return expand(result, toplevel)
+			// return p.expand(result, toplevel)
 		}
 	}
 
 	// if we reached this point, it must be a procedure call
-	return expandListSafely(pair, false)
+	return p.expandListSafely(pair, false)
+}
+
+// parseInclude processes the (include ...) expression by reading the
+// named files into the parsed syntax tree..
+func (p *parserImpl) parseInclude(pair Pair, toplevel bool) (Pair, LispError) {
+	if pair.Len() < 2 {
+		return nil, newParserError(EARGUMENT, pair, "include requires filenames")
+	}
+	// temporarily modify this parser's context
+	save_name := p.name
+	save_include := p.include
+	defer func() {
+		p.name = save_name
+		p.include = save_include
+	}()
+	results := NewPair(beginSym)
+	iter := NewPairIterator(pair)
+	// ignore the 'include' symbol we've already parsed
+	iter.Next()
+	for iter.HasNext() {
+		elem := iter.Next()
+		if filename, ok := elem.(String); ok {
+			// parse the file's contents, expand, and join with the results
+			inc, err := p.ParseFile(filename.Value())
+			if err != nil {
+				return nil, err
+			}
+			inc, err = p.expandListSafely(inc, true)
+			if err != nil {
+				return nil, err
+			}
+			results.Join(inc)
+		} else {
+			return nil, newParserError(EARGUMENT, pair, "include expects string arguments")
+		}
+	}
+	return results, nil
 }
 
 // expandQuasiquote processes the quotes, expanding the quoted elements.
@@ -794,6 +868,10 @@ func (ps *ParsedString) Len() int {
 
 func (ps *ParsedString) Set(pos int, ch rune) {
 	ps.str.Set(pos, ch)
+}
+
+func (ps *ParsedString) Value() string {
+	return ps.str.Value()
 }
 
 func (ps *ParsedString) Location() (int, int) {

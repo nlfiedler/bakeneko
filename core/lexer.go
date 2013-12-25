@@ -401,7 +401,7 @@ func lexBlockComment(l *lexer) stateFn {
 	panic("unreachable code")
 }
 
-// emitIdentifier will fold the case of the identifier if the #fold-case
+// emitIdentifier will fold the case of the identifier if the #!fold-case
 // directive is enabled, then emit the identifier to the token channel.
 // Otherwise, no folding is performed before emitting the token, per the
 // default. If the ident parameter is empty, the current token text will

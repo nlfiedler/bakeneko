@@ -30,6 +30,7 @@ const (
 	ESYNTAX                    // e.g. invalid number syntax
 	ESYMBOL                    // e.g. undefined
 	ELEXER                     // lexer error
+	EIO                        // I/O error
 )
 
 // LispError is used to provide information on the type of error that occurred

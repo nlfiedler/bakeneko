@@ -8,7 +8,9 @@ package core
 
 import (
 	"fmt"
+	"io/ioutil"
 	gc "launchpad.net/gocheck"
+	"os"
 	"strings"
 	"testing"
 )
@@ -25,11 +27,12 @@ type expectedExpandError struct {
 
 func verifyExpandMap(mapping map[string]string, t *testing.T) {
 	for input, expected := range mapping {
-		pair, err := parse(input)
+		parser := NewParser()
+		pair, err := parser.Parse(input)
 		if err != nil {
 			t.Fatalf("failed to parse %q: %s", input, err)
 		}
-		x, err := expand(pair.First(), true)
+		x, err := parser.Expand(pair.First())
 		if err != nil {
 			t.Fatalf("failed to expand %q: %s", input, err)
 		}
@@ -46,11 +49,12 @@ func verifyExpandMap(mapping map[string]string, t *testing.T) {
 
 func verifyExpandError(t *testing.T, expected map[string]expectedExpandError) {
 	for input, error := range expected {
-		pair, err := parse(input)
+		parser := NewParser()
+		pair, err := parser.Parse(input)
 		if err != nil {
 			t.Fatalf("failed to parse %q: %s", input, err)
 		}
-		_, err = expand(pair, true)
+		_, err = parser.Expand(pair)
 		if err == nil {
 			t.Fatalf("expand() should have failed with %q", input)
 		}
@@ -61,7 +65,8 @@ func verifyExpandError(t *testing.T, expected map[string]expectedExpandError) {
 }
 
 func verifyParse(input, expected string, t *testing.T) {
-	result, err := parse(input)
+	parser := NewParser()
+	result, err := parser.Parse(input)
 	if err != nil {
 		msg := fmt.Sprintf("failed to parse expression '%s', %s", input, err)
 		t.Errorf(msg)
@@ -81,7 +86,8 @@ func verifyParseMap(mapping map[string]string, t *testing.T) {
 
 func verifyParseError(t *testing.T, expected map[string]string) {
 	for input, errmsg := range expected {
-		_, err := parse(input)
+		parser := NewParser()
+		_, err := parser.Parse(input)
 		if err == nil {
 			t.Fatalf("parse() should have failed with %q", input)
 		}
@@ -174,7 +180,8 @@ func TestParseComments(t *testing.T) {
 
 func TestParseVector(t *testing.T) {
 	input := "#(1 2 3)"
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	if err != nil {
 		msg := fmt.Sprintf("failed to parse expression '%s', %s", input, err)
 		t.Errorf(msg)
@@ -208,7 +215,8 @@ func TestParseVector(t *testing.T) {
 
 func TestParseByteVector(t *testing.T) {
 	input := "#u8(0 10 5)"
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	if err != nil {
 		msg := fmt.Sprintf("failed to parse expression '%s', %s", input, err)
 		t.Errorf(msg)
@@ -313,6 +321,8 @@ func TestExpandErrors(t *testing.T) {
 	input["(lambda foo)"] = expectedExpandError{"lambda requires 2+ arguments", "lambda takes 2+ args"}
 	input[`(lambda ("foo") bar)`] = expectedExpandError{"lambda arguments must be symbols", "lambda takes symbol args"}
 	input[`(lambda "foo" bar)`] = expectedExpandError{"lambda arguments must be a list or a symbol", "lambda takes symbol args"}
+	input["(include)"] = expectedExpandError{"include requires filenames", "include requires arguments"}
+	input["(include 123)"] = expectedExpandError{"include expects string arguments", "include takes strings"}
 	verifyExpandError(t, input)
 }
 
@@ -322,7 +332,8 @@ func TestParse(t *testing.T) {
 ; this bind x to 10, z to 5 and yields 50.
 (let ((x 10) (z 5)) (* x z))
 `
-	result, err := parse(input)
+	parser := NewParser()
+	result, err := parser.Parse(input)
 	if err != nil {
 		t.Errorf("failed to parse program: %v", err)
 	} else {
@@ -366,7 +377,8 @@ func TestParse(t *testing.T) {
 
 func TestParseSingle(t *testing.T) {
 	input := `(if #t "true" "false")`
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	pair, ok := pair.First().(Pair)
 	if !ok {
 		t.Error("result is not a tree!")
@@ -435,9 +447,10 @@ func TestParseDatumLabelsError(t *testing.T) {
 func (s *ParserSuite) TestErrorLocationString(c *gc.C) {
 	input := `(define "abc" 123)`
 	cm := gc.Commentf("location for %q", input)
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	c.Assert(err, gc.IsNil, cm)
-	_, err = expand(pair.First(), true)
+	_, err = parser.Expand(pair.First())
 	c.Assert(err, gc.NotNil, cm)
 	row, col := err.Location()
 	c.Assert(row, gc.Equals, 1, cm)
@@ -447,9 +460,10 @@ func (s *ParserSuite) TestErrorLocationString(c *gc.C) {
 func (s *ParserSuite) TestErrorLocationBoolean(c *gc.C) {
 	input := `(define #false 123)`
 	cm := gc.Commentf("location for %q", input)
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	c.Assert(err, gc.IsNil, cm)
-	_, err = expand(pair.First(), true)
+	_, err = parser.Expand(pair.First())
 	c.Assert(err, gc.NotNil, cm)
 	row, col := err.Location()
 	c.Assert(row, gc.Equals, 1, cm)
@@ -459,9 +473,10 @@ func (s *ParserSuite) TestErrorLocationBoolean(c *gc.C) {
 func (s *ParserSuite) TestErrorLocationInteger(c *gc.C) {
 	input := `(define 123 "abc")`
 	cm := gc.Commentf("location for %q", input)
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	c.Assert(err, gc.IsNil, cm)
-	_, err = expand(pair.First(), true)
+	_, err = parser.Expand(pair.First())
 	c.Assert(err, gc.NotNil, cm)
 	row, col := err.Location()
 	c.Assert(row, gc.Equals, 1, cm)
@@ -471,9 +486,10 @@ func (s *ParserSuite) TestErrorLocationInteger(c *gc.C) {
 func (s *ParserSuite) TestErrorLocationFloat(c *gc.C) {
 	input := `(define 1.23 "abc")`
 	cm := gc.Commentf("location for %q", input)
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	c.Assert(err, gc.IsNil, cm)
-	_, err = expand(pair.First(), true)
+	_, err = parser.Expand(pair.First())
 	c.Assert(err, gc.NotNil, cm)
 	row, col := err.Location()
 	c.Assert(row, gc.Equals, 1, cm)
@@ -483,9 +499,10 @@ func (s *ParserSuite) TestErrorLocationFloat(c *gc.C) {
 func (s *ParserSuite) TestErrorLocationComplex(c *gc.C) {
 	input := `(define 3+4i "abc")`
 	cm := gc.Commentf("location for %q", input)
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	c.Assert(err, gc.IsNil, cm)
-	_, err = expand(pair.First(), true)
+	_, err = parser.Expand(pair.First())
 	c.Assert(err, gc.NotNil, cm)
 	row, col := err.Location()
 	c.Assert(row, gc.Equals, 1, cm)
@@ -495,9 +512,10 @@ func (s *ParserSuite) TestErrorLocationComplex(c *gc.C) {
 func (s *ParserSuite) TestErrorLocationRational(c *gc.C) {
 	input := `(define 3/4 "abc")`
 	cm := gc.Commentf("location for %q", input)
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	c.Assert(err, gc.IsNil, cm)
-	_, err = expand(pair.First(), true)
+	_, err = parser.Expand(pair.First())
 	c.Assert(err, gc.NotNil, cm)
 	row, col := err.Location()
 	c.Assert(row, gc.Equals, 1, cm)
@@ -507,9 +525,10 @@ func (s *ParserSuite) TestErrorLocationRational(c *gc.C) {
 func (s *ParserSuite) TestErrorLocationCharacter(c *gc.C) {
 	input := `(define #\z "abc")`
 	cm := gc.Commentf("location for %q", input)
-	pair, err := parse(input)
+	parser := NewParser()
+	pair, err := parser.Parse(input)
 	c.Assert(err, gc.IsNil, cm)
-	_, err = expand(pair.First(), true)
+	_, err = parser.Expand(pair.First())
 	c.Assert(err, gc.NotNil, cm)
 	row, col := err.Location()
 	c.Assert(row, gc.Equals, 1, cm)
@@ -522,4 +541,71 @@ func (s *ParserSuite) TestParsedSymbol(c *gc.C) {
 	sym := NewSymbol("eff")
 	cmp, _ := sym.CompareTo(ps)
 	c.Assert(cmp, gc.Equals, int8(-1))
+}
+
+// writeTempFile creates a temporary file and writes the given text to it,
+// returning the os.File for further use.
+func writeTempFile(text string, c *gc.C) *os.File {
+	file, err := ioutil.TempFile("", "parser_test-")
+	if err != nil {
+		c.Fatal(err.Error())
+		c.FailNow()
+	}
+	_, err = file.WriteString(text)
+	if err != nil {
+		c.Fatal(err.Error())
+		c.FailNow()
+	}
+	err = file.Close()
+	if err != nil {
+		c.Fatal(err.Error())
+		c.FailNow()
+	}
+	return file
+}
+
+func (s *ParserSuite) TestParserInclude(c *gc.C) {
+	prog := `(define foo "abc")`
+	fin := writeTempFile(prog, c)
+	defer os.Remove(fin.Name())
+	prog = fmt.Sprintf("(include \"%s\") foo", fin.Name())
+	fout := writeTempFile(prog, c)
+	defer os.Remove(fout.Name())
+	parser := NewParser()
+	pair, err := parser.ParseFile(fout.Name())
+	if err != nil {
+		c.Errorf("reading outer file failed: %s", err.Error())
+	} else {
+		expanded, err := parser.Expand(pair)
+		if err != nil {
+			c.Error(err.Error())
+		} else {
+			actual := stringify(expanded)
+			expected := `((begin (define foo "abc")) foo)`
+			c.Assert(actual, gc.Equals, expected)
+		}
+	}
+}
+
+func (s *ParserSuite) TestParserIncludeCase(c *gc.C) {
+	prog := `(define FOO "abc")`
+	fin := writeTempFile(prog, c)
+	defer os.Remove(fin.Name())
+	prog = fmt.Sprintf("(include-ci \"%s\") foo", fin.Name())
+	fout := writeTempFile(prog, c)
+	defer os.Remove(fout.Name())
+	parser := NewParser()
+	pair, err := parser.ParseFile(fout.Name())
+	if err != nil {
+		c.Errorf("reading outer file failed: %s", err.Error())
+	} else {
+		expanded, err := parser.Expand(pair)
+		if err != nil {
+			c.Error(err.Error())
+		} else {
+			actual := stringify(expanded)
+			expected := `((begin (define foo "abc")) foo)`
+			c.Assert(actual, gc.Equals, expected)
+		}
+	}
 }

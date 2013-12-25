@@ -327,7 +327,8 @@ func (c *closure) Body() interface{} {
 func Interpret(prog string) (interface{}, LispError) {
 	// thus begins the "inject" operation in CESK
 	var err LispError
-	body, err := parse(prog)
+	parser := NewParser()
+	body, err := parser.Parse(prog)
 	if err != nil {
 		return nil, err
 	}
@@ -339,7 +340,7 @@ func Interpret(prog string) (interface{}, LispError) {
 			body = Cons(beginSym, body)
 		}
 	}
-	expr, err := expand(body, true)
+	expr, err := parser.Expand(body)
 	if err != nil {
 		return nil, err
 	}
