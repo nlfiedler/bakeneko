@@ -26,7 +26,6 @@ Run the `go` tool like so:
     - quasiquote
     - unquote
     - unquote-splicing
-- Support arbitrary numbers of procedure arguments
 - Macro expansion
 - Quasi-quoting
 - Many standard procedures
