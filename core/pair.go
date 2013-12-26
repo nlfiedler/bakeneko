@@ -147,6 +147,7 @@ func (p *pair) Append(a interface{}) Pair {
 	var r Pair = p
 	// find the end of the list and append there
 	for r != nil {
+		// p as the empty list is handled by the EmptyList type
 		if r.Rest() == theEmptyList {
 			newr := Cons(a, r.Rest())
 			r.setRest(newr)
@@ -384,9 +385,11 @@ func (e EmptyList) Map(f func(interface{}) interface{}) Pair {
 	return theEmptyList
 }
 
-// Append does nothing on an empty list. EmptyList is empty.
+// Append on the empty list returns a new list whose cdr is the
+// empty list, which allows additional append operations to work
+// as expected.
 func (e EmptyList) Append(a interface{}) Pair {
-	return theEmptyList
+	return Cons(a, theEmptyList)
 }
 
 // Join does nothing on an empty list. EmptyList is empty.
@@ -453,4 +456,33 @@ func (i *PairIterator) Next() interface{} {
 		}
 	}
 	return result
+}
+
+// PairJoiner permits easily building a list by appending objects to the
+// joiner, in order, and then requesting the completed list when finished.
+type PairJoiner struct {
+	head Pair // points to the beginning of the list
+	tail Pair // the last element, used for efficiently appending
+}
+
+// NewPairJoiner constructs an empty PairJoiner for building a list.
+func NewPairJoiner() *PairJoiner {
+	return &PairJoiner{theEmptyList, theEmptyList}
+}
+
+// Append adds the given element to the end of the list managed by this
+// PairJoiner instance.
+func (pj *PairJoiner) Append(elem interface{}) *PairJoiner {
+	if pj.head == theEmptyList {
+		pj.head = NewPair(elem)
+		pj.tail = pj.head
+	} else {
+		pj.tail = pj.tail.Append(elem)
+	}
+	return pj
+}
+
+// List returns the head of the list constructed by this PairJoiner.
+func (pj *PairJoiner) List() Pair {
+	return pj.head
 }

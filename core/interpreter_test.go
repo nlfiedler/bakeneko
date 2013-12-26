@@ -7,9 +7,15 @@
 package core
 
 import (
+	gc "launchpad.net/gocheck"
 	"strings"
 	"testing"
 )
+
+type InterpreterSuite struct {
+}
+
+var _ = gc.Suite(&InterpreterSuite{})
 
 // verifyInterpret takes a map of inputs to expected outputs, running the
 // inputs through the interpreter and checking the output.
@@ -323,4 +329,30 @@ func TestInterpretCond(t *testing.T) {
 	errors[`(cond ())`] = "cond clause must not be empty"
 	errors[`(cond #f)`] = "cond clause must be a pair"
 	verifyInterpretError(t, errors)
+}
+
+func checkInteger(elem interface{}, expected int64, c *gc.C) {
+	if num, is_num := elem.(Integer); is_num {
+		c.Check(num.ToInteger(), gc.Equals, expected)
+	} else {
+		c.Errorf("actual value is not an Integer: %T", elem)
+	}
+}
+
+func (s *InterpreterSuite) TestInterpreterArbitraryArguments(c *gc.C) {
+	input := `((lambda (x y . z) z) 3 4 5 6)` // => (5 6)  # see R7RS 4.1.4
+	result, err := Interpret(input)
+	if err != nil {
+		c.Errorf("Interpret() failed: %v", err)
+	}
+	if pair, is_pair := result.(Pair); is_pair {
+		if pair.Len() != 2 {
+			c.Error("expected lambda to return a list of two")
+		} else {
+			checkInteger(pair.First(), 5, c)
+			checkInteger(pair.Second(), 6, c)
+		}
+	} else {
+		c.Errorf("expected lambda to return a list, got %T", result)
+	}
 }

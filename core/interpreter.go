@@ -160,6 +160,7 @@ func (e *environment) Set(sym Symbol, val interface{}) LispError {
 // newNullEnvironment constructs the "null" environment as defined in R7RS.
 func newNullEnvironment() Environment {
 	mapping := make(map[Symbol]interface{})
+	// list support
 	mapping[NewSymbol("append")] = NewBuiltin(builtinAppend)
 	mapping[NewSymbol("cons")] = NewBuiltin(builtinCons)
 	// number support
@@ -250,7 +251,7 @@ func (b *builtinProc) Call(values interface{}, env Environment) (interface{}, Li
 
 // lambda is a function body and its set of parameters.
 type lambda struct {
-	body   interface{} // procedure definition TODO: should be a Pair
+	body   interface{} // procedure definition
 	params Pair        // formal parameter list
 }
 
@@ -287,32 +288,44 @@ func NewClosure(body interface{}, params Pair, env Environment) Closure {
 // Bind evaluates the given values in the closure's associated environment,
 // and returns a new environment suitable for invoking the closure.
 func (c *closure) Bind(values Pair) (Environment, LispError) {
-	if c.params.Len() != values.Len() {
-		str := c.params.String()
-		return nil, NewLispErrorf(EARGUMENT,
-			"wrong number of arguments for %v, expected %d, got %d", str,
-			c.params.Len(), values.Len())
-	}
 	env := NewEnvironment(c.env)
 	// map the symbols in c.params to given values, storing in env
-	var names interface{} = c.params
-	var valuse interface{} = values
+	name_iter := NewPairIterator(c.params)
+	value_iter := NewPairIterator(values)
 	var err LispError = nil
-	for names != nil {
-		name := Car(names)
+	for name_iter.HasNext() {
+		name := name_iter.Next()
 		sym, ok := name.(Symbol)
 		if !ok {
 			// parser should have handled this already
 			return nil, NewLispErrorf(EARGUMENT, "name %s is not a symbol", name)
 		}
-		value := Car(valuse)
-		value, err = Eval(value, c.env)
-		if err != nil {
-			return nil, err
+		if !value_iter.HasNext() {
+			return nil, NewLispErrorf(EARGUMENT, "too few arguments to (lambda %v)", c.params)
 		}
-		env.Define(sym, value)
-		names = Cdr(names)
-		valuse = Cdr(valuse)
+		if !name_iter.IsProper() {
+			// join the remaining values into a list and assign to the final argument
+			results := NewPairJoiner()
+			for value_iter.HasNext() {
+				value := value_iter.Next()
+				value, err = Eval(value, c.env)
+				if err != nil {
+					return nil, err
+				}
+				results.Append(value)
+			}
+			env.Define(sym, results.List())
+		} else {
+			value := value_iter.Next()
+			value, err = Eval(value, c.env)
+			if err != nil {
+				return nil, err
+			}
+			env.Define(sym, value)
+		}
+	}
+	if value_iter.HasNext() {
+		return nil, NewLispErrorf(EARGUMENT, "too many arguments to (lambda %v)", c.params)
 	}
 	return env, nil
 }

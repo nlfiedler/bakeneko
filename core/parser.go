@@ -123,8 +123,7 @@ func (p *parserImpl) Parse(expr string) (Pair, LispError) {
 		return nil, NewLispError(ELEXER, err.Error())
 	}
 	defer drainLexer(p.tokens)
-	var results Pair = theEmptyList
-	var tail Pair = theEmptyList
+	results := NewPairJoiner()
 	for {
 		t, ok := <-p.tokens
 		if !ok || t.typ == tokenEOF {
@@ -134,14 +133,9 @@ func (p *parserImpl) Parse(expr string) (Pair, LispError) {
 		if err != nil {
 			return nil, err
 		}
-		if results == theEmptyList {
-			results = NewPair(elem)
-			tail = results
-		} else {
-			tail = tail.Append(elem)
-		}
+		results.Append(elem)
 	}
-	return results, nil
+	return results.List(), nil
 }
 
 // ParseFile is the default implementation the ParseFile() method of Parser.
@@ -682,14 +676,13 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			vlist, islist := vars.(Pair)
 			_, issym := vars.(Symbol)
 			if islist && vlist.Len() > 0 {
-				var thing interface{} = vlist
-				for thing != nil {
-					elem := Car(thing)
+				// verify that all list elements are symbols
+				iter := NewPairIterator(vlist)
+				for iter.HasNext() {
+					elem := iter.Next()
 					if _, issym := elem.(Symbol); !issym {
-						return nil, NewLispError(ESYNTAX,
-							"lambda arguments must be symbols")
+						return nil, newParserError(ESYNTAX, vars, "lambda arguments must be symbols")
 					}
-					thing = Cdr(thing)
 				}
 			} else if issym {
 				vlist = NewPair(vars)
