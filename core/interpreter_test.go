@@ -203,7 +203,7 @@ func TestInterpretQuote(t *testing.T) {
 	} else {
 		t.Errorf("result of wrong type: %T: %v", result, result)
 	}
-	// syntactic keywords cannot be derived from functions
+	// primitive lambdas cannot be derived from functions
 	input = `((quote if) #f 1 2)`
 	result, err = Interpret(input)
 	if err == nil {
@@ -211,6 +211,15 @@ func TestInterpretQuote(t *testing.T) {
 	}
 	if !strings.Contains(err.ErrorMessage(), "is not applicable") {
 		t.Error("((quote if) ...) should have failed with 'not applicable'")
+	}
+	// atoms are not applicable
+	input = `(1 2 3 4)`
+	result, err = Interpret(input)
+	if err == nil {
+		t.Error("Interpret() should have failed")
+	}
+	if !strings.Contains(err.ErrorMessage(), "is not applicable") {
+		t.Error("(1 2 3 4) should have failed with 'not applicable'")
 	}
 }
 
@@ -354,5 +363,72 @@ func (s *InterpreterSuite) TestInterpreterArbitraryArguments(c *gc.C) {
 		}
 	} else {
 		c.Errorf("expected lambda to return a list, got %T", result)
+	}
+}
+
+func (s *InterpreterSuite) TestInterpreterProcedures(c *gc.C) {
+	table := make(map[string]string)
+	table[`(define x ((lambda (x) (+ x x)) 4)) x`] = "8"
+	table[`(define reverse-subtract (lambda (x y) (- y x))) (reverse-subtract 7 10)`] = "3"
+	table[`(define x 10) ((lambda (x) (set! x 20)) 4) x`] = "10"
+	for input, expected := range table {
+		result, err := Interpret(input)
+		if err != nil {
+			c.Errorf("Interpret() failed: %v", err)
+		} else {
+			c.Check(stringify(result), gc.Equals, expected)
+		}
+	}
+}
+
+func (s *InterpreterSuite) TestInterpreterLambdaErrors(c *gc.C) {
+	table := make(map[string]string)
+	table[`((lambda x x) 3 4 5 6)`] = ".* too many arguments .*"
+	table[`(1 2 3 4)`] = ".* is not applicable.*"
+	for input, expected := range table {
+		result, err := Interpret(input)
+		if result != nil {
+			c.Errorf("Interpret() should have failed, got %v", result)
+		} else {
+			c.Check(err, gc.ErrorMatches, expected)
+		}
+	}
+}
+
+func (s *InterpreterSuite) TestInterpreterFibRecursive(c *gc.C) {
+	input := `(define fibonacci
+  (lambda (n)
+    (fibonacci-kernel 0 1 n)))
+
+(define fibonacci-kernel
+  (lambda (current next remaining)
+    (if (= 0 remaining)
+        current
+        (fibonacci-kernel next (+ current next) (- remaining 1)))))
+
+(fibonacci 100)`
+	result, err := Interpret(input)
+	if err != nil {
+		c.Errorf("Interpret() failed: %v", err)
+	} else {
+		c.Check(result, gc.Equals, NewInteger(3736710778780434371))
+	}
+}
+
+func (s *InterpreterSuite) TestInterpreterTailRecursive(c *gc.C) {
+	table := make(map[string]string)
+	table[`(define iffi (lambda (n) (if (> n 1000) n (iffi (+ n 1))))) (iffi 1)`] = "1001"
+	table[`(define iffi (lambda (n) (if (< n 1000) (iffi (+ n 1)) n))) (iffi 1)`] = "1000"
+	table[`(define cr (lambda (n) (cond ((< n 1000) (cr (+ n 1))) (else n)))) (cr 1)`] = "1000"
+	table[`(define cr (lambda (n) (cond ((> n 1000) n) (else (cr (+ n 1)))))) (cr 1)`] = "1001"
+	table[`(define andr (lambda (n) (and (< n 1000) (andr (+ n 1))))) (andr 1)`] = "#f"
+	table[`(define orr (lambda (n) (or (> n 1000) (orr (+ n 1))))) (orr 1)`] = "#t"
+	for input, expected := range table {
+		result, err := Interpret(input)
+		if err != nil {
+			c.Errorf("Interpret() failed: %v", err)
+		} else {
+			c.Check(stringify(result), gc.Equals, expected)
+		}
 	}
 }

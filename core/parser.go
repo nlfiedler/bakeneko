@@ -675,7 +675,7 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			body := Cxr("cddr", pair)
 			vlist, islist := vars.(Pair)
 			_, issym := vars.(Symbol)
-			if islist && vlist.Len() > 0 {
+			if islist {
 				// verify that all list elements are symbols
 				iter := NewPairIterator(vlist)
 				for iter.HasNext() {

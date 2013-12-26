@@ -20,11 +20,6 @@ type ParserSuite struct {
 
 var _ = gc.Suite(&ParserSuite{})
 
-type expectedExpandError struct {
-	err string // expected error message substring
-	msg string // explanation of error condition
-}
-
 func verifyExpandMap(mapping map[string]string, t *testing.T) {
 	for input, expected := range mapping {
 		parser := NewParser()
@@ -47,19 +42,15 @@ func verifyExpandMap(mapping map[string]string, t *testing.T) {
 	}
 }
 
-func verifyExpandError(t *testing.T, expected map[string]expectedExpandError) {
-	for input, error := range expected {
+func verifyExpandError(c *gc.C, expected map[string]string) {
+	for input, expected := range expected {
 		parser := NewParser()
 		pair, err := parser.Parse(input)
 		if err != nil {
-			t.Fatalf("failed to parse %q: %s", input, err)
-		}
-		_, err = parser.Expand(pair)
-		if err == nil {
-			t.Fatalf("expand() should have failed with %q", input)
-		}
-		if !strings.Contains(err.String(), error.err) {
-			t.Errorf("expected [%s] but got [%s] for input %q", error.err, err, input)
+			c.Fatalf("failed to parse %q: %s", input, err)
+		} else {
+			_, err = parser.Expand(pair)
+			c.Check(err, gc.ErrorMatches, expected)
 		}
 	}
 }
@@ -307,23 +298,23 @@ func TestExpand(t *testing.T) {
 	verifyExpandMap(mapping, t)
 }
 
-func TestExpandErrors(t *testing.T) {
-	input := make(map[string]expectedExpandError)
-	input["(if)"] = expectedExpandError{"if too many/few arguments", "if requires 3 or 4 args"}
-	input["(if bar)"] = expectedExpandError{"if too many/few arguments", "if requires 3 or 4 args"}
-	input["(if foo bar baz quux)"] = expectedExpandError{"if too many/few arguments", "if requires 3 or 4 args"}
-	input["(set!)"] = expectedExpandError{"set requires 2 arguments", "set requires 2 args"}
-	input["(set! foo)"] = expectedExpandError{"set requires 2 arguments", "set requires 2 args"}
-	input["(set! (foo) bar)"] = expectedExpandError{"can only set! a symbol", "cannot set non-symbols"}
-	input["(set! bar baz quux)"] = expectedExpandError{"set requires 2 arguments", "set requires 2 args"}
-	input["(quote)"] = expectedExpandError{"quote requires datum", "quote takes 1 arg"}
-	input["(quote foo bar)"] = expectedExpandError{"quote requires datum", "quote takes 1 arg"}
-	input["(lambda foo)"] = expectedExpandError{"lambda requires 2+ arguments", "lambda takes 2+ args"}
-	input[`(lambda ("foo") bar)`] = expectedExpandError{"lambda arguments must be symbols", "lambda takes symbol args"}
-	input[`(lambda "foo" bar)`] = expectedExpandError{"lambda arguments must be a list or a symbol", "lambda takes symbol args"}
-	input["(include)"] = expectedExpandError{"include requires filenames", "include requires arguments"}
-	input["(include 123)"] = expectedExpandError{"include expects string arguments", "include takes strings"}
-	verifyExpandError(t, input)
+func (s *ParserSuite) TestExpandErrors(c *gc.C) {
+	table := make(map[string]string)
+	table["(if)"] = ".*if too many/few arguments.*"
+	table["(if bar)"] = ".*if too many/few arguments.*"
+	table["(if foo bar baz quux)"] = ".*if too many/few arguments.*"
+	table["(set!)"] = ".*set requires 2 arguments.*"
+	table["(set! foo)"] = ".*set requires 2 arguments.*"
+	table["(set! (foo) bar)"] = ".*can only set! a symbol.*"
+	table["(set! bar baz quux)"] = ".*set requires 2 arguments.*"
+	table["(quote)"] = ".*quote requires datum.*"
+	table["(quote foo bar)"] = ".*quote requires datum.*"
+	table["(lambda foo)"] = ".*lambda requires 2\\+ arguments.*"
+	table[`(lambda ("foo") bar)`] = ".*lambda arguments must be symbols.*"
+	table[`(lambda "foo" bar)`] = ".*lambda arguments must be a list or a symbol.*"
+	table["(include)"] = ".*include requires filenames.*"
+	table["(include 123)"] = ".*include expects string arguments.*"
+	verifyExpandError(c, table)
 }
 
 func TestParse(t *testing.T) {

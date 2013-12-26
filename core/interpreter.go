@@ -160,6 +160,10 @@ func (e *environment) Set(sym Symbol, val interface{}) LispError {
 // newNullEnvironment constructs the "null" environment as defined in R7RS.
 func newNullEnvironment() Environment {
 	mapping := make(map[Symbol]interface{})
+	// derived tail recursive functions
+	mapping[NewSymbol("and")] = NewRecursive(derivedAnd)
+	mapping[NewSymbol("or")] = NewRecursive(derivedOr)
+	mapping[NewSymbol("cond")] = NewRecursive(derivedCond)
 	// list support
 	mapping[NewSymbol("append")] = NewBuiltin(builtinAppend)
 	mapping[NewSymbol("cons")] = NewBuiltin(builtinCons)
@@ -214,9 +218,8 @@ type builtinProcFunc func([]interface{}) (interface{}, LispError)
 
 // Procedure represents a callable function in Scheme.
 type Procedure interface {
-	// Call invokes the built-in procedure with the given values,
-	// we are evaluated with the given environment.
-	Call(values interface{}, env Environment) (interface{}, LispError)
+	// Call invokes the built-in procedure with the given values.
+	Call(values []interface{}) (interface{}, LispError)
 }
 
 // builtinProc is an implementation of Procedure for built-in functions.
@@ -231,22 +234,35 @@ func NewBuiltin(f builtinProcFunc) Procedure {
 }
 
 // Call invokes the built-in procedure implementation and returns the result.
-// The argument values are evaluated within the given environment before being
-// passed to the built-in procedure.
-func (b *builtinProc) Call(values interface{}, env Environment) (interface{}, LispError) {
-	args := make([]interface{}, 0)
-	for values != nil {
-		arg := Car(values)
-		if arg != nil {
-			result, err := Eval(arg, env)
-			if err != nil {
-				return nil, err
-			}
-			args = append(args, result)
-		}
-		values = Cdr(values)
-	}
-	return b.builtin(args)
+func (b *builtinProc) Call(values []interface{}) (interface{}, LispError) {
+	return b.builtin(values)
+}
+
+// tailRecursiveFunc takes a set of arguments, evalutes those arguments, and
+// either returns the tail expression to be evaluated by the caller, or the
+// final return value. Examples include if, case, cond, and, or, and so on.
+type tailRecursiveFunc func(length int, pair Pair, env Environment) (interface{}, interface{}, LispError)
+
+// TailRecursive represents a tail recursive function.
+type TailRecursive interface {
+	// Call invokes the tail recursive function with the given values.
+	Call(length int, pair Pair, env Environment) (interface{}, interface{}, LispError)
+}
+
+// recursiveProc is the internal implementation of TailRecursive.
+type recursiveProc struct {
+	// recursive is the reference to the tail recursive function.
+	recursive tailRecursiveFunc
+}
+
+// NewRecursive constructs a TailRecursive for the given function.
+func NewRecursive(f tailRecursiveFunc) TailRecursive {
+	return &recursiveProc{f}
+}
+
+// Call invokes the tail recursive function and returns the results.
+func (r *recursiveProc) Call(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+	return r.recursive(length, pair, env)
 }
 
 // lambda is a function body and its set of parameters.
@@ -285,14 +301,15 @@ func NewClosure(body interface{}, params Pair, env Environment) Closure {
 	return &closure{lam, env}
 }
 
-// Bind evaluates the given values in the closure's associated environment,
-// and returns a new environment suitable for invoking the closure.
+// Bind creates a new environment in which the given values are associated
+// with the arguments expected by the contained lambda. An improper argument
+// list will have the remaining values assigned to the final argument as a
+// single list of values.
 func (c *closure) Bind(values Pair) (Environment, LispError) {
 	env := NewEnvironment(c.env)
 	// map the symbols in c.params to given values, storing in env
 	name_iter := NewPairIterator(c.params)
 	value_iter := NewPairIterator(values)
-	var err LispError = nil
 	for name_iter.HasNext() {
 		name := name_iter.Next()
 		sym, ok := name.(Symbol)
@@ -308,19 +325,11 @@ func (c *closure) Bind(values Pair) (Environment, LispError) {
 			results := NewPairJoiner()
 			for value_iter.HasNext() {
 				value := value_iter.Next()
-				value, err = Eval(value, c.env)
-				if err != nil {
-					return nil, err
-				}
 				results.Append(value)
 			}
 			env.Define(sym, results.List())
 		} else {
 			value := value_iter.Next()
-			value, err = Eval(value, c.env)
-			if err != nil {
-				return nil, err
-			}
 			env.Define(sym, value)
 		}
 	}
@@ -376,6 +385,7 @@ func isTrue(test interface{}) bool {
 func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 	// this is effectively the 'step' function in CESK
 	for {
+		// start with the primitive expressions (R7RS 4.1)
 		if sym, ok := expr.(Symbol); ok {
 			// symbolic reference
 			val := env.Find(sym)
@@ -396,9 +406,10 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 			return pair, nil
 		}
 		first := pair.First()
-		// assume that the first is a syntactic keyword until we learn otherwise
+		// assume that the first is a primitive lambda until we learn otherwise
 		keyword := true
 		if sym, issym := first.(Symbol); issym {
+			// the primitive lambdas
 			if atomsEqual(sym, quoteSym) {
 				// (quote exp)
 				return pair.Second(), nil
@@ -416,13 +427,13 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				}
 			} else if atomsEqual(sym, setSym) {
 				// (set! var exp)
-				return syntaxSet(pair, env)
+				return primitiveSet(pair, env)
 			} else if atomsEqual(sym, defineSym) {
 				// (define var exp)
-				return syntaxDefine(pair, env)
+				return primitiveDefine(pair, env)
 			} else if atomsEqual(sym, lambdaSym) {
 				// (lambda (var*) exp)
-				return syntaxLambda(pair, env)
+				return primitiveLambda(pair, env)
 			} else if atomsEqual(sym, beginSym) {
 				// (begin exp+)
 				exp, err := evalForTail(pair.Rest(), env)
@@ -430,50 +441,46 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 					return nil, err
 				}
 				expr = exp
-			} else if atomsEqual(sym, andSym) {
-				// (and exp*)
-				exp, val, err := syntaxAnd(length, pair, env)
-				if exp != nil {
-					expr = exp
-				} else {
-					return val, err
-				}
-			} else if atomsEqual(sym, orSym) {
-				// (or exp*)
-				exp, val, err := syntaxOr(length, pair, env)
-				if exp != nil {
-					expr = exp
-				} else {
-					return val, err
-				}
-			} else if atomsEqual(sym, condSym) {
-				// (cond <clause>+)
-				val, exp, err := syntaxCond(length, pair, env)
-				if exp != nil {
-					expr = exp
-				} else {
-					return val, err
-				}
 			} else {
-				// nope, was not a syntactic keyword
+				val := env.Find(sym)
+				if tr, ok := val.(TailRecursive); ok {
+					// invoke the tail recursive function
+					exp, val, err := tr.Call(length, pair, env)
+					if exp != nil {
+						expr = exp
+					} else {
+						return val, err
+					}
+					continue
+				}
+				// nope, was not a primitive or recursive lambda
 				keyword = false
 			}
 		} else {
-			// nope, was not a syntactic keyword
 			keyword = false
 		}
 		if !keyword {
-			// (proc args*)
-			proc, err := Eval(first, env)
-			if err != nil {
-				return nil, err
+			// evaluate all of the list elements in order
+			joinr := NewPairJoiner()
+			iter := NewPairIterator(pair)
+			for iter.HasNext() {
+				exp := iter.Next()
+				val, err := Eval(exp, env)
+				if err != nil {
+					return nil, err
+				}
+				joinr.Append(val)
 			}
-			if builtin, ok := proc.(Procedure); ok {
-				return builtin.Call(pair.Rest(), env)
-			} else if clos, ok := proc.(Closure); ok {
-				if args, ok := pair.Rest().(Pair); ok {
+			// invoke the lambda or built-in procedure as appropriate
+			exps := joinr.List()
+			fun, args := exps.First(), exps.Rest()
+			if builtin, ok := fun.(Procedure); ok {
+				return builtin.Call(joinr.Slice()[1:])
+			} else if clos, ok := fun.(Closure); ok {
+				if arg_list, ok := args.(Pair); ok {
 					expr = clos.Body()
-					env, err = clos.Bind(args)
+					var err LispError
+					env, err = clos.Bind(arg_list)
 					if err != nil {
 						return nil, err
 					}
@@ -483,7 +490,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				}
 			} else {
 				return nil, NewLispErrorf(ESUPPORT,
-					"The object %v is not applicable.", proc)
+					"The object %v is not applicable.", fun)
 			}
 		}
 	}
@@ -522,8 +529,8 @@ func extractFirst(expr interface{}) interface{} {
 	return expr
 }
 
-// syntaxSet implements the syntactic keyword set!
-func syntaxSet(pair Pair, env Environment) (interface{}, LispError) {
+// primitiveSet implements the derived lambda set!
+func primitiveSet(pair Pair, env Environment) (interface{}, LispError) {
 	exp := pair.Third()
 	val, err := Eval(exp, env)
 	if err != nil {
@@ -538,8 +545,8 @@ func syntaxSet(pair Pair, env Environment) (interface{}, LispError) {
 	return nil, nil
 }
 
-// syntaxDefine implements the syntactic keyword define
-func syntaxDefine(pair Pair, env Environment) (interface{}, LispError) {
+// primitiveDefine implements the derived lambda define
+func primitiveDefine(pair Pair, env Environment) (interface{}, LispError) {
 	exp := pair.Third()
 	val, err := Eval(exp, env)
 	if err != nil {
@@ -554,8 +561,8 @@ func syntaxDefine(pair Pair, env Environment) (interface{}, LispError) {
 	return nil, nil
 }
 
-// syntaxLambda implements the syntactic keyword lambda
-func syntaxLambda(pair Pair, env Environment) (interface{}, LispError) {
+// primitiveLambda implements the derived lambda lambda
+func primitiveLambda(pair Pair, env Environment) (interface{}, LispError) {
 	vars := pair.Second()
 	body := pair.Third()
 	if vlist, ok := vars.(Pair); ok {
@@ -564,8 +571,8 @@ func syntaxLambda(pair Pair, env Environment) (interface{}, LispError) {
 	return nil, NewLispErrorf(EARGUMENT, "lambda arguments wrong type: %v", vars)
 }
 
-// syntaxAnd implements the syntactic keyword and
-func syntaxAnd(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+// derivedAnd implements the derived lambda and
+func derivedAnd(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
 	if length == 1 {
 		// (and) => #t
 		return nil, BooleanTrue, nil
@@ -587,8 +594,8 @@ func syntaxAnd(length int, pair Pair, env Environment) (interface{}, interface{}
 	return iter.Next(), nil, nil
 }
 
-// syntaxOr implements the syntactic keyword or
-func syntaxOr(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+// derivedOr implements the derived lambda or
+func derivedOr(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
 	if length == 1 {
 		// (or) => #f
 		return nil, BooleanFalse, nil
@@ -610,11 +617,8 @@ func syntaxOr(length int, pair Pair, env Environment) (interface{}, interface{},
 	return iter.Next(), nil, nil
 }
 
-// syntaxCond implements the syntactic keyword cond, returning the evaluated
-// result, if not a tail-call, or nil for tail call, with the second return
-// value being the expression to be evaluated in tail-call fashion, while the
-// third return value is any error that occurred.
-func syntaxCond(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+// derivedCond implements the derived lambda cond
+func derivedCond(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
 	// evalExpr evaluates the expression(s) for the clause, returning the
 	// last expression in the sequence for evaluation in tail-call fashion.
 	evalExpr := func(test, expr interface{}) (interface{}, LispError) {
@@ -649,7 +653,7 @@ func syntaxCond(length int, pair Pair, env Environment) (interface{}, interface{
 						"cond else clause must not be empty: %v", clause)
 				}
 				exp, err := evalForTail(clair.Rest(), env)
-				return nil, exp, err
+				return exp, nil, err
 			}
 			result, err := Eval(test, env)
 			if err != nil {
@@ -658,10 +662,10 @@ func syntaxCond(length int, pair Pair, env Environment) (interface{}, interface{
 			if isTrue(result) {
 				if clair.Len() < 2 {
 					// return test result as result of cond
-					return result, nil, nil
+					return nil, result, nil
 				}
 				exp, err := evalExpr(result, clair.Rest())
-				return nil, exp, err
+				return exp, nil, err
 			}
 		} else {
 			return nil, nil, NewLispErrorf(EARGUMENT,
@@ -669,11 +673,11 @@ func syntaxCond(length int, pair Pair, env Environment) (interface{}, interface{
 		}
 	}
 	// unspecified!
-	return theEmptyList, nil, nil
+	return nil, theEmptyList, nil
 }
 
-// syntaxCase implements the syntactic keyword case
-func syntaxCase(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+// derivedCase implements the derived lambda case
+func derivedCase(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
 	// implement syntactic case (need Atom.EqualTo() first)
 	return nil, nil, nil
 }

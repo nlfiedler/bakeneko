@@ -486,3 +486,14 @@ func (pj *PairJoiner) Append(elem interface{}) *PairJoiner {
 func (pj *PairJoiner) List() Pair {
 	return pj.head
 }
+
+// Slice constructs a Go slice containing the values in the list of pairs.
+func (pj *PairJoiner) Slice() []interface{} {
+	args := make([]interface{}, 0)
+	var curr interface{} = pj.head
+	for curr != nil {
+		args = append(args, Car(curr))
+		curr = Cdr(curr)
+	}
+	return args
+}

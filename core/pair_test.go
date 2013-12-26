@@ -512,4 +512,9 @@ func (ps *PairSuite) TestPairJoiner(c *gc.C) {
 	c.Check(joiner.List().String(), gc.Equals, "(foo bar)")
 	joiner.Append(NewSymbol("qux"))
 	c.Check(joiner.List().String(), gc.Equals, "(foo bar qux)")
+	slice := joiner.Slice()
+	c.Check(len(slice), gc.Equals, 3)
+	c.Check(slice[0], gc.Equals, NewSymbol("foo"))
+	c.Check(slice[1], gc.Equals, NewSymbol("bar"))
+	c.Check(slice[2], gc.Equals, NewSymbol("qux"))
 }
