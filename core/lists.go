@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -13,10 +13,6 @@ package core
 // builtinCons takes the first two arguments and returns a new Pair
 // consisting of those arguments.
 func builtinCons(args []interface{}) (interface{}, LispError) {
-	if len(args) != 2 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"cons called with %d argument(s), requires two arguments", len(args))
-	}
 	return Cons(args[0], args[1]), nil
 }
 

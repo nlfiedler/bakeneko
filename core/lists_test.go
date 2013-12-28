@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -18,6 +18,11 @@ func TestBuiltinCons(t *testing.T) {
 	inputs[`(cons 'a 3)`] = `(a . 3)`
 	inputs[`(cons '(a b) 'c)`] = `((a b) . c)`
 	verifyInterpret(t, inputs)
+	// error cases
+	inputs = make(map[string]string)
+	inputs[`(cons 'a 'b 'c)`] = "requires 2"
+	inputs[`(cons 'a)`] = "requires 2"
+	verifyInterpretError(t, inputs)
 }
 
 func TestBuiltinAppend(t *testing.T) {

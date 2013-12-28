@@ -164,35 +164,40 @@ func newNullEnvironment() Environment {
 	mapping[NewSymbol("and")] = NewRecursive(derivedAnd)
 	mapping[NewSymbol("or")] = NewRecursive(derivedOr)
 	mapping[NewSymbol("cond")] = NewRecursive(derivedCond)
+	builtins := make([]Procedure, 0, 32)
 	// list support
-	mapping[NewSymbol("append")] = NewBuiltin(builtinAppend)
-	mapping[NewSymbol("cons")] = NewBuiltin(builtinCons)
+	builtins = append(builtins, NewBuiltin(builtinAppend, "append", -1, -1))
+	builtins = append(builtins, NewBuiltin(builtinCons, "cons", 2, 2))
 	// number support
-	mapping[NewSymbol("number?")] = NewBuiltin(builtinIsNumber)
-	mapping[NewSymbol("complex?")] = NewBuiltin(builtinIsComplex)
-	mapping[NewSymbol("real?")] = NewBuiltin(builtinIsReal)
-	mapping[NewSymbol("rational?")] = NewBuiltin(builtinIsRational)
-	mapping[NewSymbol("integer?")] = NewBuiltin(builtinIsInteger)
-	mapping[NewSymbol("exact?")] = NewBuiltin(builtinIsExact)
-	mapping[NewSymbol("inexact?")] = NewBuiltin(builtinIsInexact)
-	mapping[NewSymbol("=")] = NewBuiltin(builtinIsEqual)
-	mapping[NewSymbol("<")] = NewBuiltin(builtinIsLess)
-	mapping[NewSymbol("<=")] = NewBuiltin(builtinIsLessEqual)
-	mapping[NewSymbol(">")] = NewBuiltin(builtinIsGreater)
-	mapping[NewSymbol(">=")] = NewBuiltin(builtinIsGreaterEqual)
-	mapping[NewSymbol("zero?")] = NewBuiltin(builtinIsZero)
-	mapping[NewSymbol("positive?")] = NewBuiltin(builtinIsPositive)
-	mapping[NewSymbol("negative?")] = NewBuiltin(builtinIsNegative)
-	mapping[NewSymbol("odd?")] = NewBuiltin(builtinIsOdd)
-	mapping[NewSymbol("even?")] = NewBuiltin(builtinIsEven)
-	mapping[NewSymbol("max")] = NewBuiltin(builtinMax)
-	mapping[NewSymbol("min")] = NewBuiltin(builtinMin)
-	mapping[NewSymbol("+")] = NewBuiltin(builtinAdd)
-	mapping[NewSymbol("-")] = NewBuiltin(builtinSubtract)
-	mapping[NewSymbol("*")] = NewBuiltin(builtinMultiply)
-	mapping[NewSymbol("/")] = NewBuiltin(builtinDivide)
-	mapping[NewSymbol("abs")] = NewBuiltin(builtinAbs)
-	mapping[NewSymbol("quotient")] = NewBuiltin(builtinQuotient)
+	builtins = append(builtins, NewBuiltin(builtinIsNumber, "number?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsComplex, "complex?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsReal, "real?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsRational, "rational?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsInteger, "integer?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsExact, "exact?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsInexact, "inexact?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsEqual, "=", 2, -1))
+	builtins = append(builtins, NewBuiltin(builtinIsLess, "<", 2, -1))
+	builtins = append(builtins, NewBuiltin(builtinIsLessEqual, "<=", 2, -1))
+	builtins = append(builtins, NewBuiltin(builtinIsGreater, ">", 2, -1))
+	builtins = append(builtins, NewBuiltin(builtinIsGreaterEqual, ">=", 2, -1))
+	builtins = append(builtins, NewBuiltin(builtinIsZero, "zero?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsPositive, "positive?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsNegative, "negative?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsOdd, "odd?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinIsEven, "even?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinMax, "max", 2, -1))
+	builtins = append(builtins, NewBuiltin(builtinMin, "min", 2, -1))
+	builtins = append(builtins, NewBuiltin(builtinAdd, "+", -1, -1))
+	builtins = append(builtins, NewBuiltin(builtinSubtract, "-", -1, -1))
+	builtins = append(builtins, NewBuiltin(builtinMultiply, "*", -1, -1))
+	builtins = append(builtins, NewBuiltin(builtinDivide, "/", 1, -1))
+	builtins = append(builtins, NewBuiltin(builtinAbs, "abs", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinQuotient, "quotient", 2, 2))
+	// map the procedures into the environment
+	for _, fun := range builtins {
+		mapping[fun.Name()] = fun
+	}
 	ne := NewRestrictedEnvironment(nil, mapping)
 	return ne
 }
@@ -218,23 +223,50 @@ type builtinProcFunc func([]interface{}) (interface{}, LispError)
 
 // Procedure represents a callable function in Scheme.
 type Procedure interface {
+	// Name returns the name of the procedure as a symbol.
+	Name() Symbol
 	// Call invokes the built-in procedure with the given values.
 	Call(values []interface{}) (interface{}, LispError)
 }
 
 // builtinProc is an implementation of Procedure for built-in functions.
 type builtinProc struct {
-	// builtin is the reference to the procedure implementation.
-	builtin builtinProcFunc
+	name    Symbol          // name of the procedure
+	argMin  int             // minimum number of required arguments (-1 skips checks)
+	argMax  int             // maximum number of allowed arguments (-1 skips checks)
+	builtin builtinProcFunc // reference to the procedure implementation
 }
 
-// NewBuiltin constructs a Procedure for the given built-in function.
-func NewBuiltin(f builtinProcFunc) Procedure {
-	return &builtinProc{f}
+// NewBuiltin constructs a Procedure for the given built-in function, with an
+// associated name (for error reporting), and a minimum and maximum number of
+// arguments, which permits validation of inputs.
+func NewBuiltin(f builtinProcFunc, name string, min, max int) Procedure {
+	return &builtinProc{NewSymbol(name), min, max, f}
+}
+
+// Name returns the name assigned to the procedure via NewBuiltin().
+func (b *builtinProc) Name() Symbol {
+	return b.name
 }
 
 // Call invokes the built-in procedure implementation and returns the result.
 func (b *builtinProc) Call(values []interface{}) (interface{}, LispError) {
+	if b.argMin >= 0 || b.argMax >= 0 {
+		// validate the correct number of arguments were given
+		count := len(values)
+		if b.argMin == b.argMax {
+			if count != b.argMin {
+				return nil, NewLispErrorf(EARGUMENT,
+					"%v called with %d argument(s), requires %d", b.name, count, b.argMin)
+			}
+		} else if b.argMin >= 0 && count < b.argMin {
+			return nil, NewLispErrorf(EARGUMENT,
+				"%v called with %d argument(s), requires at least %d", b.name, count, b.argMin)
+		} else if b.argMax >= 0 && count > b.argMax {
+			return nil, NewLispErrorf(EARGUMENT,
+				"%v called with %d argument(s), allows at most %d", b.name, count, b.argMax)
+		}
+	}
 	return b.builtin(values)
 }
 

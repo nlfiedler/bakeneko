@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -94,7 +94,7 @@ func TestBuiltinIsEqual(t *testing.T) {
 	inputs[`(= 3.0 3 9/3 3.0+0.0i)`] = `#t`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(= 3)`] = "two or more arguments"
+	inputs[`(= 3)`] = "requires at least 2"
 	inputs[`(= 'a 4)`] = "numeric arguments"
 	inputs[`(= 4 'b)`] = "numeric arguments"
 	verifyInterpretError(t, inputs)
@@ -111,7 +111,7 @@ func TestBuiltinIsLess(t *testing.T) {
 	inputs[`(< 3.0 4 15/3 6.0+0.0i)`] = `#t`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(< 3)`] = "two or more arguments"
+	inputs[`(< 3)`] = "requires at least 2"
 	inputs[`(< 'a 4)`] = "numeric arguments"
 	inputs[`(< 4 'b)`] = "numeric arguments"
 	verifyInterpretError(t, inputs)
@@ -129,7 +129,7 @@ func TestBuiltinIsLessEqual(t *testing.T) {
 	inputs[`(<= 3.0 4 15/3 6.0+0.0i)`] = `#t`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(<= 3)`] = "two or more arguments"
+	inputs[`(<= 3)`] = "requires at least 2"
 	inputs[`(<= 'a 4)`] = "numeric arguments"
 	inputs[`(<= 4 'b)`] = "numeric arguments"
 	verifyInterpretError(t, inputs)
@@ -146,7 +146,7 @@ func TestBuiltinIsGreater(t *testing.T) {
 	inputs[`(> 6.0+0.0i 15/3 4 3.0)`] = `#t`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(> 3)`] = "two or more arguments"
+	inputs[`(> 3)`] = "requires at least 2"
 	inputs[`(> 'a 4)`] = "numeric arguments"
 	inputs[`(> 4 'b)`] = "numeric arguments"
 	verifyInterpretError(t, inputs)
@@ -165,7 +165,7 @@ func TestBuiltinIsGreaterEqual(t *testing.T) {
 	inputs[`(>= 6.0+0.0i 15/3 4 3.0)`] = `#t`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(>= 3)`] = "two or more arguments"
+	inputs[`(>= 3)`] = "requires at least 2"
 	inputs[`(>= 'a 4)`] = "numeric arguments"
 	inputs[`(>= 4 'b)`] = "numeric arguments"
 	verifyInterpretError(t, inputs)
@@ -184,8 +184,8 @@ func TestBuiltinIsZero(t *testing.T) {
 	inputs[`(zero? 0)`] = `#t`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(zero?)`] = "takes only one"
-	inputs[`(zero? 1 2)`] = "takes only one"
+	inputs[`(zero?)`] = "requires 1"
+	inputs[`(zero? 1 2)`] = "requires 1"
 	inputs[`(zero? 'a)`] = "numeric argument"
 	verifyInterpretError(t, inputs)
 }
@@ -206,8 +206,8 @@ func TestBuiltinIsPositive(t *testing.T) {
 	inputs[`(positive? 0)`] = `#f`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(positive?)`] = "takes only one"
-	inputs[`(positive? 1 2)`] = "takes only one"
+	inputs[`(positive?)`] = "requires 1"
+	inputs[`(positive? 1 2)`] = "requires 1"
 	inputs[`(positive? 'a)`] = "numeric argument"
 	verifyInterpretError(t, inputs)
 }
@@ -228,8 +228,8 @@ func TestBuiltinIsNegative(t *testing.T) {
 	inputs[`(negative? 0)`] = `#f`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(negative?)`] = "takes only one"
-	inputs[`(negative? 1 2)`] = "takes only one"
+	inputs[`(negative?)`] = "requires 1"
+	inputs[`(negative? 1 2)`] = "requires 1"
 	inputs[`(negative? 'a)`] = "numeric argument"
 	verifyInterpretError(t, inputs)
 }
@@ -248,8 +248,8 @@ func TestBuiltinIsOdd(t *testing.T) {
 	inputs[`(odd? 0)`] = `#f`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(odd?)`] = "takes only one"
-	inputs[`(odd? 1 2)`] = "takes only one"
+	inputs[`(odd?)`] = "requires 1"
+	inputs[`(odd? 1 2)`] = "requires 1"
 	inputs[`(odd? 'a)`] = "integer argument"
 	inputs[`(odd? -2.5+0.0i)`] = "integer argument"
 	inputs[`(odd? 3+4i)`] = "integer argument"
@@ -277,8 +277,8 @@ func TestBuiltinIsEven(t *testing.T) {
 	inputs[`(even? 0)`] = `#t`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(even?)`] = "takes only one"
-	inputs[`(even? 1 2)`] = "takes only one"
+	inputs[`(even?)`] = "requires 1"
+	inputs[`(even? 1 2)`] = "requires 1"
 	inputs[`(even? 'a)`] = "integer argument"
 	inputs[`(even? -2.5+0.0i)`] = "integer argument"
 	inputs[`(even? 3+4i)`] = "integer argument"
@@ -305,7 +305,7 @@ func TestBuiltinMax(t *testing.T) {
 	inputs[`(max 6.0+0.0i 15/3 4 3.0)`] = `6+0i`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(max 3)`] = "two or more arguments"
+	inputs[`(max 3)`] = "requires at least 2"
 	inputs[`(max 'a 4)`] = "numeric arguments"
 	inputs[`(max 4 'b)`] = "numeric arguments"
 	verifyInterpretError(t, inputs)
@@ -324,7 +324,7 @@ func TestBuiltinMin(t *testing.T) {
 	inputs[`(min 6.0+0.0i 15/3 4 3.0)`] = `3`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(min 3)`] = "two or more arguments"
+	inputs[`(min 3)`] = "requires at least 2"
 	inputs[`(min 'a 4)`] = "numeric arguments"
 	inputs[`(min 4 'b)`] = "numeric arguments"
 	verifyInterpretError(t, inputs)
@@ -407,7 +407,7 @@ func TestBuiltinDivide(t *testing.T) {
 	inputs[`(/ 1 0.0+0.0i)`] = "+Inf+Infi"
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(/)`] = "one or more arguments"
+	inputs[`(/)`] = "requires at least 1"
 	inputs[`(/ 'a 4)`] = "numeric arguments"
 	inputs[`(/ 4 'b)`] = "numeric arguments"
 	inputs[`(/ 1 0)`] = "division by zero"
@@ -424,8 +424,8 @@ func TestBuiltinAbs(t *testing.T) {
 	inputs[`(abs 1/5)`] = `1/5`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(abs)`] = "takes only one"
-	inputs[`(abs 3 3)`] = "takes only one"
+	inputs[`(abs)`] = "requires 1"
+	inputs[`(abs 3 3)`] = "requires 1"
 	inputs[`(abs 'a)`] = "numeric argument"
 	inputs[`(abs -1.0+0.5i)`] = "complex types"
 	verifyInterpretError(t, inputs)
@@ -440,8 +440,8 @@ func TestBuiltinQuotient(t *testing.T) {
 	inputs[`(quotient 5 4)`] = `1`
 	verifyInterpret(t, inputs)
 	inputs = make(map[string]string)
-	inputs[`(quotient)`] = "two arguments"
-	inputs[`(quotient 4)`] = "two arguments"
+	inputs[`(quotient)`] = "requires 2"
+	inputs[`(quotient 4)`] = "requires 2"
 	inputs[`(quotient 'a 4)`] = "integer arguments"
 	inputs[`(quotient 4 'b)`] = "integer arguments"
 	inputs[`(quotient 3.0 4)`] = "integer arguments"

@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -40,20 +40,12 @@ import (
 
 // builtinIsNumber implements the number? predicate.
 func builtinIsNumber(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"number? called with %d argument(s), takes only one", len(args))
-	}
 	_, ok := args[0].(Number)
 	return BooleanFromBool(ok), nil
 }
 
 // builtinIsComplex implements the complex? predicate.
 func builtinIsComplex(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"complex? called with %d argument(s), takes only one", len(args))
-	}
 	// Treat all numbers as complex
 	_, ok := args[0].(Number)
 	return BooleanFromBool(ok), nil
@@ -61,10 +53,6 @@ func builtinIsComplex(args []interface{}) (interface{}, LispError) {
 
 // builtinIsReal implements the real? predicate.
 func builtinIsReal(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"real? called with %d argument(s), takes only one", len(args))
-	}
 	_, ok := args[0].(Float)
 	if ok {
 		return BooleanFromBool(ok), nil
@@ -82,10 +70,6 @@ func builtinIsReal(args []interface{}) (interface{}, LispError) {
 
 // builtinIsRational implements the rational? predicate.
 func builtinIsRational(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"rational? called with %d argument(s), takes only one", len(args))
-	}
 	_, ok := args[0].(Rational)
 	if !ok {
 		// Otherwise, real numbers are also rational.
@@ -96,10 +80,6 @@ func builtinIsRational(args []interface{}) (interface{}, LispError) {
 
 // builtinIsInteger implements the integer? predicate.
 func builtinIsInteger(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"integer? called with %d argument(s), takes only one", len(args))
-	}
 	num, ok := args[0].(Float)
 	if ok {
 		_, fr := math.Modf(num.ToFloat())
@@ -114,20 +94,12 @@ func builtinIsInteger(args []interface{}) (interface{}, LispError) {
 
 // builtinIsExact implements the exact? predicate.
 func builtinIsExact(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"exact? called with %d argument(s), takes only one", len(args))
-	}
 	// All of our numbers are inexact
 	return BooleanFalse, nil
 }
 
 // builtinIsInexact implements the exact? predicate.
 func builtinIsInexact(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"inexact? called with %d argument(s), takes only one", len(args))
-	}
 	// All of our numbers are inexact
 	_, ok := args[0].(Number)
 	return BooleanFromBool(ok), nil
@@ -185,9 +157,6 @@ type compareNumbersFn func(int8) bool
 // Boolean(false) if it does not. Otherwise nil and an error are returned if
 // something went wrong.
 func compareNumbersequence(args []interface{}, op string, fn compareNumbersFn) (interface{}, LispError) {
-	if len(args) < 2 {
-		return nil, NewLispErrorf(EARGUMENT, "%s requires two or more arguments", op)
-	}
 	prev, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispErrorf(EARGUMENT, "%s requires numeric arguments", op)
@@ -251,10 +220,6 @@ func builtinIsGreaterEqual(args []interface{}) (interface{}, LispError) {
 
 // builtinIsZero implements the zero? predicate.
 func builtinIsZero(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"zero? called with %d argument(s), takes only one", len(args))
-	}
 	num, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "zero? requires a numeric argument")
@@ -269,10 +234,6 @@ func builtinIsZero(args []interface{}) (interface{}, LispError) {
 
 // builtinIsPositive implements the positive? predicate.
 func builtinIsPositive(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"positive? called with %d argument(s), takes only one", len(args))
-	}
 	num, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "positive? requires a numeric argument")
@@ -287,10 +248,6 @@ func builtinIsPositive(args []interface{}) (interface{}, LispError) {
 
 // builtinIsNegative implements the negative? predicate.
 func builtinIsNegative(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"negative? called with %d argument(s), takes only one", len(args))
-	}
 	num, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "negative? requires a numeric argument")
@@ -305,10 +262,6 @@ func builtinIsNegative(args []interface{}) (interface{}, LispError) {
 
 // builtinIsOdd implements the odd? predicate.
 func builtinIsOdd(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"odd? called with %d argument(s), takes only one", len(args))
-	}
 	num, is_num := args[0].(Integer)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "odd? requires an integer argument")
@@ -325,10 +278,6 @@ func builtinIsOdd(args []interface{}) (interface{}, LispError) {
 
 // builtinIsEven implements the even? predicate.
 func builtinIsEven(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"even? called with %d argument(s), takes only one", len(args))
-	}
 	num, is_num := args[0].(Integer)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "even? requires an integer argument")
@@ -349,9 +298,6 @@ type reduceNumbersFn func(a, b Number) (Number, error)
 // reduceSequence performs the given reduction operation on a series of
 // numeric arguments, returning a single numeric result.
 func reduceSequence(args []interface{}, op string, fn reduceNumbersFn) (interface{}, LispError) {
-	if len(args) < 2 {
-		return nil, NewLispErrorf(EARGUMENT, "%s requires two or more arguments", op)
-	}
 	curr, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispErrorf(EARGUMENT, "%s requires numeric arguments", op)
@@ -454,9 +400,6 @@ func builtinMultiply(args []interface{}) (interface{}, LispError) {
 
 // builtinDivide implements the / procedure.
 func builtinDivide(args []interface{}) (val interface{}, err LispError) {
-	if len(args) < 1 {
-		return nil, NewLispError(EARGUMENT, "/ requires one or more arguments")
-	}
 	defer func() {
 		if x := recover(); x != nil {
 			val = nil
@@ -492,10 +435,6 @@ func builtinDivide(args []interface{}) (val interface{}, err LispError) {
 
 // builtinAbs implements the abs procedure.
 func builtinAbs(args []interface{}) (interface{}, LispError) {
-	if len(args) != 1 {
-		return nil, NewLispErrorf(EARGUMENT,
-			"abs called with %d argument(s), takes only one", len(args))
-	}
 	num, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "abs requires a numeric argument")
@@ -518,9 +457,6 @@ func builtinAbs(args []interface{}) (interface{}, LispError) {
 
 // builtinQuotient implements the quotient procedure.
 func builtinQuotient(args []interface{}) (val interface{}, err LispError) {
-	if len(args) != 2 {
-		return nil, NewLispError(EARGUMENT, "quotient requires two arguments")
-	}
 	dividend, ok := args[0].(Integer)
 	if !ok {
 		return nil, NewLispError(EARGUMENT, "quotient requires integer arguments")
