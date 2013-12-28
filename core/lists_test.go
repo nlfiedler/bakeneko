@@ -40,3 +40,29 @@ func TestBuiltinAppend(t *testing.T) {
 	inputs[`(append '(a . b) '(c d))`] = "is not a list"
 	verifyInterpretError(t, inputs)
 }
+
+func TestBuiltinCar(t *testing.T) {
+	inputs := make(map[string]string)
+	inputs[`(car '(a b c))`] = `a`
+	inputs[`(car '((a) b c d))`] = `(a)`
+	inputs[`(car '(1 . 2))`] = `1`
+	verifyInterpret(t, inputs)
+	// error cases
+	inputs = make(map[string]string)
+	inputs[`(car 1)`] = "expects a pair"
+	inputs[`(car ())`] = "expects a non-empty pair"
+	verifyInterpretError(t, inputs)
+}
+
+func TestBuiltinCdr(t *testing.T) {
+	inputs := make(map[string]string)
+	inputs[`(cdr '(a b c))`] = `(b c)`
+	inputs[`(cdr '((a) b c d))`] = `(b c d)`
+	inputs[`(cdr '(1 . 2))`] = `2`
+	verifyInterpret(t, inputs)
+	// error cases
+	inputs = make(map[string]string)
+	inputs[`(cdr 1)`] = "expects a pair"
+	inputs[`(cdr ())`] = "expects a non-empty pair"
+	verifyInterpretError(t, inputs)
+}

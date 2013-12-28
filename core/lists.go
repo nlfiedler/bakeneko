@@ -10,6 +10,28 @@ package core
 // Set of built-in procedures for handling pairs and lists.
 //
 
+// builtinCar extracts the first element (car) of the given pair.
+func builtinCar(args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		if pair.Len() == 0 {
+			return nil, NewLispError(EARGUMENT, "car expects a non-empty pair")
+		}
+		return pair.First(), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "car expects a pair, not %v", args[0])
+}
+
+// builtinCdr extracts the rest (cdr) of the given pair.
+func builtinCdr(args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		if pair.Len() == 0 {
+			return nil, NewLispError(EARGUMENT, "cdr expects a non-empty pair")
+		}
+		return pair.Rest(), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "cdr expects a pair, not %v", args[0])
+}
+
 // builtinCons takes the first two arguments and returns a new Pair
 // consisting of those arguments.
 func builtinCons(args []interface{}) (interface{}, LispError) {

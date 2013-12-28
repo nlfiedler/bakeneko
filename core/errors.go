@@ -33,6 +33,13 @@ const (
 	EIO                        // I/O error
 )
 
+// Locatable is any Scheme element whose location within the parsed text is
+// known, and is defined by the (1-based) row and column of the input text.
+type Locatable interface {
+	// Location returns the row and column (1-based) of the element.
+	Location() (int, int)
+}
+
 // LispError is used to provide information on the type of error that occurred
 // while parsing or evaluating the Lisp script. It implements the error
 // interface.
@@ -70,6 +77,18 @@ func NewLispError(err ErrorCode, msg string) LispError {
 func NewLispErrorf(err ErrorCode, form string, args ...interface{}) LispError {
 	detail := fmt.Sprintf(form, args...)
 	return NewLispError(err, detail)
+}
+
+// NewLispErrorl returns a LispError of the given type, for the selected
+// element, with the clarifying message. If the element has location
+// information, it will be incorporated into the error message.
+func NewLispErrorl(err ErrorCode, elem interface{}, msg string) LispError {
+	str := stringify(elem)
+	result := NewLispError(err, msg+": "+str)
+	if le, ok := elem.(Locatable); ok {
+		result.SetLocation(le.Location())
+	}
+	return result
 }
 
 // Returns the error portion of this result in string form.

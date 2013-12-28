@@ -167,6 +167,8 @@ func newNullEnvironment() Environment {
 	builtins := make([]Procedure, 0, 32)
 	// list support
 	builtins = append(builtins, NewBuiltin(builtinAppend, "append", -1, -1))
+	builtins = append(builtins, NewBuiltin(builtinCar, "car", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinCdr, "cdr", 1, 1))
 	builtins = append(builtins, NewBuiltin(builtinCons, "cons", 2, 2))
 	// number support
 	builtins = append(builtins, NewBuiltin(builtinIsNumber, "number?", 1, 1))
