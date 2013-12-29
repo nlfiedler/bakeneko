@@ -165,6 +165,11 @@ func newNullEnvironment() Environment {
 	mapping[NewSymbol("or")] = NewRecursive(derivedOr)
 	mapping[NewSymbol("cond")] = NewRecursive(derivedCond)
 	builtins := make([]Procedure, 0, 32)
+	// symbol procedures
+	builtins = append(builtins, NewBuiltin(symbolPredicate, "symbol?", 1, 1))
+	builtins = append(builtins, NewBuiltin(symbolEqual, "symbol=?", 2, -1))
+	builtins = append(builtins, NewBuiltin(symbolToString, "symbol->string", 1, 1))
+	builtins = append(builtins, NewBuiltin(symbolFromString, "string->symbol", 1, 1))
 	// list support
 	builtins = append(builtins, NewBuiltin(builtinAppend, "append", -1, -1))
 	builtins = append(builtins, NewBuiltin(builtinCar, "car", 1, 1))

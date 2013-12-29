@@ -14,6 +14,7 @@ import (
 var NumberOutOfRange = errors.New("number value of out range")
 var InvalidUtf8String = errors.New("input contains invalid UTF-8 bytes")
 var OutOfBounds = errors.New("index out of bounds")
+var StringIsImmutable = errors.New("immutable string cannot be set!")
 var ParserError = errors.New("unexpected parser error")
 var TypeMismatch = errors.New("type mismatch in atom comparison")
 

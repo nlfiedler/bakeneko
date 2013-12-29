@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -7,9 +7,15 @@
 package core
 
 import (
+	gc "launchpad.net/gocheck"
 	"testing"
 	"unicode/utf8"
 )
+
+type AtomSuite struct {
+}
+
+var _ = gc.Suite(&AtomSuite{})
 
 func TestBoolean(t *testing.T) {
 	b := NewBoolean("#t")
@@ -485,4 +491,29 @@ func TestRational(t *testing.T) {
 	if r.String() != "1/4" {
 		t.Errorf("Rational.String() yield wrong result: %s", r.String())
 	}
+}
+
+func (s *AtomSuite) TestImmutableString(c *gc.C) {
+	is := NewImmutableString("foobar")
+	c.Check(is, gc.NotNil)
+	c.Check(is, gc.HasLen, 6)
+	cmp, err := is.CompareTo(NewString("barfoo"))
+	c.Check(err, gc.IsNil)
+	c.Check(cmp, gc.Equals, int8(1))
+	cmp, err = is.CompareTo(NewString("foobar"))
+	c.Check(err, gc.IsNil)
+	c.Check(cmp, gc.Equals, int8(0))
+	cmp, err = is.CompareTo(NewString("moocar"))
+	c.Check(err, gc.IsNil)
+	c.Check(cmp, gc.Equals, int8(-1))
+	eq, err := is.EqualTo(NewString("barfoo"))
+	c.Check(err, gc.IsNil)
+	c.Check(eq, gc.Equals, false)
+	eq, err = is.EqualTo(NewString("foobar"))
+	c.Check(err, gc.IsNil)
+	c.Check(eq, gc.Equals, true)
+	c.Check(is.Eval(), gc.Equals, "foobar")
+	c.Check(is.Value(), gc.Equals, "foobar")
+	c.Check(is.String(), gc.Equals, `"foobar"`)
+	c.Check(is.Set(1, 'u'), gc.ErrorMatches, StringIsImmutable.Error())
 }

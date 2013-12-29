@@ -195,7 +195,7 @@ type String interface {
 	Len() int
 	// Set changes the rune at the given zero-based position within the
 	// string. If the position is out of bounds, panic ensues.
-	Set(pos int, ch rune)
+	Set(pos int, ch rune) error
 	// Value returns the string value itself, without quotes.
 	Value() string
 }
@@ -225,11 +225,11 @@ func (s *StringImpl) Len() int {
 	return len(s.strng)
 }
 
-// Set changes the rune at the given zero-based position within the string.
-// If the position is out of bounds, the function panics with OutOfBounds.
-func (s *StringImpl) Set(pos int, ch rune) {
+// Set changes the rune at the given zero-based position within the string. If
+// pos is out of bounds, the function returns the OutOfBounds error.
+func (s *StringImpl) Set(pos int, ch rune) error {
 	if s == nil {
-		return
+		return nil
 	}
 	if s.slice == nil {
 		// convert the string to a slice of runes
@@ -242,9 +242,10 @@ func (s *StringImpl) Set(pos int, ch rune) {
 		}
 	}
 	if pos < 0 || pos >= len(s.slice) {
-		panic(OutOfBounds)
+		return OutOfBounds
 	}
 	s.slice[pos] = ch
+	return nil
 }
 
 // toString converts the slice of runes to a string, saving the string
@@ -263,9 +264,9 @@ func (s *StringImpl) toString() string {
 }
 
 func (s *StringImpl) CompareTo(other Atom) (int8, error) {
-	if os, ok := other.(*StringImpl); ok {
-		ost := os.toString()
-		st := s.toString()
+	if os, ok := other.(String); ok {
+		ost := os.Value()
+		st := s.Value()
 		if st == ost {
 			return 0, nil
 		} else if st > ost {
@@ -278,9 +279,9 @@ func (s *StringImpl) CompareTo(other Atom) (int8, error) {
 }
 
 func (s *StringImpl) EqualTo(other Atom) (bool, error) {
-	if os, ok := other.(*StringImpl); ok {
-		ost := os.toString()
-		st := s.toString()
+	if os, ok := other.(String); ok {
+		ost := os.Value()
+		st := s.Value()
 		return st == ost, nil
 	}
 	return false, TypeMismatch
@@ -308,6 +309,58 @@ func (s *StringImpl) Value() string {
 		return ""
 	}
 	return s.toString()
+}
+
+// ImmutableString is like a String but Set() returns an error.
+type ImmutableString string
+
+// NewImmutableString creates a new ImmutableString instance.
+func NewImmutableString(val string) ImmutableString {
+	return ImmutableString(val)
+}
+
+func (is ImmutableString) CompareTo(other Atom) (int8, error) {
+	if os, ok := other.(String); ok {
+		ost := os.Value()
+		st := is.Value()
+		if st == ost {
+			return 0, nil
+		} else if st > ost {
+			return 1, nil
+		} else {
+			return -1, nil
+		}
+	}
+	return 0, TypeMismatch
+}
+
+func (is ImmutableString) EqualTo(other Atom) (bool, error) {
+	if os, ok := other.(String); ok {
+		ost := os.Value()
+		st := is.Value()
+		return st == ost, nil
+	}
+	return false, TypeMismatch
+}
+
+func (is ImmutableString) Eval() interface{} {
+	return string(is)
+}
+
+func (is ImmutableString) String() string {
+	return fmt.Sprintf("\"%s\"", string(is))
+}
+
+func (is ImmutableString) Len() int {
+	return len(string(is))
+}
+
+func (is ImmutableString) Set(pos int, ch rune) error {
+	return StringIsImmutable
+}
+
+func (is ImmutableString) Value() string {
+	return string(is)
 }
 
 // Character represents a single character (e.g. '#\\a' or '#\\space') in Scheme.

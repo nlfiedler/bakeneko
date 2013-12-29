@@ -841,8 +841,8 @@ func (ps *ParsedString) Len() int {
 	return ps.str.Len()
 }
 
-func (ps *ParsedString) Set(pos int, ch rune) {
-	ps.str.Set(pos, ch)
+func (ps *ParsedString) Set(pos int, ch rune) error {
+	return ps.str.Set(pos, ch)
 }
 
 func (ps *ParsedString) Value() string {

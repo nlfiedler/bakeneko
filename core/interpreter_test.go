@@ -33,6 +33,18 @@ func verifyInterpret(t *testing.T, inputs map[string]string) {
 	}
 }
 
+// checkInterpret takes a map of inputs to expected outputs, running the
+// inputs through the interpreter and checking the output.
+func checkInterpret(c *gc.C, inputs map[string]string) {
+	for input, expected := range inputs {
+		result, err := Interpret(input)
+		if err != nil {
+			c.Errorf("Interpret() failed for '%s' with: %v", input, err)
+		}
+		c.Check(stringify(result), gc.Equals, expected)
+	}
+}
+
 // verifyInterpretError takes a map of inputs to expected error messages,
 // running the inputs through the interpreter and ensuring that each one fails
 // with the associated error message.
@@ -47,6 +59,19 @@ func verifyInterpretError(t *testing.T, inputs map[string]string) {
 			t.Errorf("Interpret() yielded wrong error for '%s';"+
 				" expected '%s' but got '%s'", k, v, str)
 		}
+	}
+}
+
+// checkInterpretError takes a map of inputs to expected error messages,
+// running the inputs through the interpreter and ensuring that each one fails
+// with the associated error message.
+func checkInterpretError(c *gc.C, inputs map[string]string) {
+	for input, expected := range inputs {
+		result, err := Interpret(input)
+		if err == nil {
+			c.Errorf("Interpret() should have failed for '%s', but got %v", input, result)
+		}
+		c.Check(err, gc.ErrorMatches, expected)
 	}
 }
 
