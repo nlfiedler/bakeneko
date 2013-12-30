@@ -167,6 +167,7 @@ func newNullEnvironment() Environment {
 	builtins := make([]Procedure, 0, 32)
 	// equivalence procedures (R7RS 6.1)
 	builtins = append(builtins, NewBuiltin(builtinEqv, "eqv?", 2, 2))
+	builtins = append(builtins, NewBuiltin(builtinEqv, "eq?", 2, 2))
 	// symbol procedures (R7RS 6.5)
 	builtins = append(builtins, NewBuiltin(symbolPredicate, "symbol?", 1, 1))
 	builtins = append(builtins, NewBuiltin(symbolEqual, "symbol=?", 2, -1))

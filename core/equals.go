@@ -21,7 +21,8 @@ type Equaler interface {
 	Eqv(other interface{}) bool
 }
 
-// builtinEqv implements the eqv? procedure
+// builtinEqv implements the eqv? and eq? procedures (because no additional
+// distinctions are made since none are required).
 func builtinEqv(name string, args []interface{}) (interface{}, LispError) {
 	eq1, is_eq1 := args[0].(Equaler)
 	eq2, is_eq2 := args[1].(Equaler)
