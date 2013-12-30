@@ -812,21 +812,24 @@ func NewParsedString(val string, row, col int) String {
 }
 
 func (ps *ParsedString) CompareTo(other Atom) (int8, error) {
-	if os, ok := other.(*ParsedString); ok {
-		return ps.str.CompareTo(os.str)
-	} else if s, ok := other.(String); ok {
+	if s, ok := other.(String); ok {
 		return ps.str.CompareTo(s)
 	}
 	return 0, TypeMismatch
 }
 
 func (ps *ParsedString) EqualTo(other Atom) (bool, error) {
-	if os, ok := other.(*ParsedString); ok {
-		return ps.str.EqualTo(os.str)
-	} else if s, ok := other.(String); ok {
+	if s, ok := other.(String); ok {
 		return ps.str.EqualTo(s)
 	}
 	return false, TypeMismatch
+}
+
+func (ps *ParsedString) Eqv(other interface{}) bool {
+	if s, ok := other.(String); ok {
+		return ps.str.Eqv(s)
+	}
+	return false
 }
 
 func (ps *ParsedString) Eval() interface{} {
@@ -865,24 +868,6 @@ func NewParsedBoolean(val string, row, col int) Boolean {
 	return &ParsedBoolean{NewBoolean(val), row, col}
 }
 
-func (pb *ParsedBoolean) CompareTo(other Atom) (int8, error) {
-	if ob, ok := other.(*ParsedBoolean); ok {
-		return pb.Boolean.CompareTo(ob.Boolean)
-	} else if b, ok := other.(Boolean); ok {
-		return pb.Boolean.CompareTo(b)
-	}
-	return 0, TypeMismatch
-}
-
-func (pb *ParsedBoolean) EqualTo(other Atom) (bool, error) {
-	if ob, ok := other.(*ParsedBoolean); ok {
-		return pb.Boolean.EqualTo(ob.Boolean)
-	} else if b, ok := other.(Boolean); ok {
-		return pb.Boolean.EqualTo(b)
-	}
-	return false, TypeMismatch
-}
-
 func (pb *ParsedBoolean) Location() (int, int) {
 	return pb.row, pb.col
 }
@@ -897,24 +882,6 @@ type ParsedSymbol struct {
 // NewParsedSymbol returns a Locatable Symbol object.
 func NewParsedSymbol(val string, row, col int) Symbol {
 	return &ParsedSymbol{NewSymbol(val), row, col}
-}
-
-func (ps *ParsedSymbol) CompareTo(other Atom) (int8, error) {
-	if os, ok := other.(*ParsedSymbol); ok {
-		return ps.Symbol.CompareTo(os.Symbol)
-	} else if s, ok := other.(Symbol); ok {
-		return ps.Symbol.CompareTo(s)
-	}
-	return 0, TypeMismatch
-}
-
-func (ps *ParsedSymbol) EqualTo(other Atom) (bool, error) {
-	if os, ok := other.(*ParsedSymbol); ok {
-		return ps.Symbol.EqualTo(os.Symbol)
-	} else if s, ok := other.(Symbol); ok {
-		return ps.Symbol.EqualTo(s)
-	}
-	return false, TypeMismatch
 }
 
 func (ps *ParsedSymbol) IsSymbol() bool {
@@ -937,24 +904,6 @@ func NewParsedInteger(val int64, row, col int) Integer {
 	return &ParsedInteger{NewInteger(val), row, col}
 }
 
-func (pi *ParsedInteger) CompareTo(other Atom) (int8, error) {
-	if os, ok := other.(*ParsedInteger); ok {
-		return pi.Integer.CompareTo(os.Integer)
-	} else if s, ok := other.(Integer); ok {
-		return pi.Integer.CompareTo(s)
-	}
-	return 0, TypeMismatch
-}
-
-func (pi *ParsedInteger) EqualTo(other Atom) (bool, error) {
-	if os, ok := other.(*ParsedInteger); ok {
-		return pi.Integer.EqualTo(os.Integer)
-	} else if s, ok := other.(Integer); ok {
-		return pi.Integer.EqualTo(s)
-	}
-	return false, TypeMismatch
-}
-
 func (pi *ParsedInteger) Location() (int, int) {
 	return pi.row, pi.col
 }
@@ -969,24 +918,6 @@ type ParsedFloat struct {
 // NewParsedFloat returns a Locatable Float object.
 func NewParsedFloat(val float64, row, col int) Float {
 	return &ParsedFloat{NewFloat(val), row, col}
-}
-
-func (pf *ParsedFloat) CompareTo(other Atom) (int8, error) {
-	if os, ok := other.(*ParsedFloat); ok {
-		return pf.Float.CompareTo(os.Float)
-	} else if s, ok := other.(Float); ok {
-		return pf.Float.CompareTo(s)
-	}
-	return 0, TypeMismatch
-}
-
-func (pf *ParsedFloat) EqualTo(other Atom) (bool, error) {
-	if os, ok := other.(*ParsedFloat); ok {
-		return pf.Float.EqualTo(os.Float)
-	} else if s, ok := other.(Float); ok {
-		return pf.Float.EqualTo(s)
-	}
-	return false, TypeMismatch
 }
 
 func (pf *ParsedFloat) Location() (int, int) {
@@ -1005,24 +936,6 @@ func NewParsedComplex(val complex128, row, col int) Complex {
 	return &ParsedComplex{NewComplex(val), row, col}
 }
 
-func (pc *ParsedComplex) CompareTo(other Atom) (int8, error) {
-	if os, ok := other.(*ParsedComplex); ok {
-		return pc.Complex.CompareTo(os.Complex)
-	} else if s, ok := other.(Complex); ok {
-		return pc.Complex.CompareTo(s)
-	}
-	return 0, TypeMismatch
-}
-
-func (pc *ParsedComplex) EqualTo(other Atom) (bool, error) {
-	if os, ok := other.(*ParsedComplex); ok {
-		return pc.Complex.EqualTo(os.Complex)
-	} else if s, ok := other.(Complex); ok {
-		return pc.Complex.EqualTo(s)
-	}
-	return false, TypeMismatch
-}
-
 func (pc *ParsedComplex) Location() (int, int) {
 	return pc.row, pc.col
 }
@@ -1039,24 +952,6 @@ func NewParsedRational(a, b int64, row, col int) Rational {
 	return &ParsedRational{NewRational(a, b), row, col}
 }
 
-func (pc *ParsedRational) CompareTo(other Atom) (int8, error) {
-	if os, ok := other.(*ParsedRational); ok {
-		return pc.Rational.CompareTo(os.Rational)
-	} else if s, ok := other.(Rational); ok {
-		return pc.Rational.CompareTo(s)
-	}
-	return 0, TypeMismatch
-}
-
-func (pc *ParsedRational) EqualTo(other Atom) (bool, error) {
-	if os, ok := other.(*ParsedRational); ok {
-		return pc.Rational.EqualTo(os.Rational)
-	} else if s, ok := other.(Rational); ok {
-		return pc.Rational.EqualTo(s)
-	}
-	return false, TypeMismatch
-}
-
 func (pc *ParsedRational) Location() (int, int) {
 	return pc.row, pc.col
 }
@@ -1071,24 +966,6 @@ type ParsedCharacter struct {
 // NewParsedCharacter returns a Locatable Character object.
 func NewParsedCharacter(val string, row, col int) Character {
 	return &ParsedCharacter{NewCharacter(val), row, col}
-}
-
-func (pc *ParsedCharacter) CompareTo(other Atom) (int8, error) {
-	if os, ok := other.(*ParsedCharacter); ok {
-		return pc.Character.CompareTo(os.Character)
-	} else if s, ok := other.(Character); ok {
-		return pc.Character.CompareTo(s)
-	}
-	return 0, TypeMismatch
-}
-
-func (pc *ParsedCharacter) EqualTo(other Atom) (bool, error) {
-	if os, ok := other.(*ParsedCharacter); ok {
-		return pc.Character.EqualTo(os.Character)
-	} else if s, ok := other.(Character); ok {
-		return pc.Character.EqualTo(s)
-	}
-	return false, TypeMismatch
 }
 
 func (pc *ParsedCharacter) Location() (int, int) {

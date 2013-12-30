@@ -22,6 +22,13 @@ func NewVector(data []interface{}) Vector {
 	return Vector(data)
 }
 
+func (v Vector) Eqv(other interface{}) bool {
+	if ov, ok := other.(Vector); ok {
+		return v.Length() == 0 && ov.Length() == 0
+	}
+	return false
+}
+
 // Length returns the number of elements in the vector.
 func (b Vector) Length() int {
 	return len(b)

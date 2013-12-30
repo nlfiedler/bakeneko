@@ -40,8 +40,9 @@ func checkInterpret(c *gc.C, inputs map[string]string) {
 		result, err := Interpret(input)
 		if err != nil {
 			c.Errorf("Interpret() failed for '%s' with: %v", input, err)
+		} else {
+			c.Check(stringify(result), gc.Equals, expected)
 		}
-		c.Check(stringify(result), gc.Equals, expected)
 	}
 }
 
@@ -70,8 +71,9 @@ func checkInterpretError(c *gc.C, inputs map[string]string) {
 		result, err := Interpret(input)
 		if err == nil {
 			c.Errorf("Interpret() should have failed for '%s', but got %v", input, result)
+		} else {
+			c.Check(err, gc.ErrorMatches, expected)
 		}
-		c.Check(err, gc.ErrorMatches, expected)
 	}
 }
 

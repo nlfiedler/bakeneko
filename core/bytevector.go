@@ -24,6 +24,13 @@ func NewByteVector(data []uint8) ByteVector {
 	return ByteVector(data)
 }
 
+func (bv ByteVector) Eqv(other interface{}) bool {
+	if obv, ok := other.(ByteVector); ok {
+		return bv.Length() == 0 && obv.Length() == 0
+	}
+	return false
+}
+
 // Length returns the number of elements in the bytevector.
 func (b ByteVector) Length() int {
 	return len(b)

@@ -14,6 +14,7 @@ import (
 // be assembled to form arbitrary tree structures, or more commonly, linked
 // lists.
 type Pair interface {
+	Equaler
 	// First returns the car of the pair.
 	First() interface{}
 	// Second returns the first non-Pair thing in cdr.
@@ -192,6 +193,13 @@ func (p *pair) First() interface{} {
 	return nil
 }
 
+func (p *pair) Eqv(other interface{}) bool {
+	if op, ok := other.(Pair); ok {
+		return p.Len() == 0 && op.Len() == 0
+	}
+	return false
+}
+
 // Rest returns the second item in the pair.
 func (p *pair) Rest() interface{} {
 	if p != nil {
@@ -353,6 +361,13 @@ func (e EmptyList) Len() int {
 // always "()".
 func (e EmptyList) String() string {
 	return "()"
+}
+
+func (e EmptyList) Eqv(other interface{}) bool {
+	if op, ok := other.(Pair); ok {
+		return op.Len() == 0
+	}
+	return false
 }
 
 // First always returns nil.
