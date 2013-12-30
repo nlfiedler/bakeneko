@@ -176,11 +176,24 @@ func newNullEnvironment() Environment {
 	builtins = append(builtins, NewBuiltin(builtinAppend, "append", -1, -1))
 	builtins = append(builtins, NewBuiltin(builtinCar, "car", 1, 1))
 	builtins = append(builtins, NewBuiltin(builtinCdr, "cdr", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinCaar, "caar", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinCadr, "cadr", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinCdar, "cdar", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinCddr, "cddr", 1, 1))
+	// CxR library (R7RS Appendix A)
+	cxr_lib := []string{
+		"caaaar", "caaadr", "caaar", "caadar", "caaddr", "caadr",
+		"cadaar", "cadadr", "cadar", "caddar", "cadddr", "caddr",
+		"cdaaar", "cdaadr", "cdaar", "cdadar", "cdaddr", "cdadr",
+		"cddaar", "cddadr", "cddar", "cdddar", "cddddr", "cdddr",
+	}
+	for _, fname := range cxr_lib {
+		builtins = append(builtins, NewBuiltin(builtinCxr, fname, 1, 1))
+	}
 	builtins = append(builtins, NewBuiltin(builtinCons, "cons", 2, 2))
 	// builtins = append(builtins, NewBuiltin(builtinIsPair, "pair?", 1, 1))
 	// builtins = append(builtins, NewBuiltin(builtinSetCar, "set-car!", 2, 2))
 	// builtins = append(builtins, NewBuiltin(builtinSetCdr, "set-cdr!", 2, 2))
-	// TODO: caar, cadr, cdar, cddr, .... cddddr
 	// builtins = append(builtins, NewBuiltin(builtinIsNull, "null?", 1, 1))
 	// builtins = append(builtins, NewBuiltin(builtinIsList, "list?", 1, 1))
 	// builtins = append(builtins, NewBuiltin(builtinMakeList, "make-list", 1, -1))

@@ -21,6 +21,17 @@ func builtinCar(name string, args []interface{}) (interface{}, LispError) {
 	return nil, NewLispErrorf(EARGUMENT, "%s expects a pair, not %v", name, args[0])
 }
 
+// builtinCaar implements the caar procedure.
+func builtinCaar(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		if pair.Len() == 0 {
+			return nil, NewLispErrorf(EARGUMENT, "%s expects a non-empty pair", name)
+		}
+		return Car(Car(pair)), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a pair, not %v", name, args[0])
+}
+
 // builtinCdr extracts the rest (cdr) of the given pair.
 func builtinCdr(name string, args []interface{}) (interface{}, LispError) {
 	if pair, ok := args[0].(Pair); ok {
@@ -28,6 +39,50 @@ func builtinCdr(name string, args []interface{}) (interface{}, LispError) {
 			return nil, NewLispErrorf(EARGUMENT, "%s expects a non-empty pair", name)
 		}
 		return pair.Rest(), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a pair, not %v", name, args[0])
+}
+
+// builtinCadr implements the cadr procedure.
+func builtinCadr(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		if pair.Len() == 0 {
+			return nil, NewLispErrorf(EARGUMENT, "%s expects a non-empty pair", name)
+		}
+		return Car(Cdr(pair)), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a pair, not %v", name, args[0])
+}
+
+// builtinCdar implements the cdar procedure.
+func builtinCdar(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		if pair.Len() == 0 {
+			return nil, NewLispErrorf(EARGUMENT, "%s expects a non-empty pair", name)
+		}
+		return Cdr(Car(pair)), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a pair, not %v", name, args[0])
+}
+
+// builtinCddr implements the cddr procedure.
+func builtinCddr(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		if pair.Len() == 0 {
+			return nil, NewLispErrorf(EARGUMENT, "%s expects a non-empty pair", name)
+		}
+		return Cdr(Cdr(pair)), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a pair, not %v", name, args[0])
+}
+
+// builtinCxr implements the 24 procedures defined in the CxR library.
+func builtinCxr(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		if pair.Len() == 0 {
+			return nil, NewLispErrorf(EARGUMENT, "%s expects a non-empty pair", name)
+		}
+		return Cxr(name, pair), nil
 	}
 	return nil, NewLispErrorf(EARGUMENT, "%s expects a pair, not %v", name, args[0])
 }
