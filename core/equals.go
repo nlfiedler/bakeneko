@@ -22,7 +22,7 @@ type Equaler interface {
 }
 
 // builtinEqv implements the eqv? procedure
-func builtinEqv(args []interface{}) (interface{}, LispError) {
+func builtinEqv(name string, args []interface{}) (interface{}, LispError) {
 	eq1, is_eq1 := args[0].(Equaler)
 	eq2, is_eq2 := args[1].(Equaler)
 	if is_eq1 && is_eq2 {

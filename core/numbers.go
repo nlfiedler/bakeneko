@@ -39,20 +39,20 @@ import (
 // }
 
 // builtinIsNumber implements the number? predicate.
-func builtinIsNumber(args []interface{}) (interface{}, LispError) {
+func builtinIsNumber(name string, args []interface{}) (interface{}, LispError) {
 	_, ok := args[0].(Number)
 	return BooleanFromBool(ok), nil
 }
 
 // builtinIsComplex implements the complex? predicate.
-func builtinIsComplex(args []interface{}) (interface{}, LispError) {
+func builtinIsComplex(name string, args []interface{}) (interface{}, LispError) {
 	// Treat all numbers as complex
 	_, ok := args[0].(Number)
 	return BooleanFromBool(ok), nil
 }
 
 // builtinIsReal implements the real? predicate.
-func builtinIsReal(args []interface{}) (interface{}, LispError) {
+func builtinIsReal(name string, args []interface{}) (interface{}, LispError) {
 	_, ok := args[0].(Float)
 	if ok {
 		return BooleanFromBool(ok), nil
@@ -69,17 +69,17 @@ func builtinIsReal(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsRational implements the rational? predicate.
-func builtinIsRational(args []interface{}) (interface{}, LispError) {
+func builtinIsRational(name string, args []interface{}) (interface{}, LispError) {
 	_, ok := args[0].(Rational)
 	if !ok {
 		// Otherwise, real numbers are also rational.
-		return builtinIsReal(args)
+		return builtinIsReal(name, args)
 	}
 	return BooleanFromBool(ok), nil
 }
 
 // builtinIsInteger implements the integer? predicate.
-func builtinIsInteger(args []interface{}) (interface{}, LispError) {
+func builtinIsInteger(name string, args []interface{}) (interface{}, LispError) {
 	num, ok := args[0].(Float)
 	if ok {
 		_, fr := math.Modf(num.ToFloat())
@@ -93,13 +93,13 @@ func builtinIsInteger(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsExact implements the exact? predicate.
-func builtinIsExact(args []interface{}) (interface{}, LispError) {
+func builtinIsExact(name string, args []interface{}) (interface{}, LispError) {
 	// All of our numbers are inexact
 	return BooleanFalse, nil
 }
 
 // builtinIsInexact implements the exact? predicate.
-func builtinIsInexact(args []interface{}) (interface{}, LispError) {
+func builtinIsInexact(name string, args []interface{}) (interface{}, LispError) {
 	// All of our numbers are inexact
 	_, ok := args[0].(Number)
 	return BooleanFromBool(ok), nil
@@ -179,7 +179,7 @@ func compareNumbersequence(args []interface{}, op string, fn compareNumbersFn) (
 }
 
 // builtinIsEqual implements the = predicate.
-func builtinIsEqual(args []interface{}) (interface{}, LispError) {
+func builtinIsEqual(name string, args []interface{}) (interface{}, LispError) {
 	cond := func(val int8) bool {
 		return val == 0
 	}
@@ -187,7 +187,7 @@ func builtinIsEqual(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsLess implements the < predicate.
-func builtinIsLess(args []interface{}) (interface{}, LispError) {
+func builtinIsLess(name string, args []interface{}) (interface{}, LispError) {
 	cond := func(val int8) bool {
 		return val < 0
 	}
@@ -195,7 +195,7 @@ func builtinIsLess(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsLessEqual implements the <= predicate.
-func builtinIsLessEqual(args []interface{}) (interface{}, LispError) {
+func builtinIsLessEqual(name string, args []interface{}) (interface{}, LispError) {
 	cond := func(val int8) bool {
 		return val <= 0
 	}
@@ -203,7 +203,7 @@ func builtinIsLessEqual(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsGreater implements the > predicate.
-func builtinIsGreater(args []interface{}) (interface{}, LispError) {
+func builtinIsGreater(name string, args []interface{}) (interface{}, LispError) {
 	cond := func(val int8) bool {
 		return val > 0
 	}
@@ -211,7 +211,7 @@ func builtinIsGreater(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsGreaterEqual implements the >= predicate.
-func builtinIsGreaterEqual(args []interface{}) (interface{}, LispError) {
+func builtinIsGreaterEqual(name string, args []interface{}) (interface{}, LispError) {
 	cond := func(val int8) bool {
 		return val >= 0
 	}
@@ -219,7 +219,7 @@ func builtinIsGreaterEqual(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsZero implements the zero? predicate.
-func builtinIsZero(args []interface{}) (interface{}, LispError) {
+func builtinIsZero(name string, args []interface{}) (interface{}, LispError) {
 	num, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "zero? requires a numeric argument")
@@ -233,7 +233,7 @@ func builtinIsZero(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsPositive implements the positive? predicate.
-func builtinIsPositive(args []interface{}) (interface{}, LispError) {
+func builtinIsPositive(name string, args []interface{}) (interface{}, LispError) {
 	num, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "positive? requires a numeric argument")
@@ -247,7 +247,7 @@ func builtinIsPositive(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsNegative implements the negative? predicate.
-func builtinIsNegative(args []interface{}) (interface{}, LispError) {
+func builtinIsNegative(name string, args []interface{}) (interface{}, LispError) {
 	num, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "negative? requires a numeric argument")
@@ -261,7 +261,7 @@ func builtinIsNegative(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsOdd implements the odd? predicate.
-func builtinIsOdd(args []interface{}) (interface{}, LispError) {
+func builtinIsOdd(name string, args []interface{}) (interface{}, LispError) {
 	num, is_num := args[0].(Integer)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "odd? requires an integer argument")
@@ -277,7 +277,7 @@ func builtinIsOdd(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinIsEven implements the even? predicate.
-func builtinIsEven(args []interface{}) (interface{}, LispError) {
+func builtinIsEven(name string, args []interface{}) (interface{}, LispError) {
 	num, is_num := args[0].(Integer)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "even? requires an integer argument")
@@ -318,7 +318,7 @@ func reduceSequence(args []interface{}, op string, fn reduceNumbersFn) (interfac
 }
 
 // builtinMax implements the max procedure.
-func builtinMax(args []interface{}) (interface{}, LispError) {
+func builtinMax(name string, args []interface{}) (interface{}, LispError) {
 	reduce := func(a, b Number) (Number, error) {
 		cmp, err := compareNumbers(a, b)
 		if err != nil {
@@ -335,7 +335,7 @@ func builtinMax(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinMin implements the min procedure.
-func builtinMin(args []interface{}) (interface{}, LispError) {
+func builtinMin(name string, args []interface{}) (interface{}, LispError) {
 	reduce := func(a, b Number) (Number, error) {
 		cmp, err := compareNumbers(a, b)
 		if err != nil {
@@ -363,7 +363,7 @@ func padArguments(args []interface{}, num Number) []interface{} {
 }
 
 // builtinAdd implements the + procedure.
-func builtinAdd(args []interface{}) (interface{}, LispError) {
+func builtinAdd(name string, args []interface{}) (interface{}, LispError) {
 	reduce := func(a, b Number) (Number, error) {
 		n1, n2 := coerceNumbers(a, b)
 		return n1.Add(n2), nil
@@ -375,7 +375,7 @@ func builtinAdd(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinSubtract implements the - procedure.
-func builtinSubtract(args []interface{}) (interface{}, LispError) {
+func builtinSubtract(name string, args []interface{}) (interface{}, LispError) {
 	reduce := func(a, b Number) (Number, error) {
 		n1, n2 := coerceNumbers(a, b)
 		return n1.Subtract(n2), nil
@@ -387,7 +387,7 @@ func builtinSubtract(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinMultiply implements the * procedure.
-func builtinMultiply(args []interface{}) (interface{}, LispError) {
+func builtinMultiply(name string, args []interface{}) (interface{}, LispError) {
 	reduce := func(a, b Number) (Number, error) {
 		n1, n2 := coerceNumbers(a, b)
 		return n1.Multiply(n2), nil
@@ -399,7 +399,7 @@ func builtinMultiply(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinDivide implements the / procedure.
-func builtinDivide(args []interface{}) (val interface{}, err LispError) {
+func builtinDivide(name string, args []interface{}) (val interface{}, err LispError) {
 	defer func() {
 		if x := recover(); x != nil {
 			val = nil
@@ -434,7 +434,7 @@ func builtinDivide(args []interface{}) (val interface{}, err LispError) {
 }
 
 // builtinAbs implements the abs procedure.
-func builtinAbs(args []interface{}) (interface{}, LispError) {
+func builtinAbs(name string, args []interface{}) (interface{}, LispError) {
 	num, is_num := args[0].(Number)
 	if !is_num {
 		return nil, NewLispError(EARGUMENT, "abs requires a numeric argument")
@@ -456,7 +456,7 @@ func builtinAbs(args []interface{}) (interface{}, LispError) {
 }
 
 // builtinQuotient implements the quotient procedure.
-func builtinQuotient(args []interface{}) (val interface{}, err LispError) {
+func builtinQuotient(name string, args []interface{}) (val interface{}, err LispError) {
 	dividend, ok := args[0].(Integer)
 	if !ok {
 		return nil, NewLispError(EARGUMENT, "quotient requires integer arguments")

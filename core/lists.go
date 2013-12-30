@@ -11,37 +11,37 @@ package core
 //
 
 // builtinCar extracts the first element (car) of the given pair.
-func builtinCar(args []interface{}) (interface{}, LispError) {
+func builtinCar(name string, args []interface{}) (interface{}, LispError) {
 	if pair, ok := args[0].(Pair); ok {
 		if pair.Len() == 0 {
-			return nil, NewLispError(EARGUMENT, "car expects a non-empty pair")
+			return nil, NewLispErrorf(EARGUMENT, "%s expects a non-empty pair", name)
 		}
 		return pair.First(), nil
 	}
-	return nil, NewLispErrorf(EARGUMENT, "car expects a pair, not %v", args[0])
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a pair, not %v", name, args[0])
 }
 
 // builtinCdr extracts the rest (cdr) of the given pair.
-func builtinCdr(args []interface{}) (interface{}, LispError) {
+func builtinCdr(name string, args []interface{}) (interface{}, LispError) {
 	if pair, ok := args[0].(Pair); ok {
 		if pair.Len() == 0 {
-			return nil, NewLispError(EARGUMENT, "cdr expects a non-empty pair")
+			return nil, NewLispErrorf(EARGUMENT, "%s expects a non-empty pair", name)
 		}
 		return pair.Rest(), nil
 	}
-	return nil, NewLispErrorf(EARGUMENT, "cdr expects a pair, not %v", args[0])
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a pair, not %v", name, args[0])
 }
 
 // builtinCons takes the first two arguments and returns a new Pair
 // consisting of those arguments.
-func builtinCons(args []interface{}) (interface{}, LispError) {
+func builtinCons(name string, args []interface{}) (interface{}, LispError) {
 	return Cons(args[0], args[1]), nil
 }
 
 var notAListMsg = "The object %v, passed as an argument to append, is not a list."
 
 // builtinAppend builds a new Pair consisting of the arguments.
-func builtinAppend(args []interface{}) (interface{}, LispError) {
+func builtinAppend(name string, args []interface{}) (interface{}, LispError) {
 	var results Pair = theEmptyList
 	var tail Pair = theEmptyList
 	last := len(args) - 1

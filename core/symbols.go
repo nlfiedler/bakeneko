@@ -12,7 +12,7 @@ package core
 
 // symbolPredicate tests if the given object is a symbol, returning true if so
 // and false otherwise.
-func symbolPredicate(args []interface{}) (interface{}, LispError) {
+func symbolPredicate(name string, args []interface{}) (interface{}, LispError) {
 	_, ok := args[0].(Symbol)
 	return BooleanFromBool(ok), nil
 }
@@ -21,7 +21,7 @@ var notASymbolMsg string = "%v requires symbol arguments"
 
 // symbolEqual returns true if all of the arguments are symbols and are equal
 // in the sense of string=?.
-func symbolEqual(args []interface{}) (interface{}, LispError) {
+func symbolEqual(name string, args []interface{}) (interface{}, LispError) {
 	prev, is_num := args[0].(Symbol)
 	if !is_num {
 		return nil, NewLispErrorf(EARGUMENT, notASymbolMsg, "symbol=?")
@@ -44,7 +44,7 @@ func symbolEqual(args []interface{}) (interface{}, LispError) {
 }
 
 // symbolToString returns the symbol name as a string.
-func symbolToString(args []interface{}) (interface{}, LispError) {
+func symbolToString(name string, args []interface{}) (interface{}, LispError) {
 	sym, ok := args[0].(Symbol)
 	if !ok {
 		return nil, NewLispErrorf(EARGUMENT, notASymbolMsg, "symbol->string")
@@ -53,7 +53,7 @@ func symbolToString(args []interface{}) (interface{}, LispError) {
 }
 
 // symbolFromString returns the string as a symbol.
-func symbolFromString(args []interface{}) (interface{}, LispError) {
+func symbolFromString(name string, args []interface{}) (interface{}, LispError) {
 	str, ok := args[0].(String)
 	if !ok {
 		return nil, NewLispError(EARGUMENT, "string->symbol requires string argument")

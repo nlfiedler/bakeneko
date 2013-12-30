@@ -225,7 +225,7 @@ func newNullEnvironment() Environment {
 	builtins = append(builtins, NewBuiltin(builtinQuotient, "quotient", 2, 2))
 	// map the procedures into the environment
 	for _, fun := range builtins {
-		mapping[fun.Name()] = fun
+		mapping[NewSymbol(fun.Name())] = fun
 	}
 	ne := NewRestrictedEnvironment(nil, mapping)
 	return ne
@@ -247,20 +247,22 @@ func newReportEnvironment() Environment {
 var theReportEnvironment Environment = newReportEnvironment()
 
 // builtinProcFunc is the type of the function that implements a built-in
-// Scheme procedure (e.g. builtinCons).
-type builtinProcFunc func([]interface{}) (interface{}, LispError)
+// Scheme procedure (e.g. builtinCons). The first argument is the name by
+// which the procedure is bound in the environment. The second argument
+// is the collection of evaluated arguments.
+type builtinProcFunc func(string, []interface{}) (interface{}, LispError)
 
 // Procedure represents a callable function in Scheme.
 type Procedure interface {
 	// Name returns the name of the procedure as a symbol.
-	Name() Symbol
+	Name() string
 	// Call invokes the built-in procedure with the given values.
 	Call(values []interface{}) (interface{}, LispError)
 }
 
 // builtinProc is an implementation of Procedure for built-in functions.
 type builtinProc struct {
-	name    Symbol          // name of the procedure
+	name    string          // name of the procedure
 	argMin  int             // minimum number of required arguments (-1 skips checks)
 	argMax  int             // maximum number of allowed arguments (-1 skips checks)
 	builtin builtinProcFunc // reference to the procedure implementation
@@ -270,11 +272,11 @@ type builtinProc struct {
 // associated name (for error reporting), and a minimum and maximum number of
 // arguments, which permits validation of inputs.
 func NewBuiltin(f builtinProcFunc, name string, min, max int) Procedure {
-	return &builtinProc{NewSymbol(name), min, max, f}
+	return &builtinProc{name, min, max, f}
 }
 
 // Name returns the name assigned to the procedure via NewBuiltin().
-func (b *builtinProc) Name() Symbol {
+func (b *builtinProc) Name() string {
 	return b.name
 }
 
@@ -296,18 +298,18 @@ func (b *builtinProc) Call(values []interface{}) (interface{}, LispError) {
 				"%v called with %d argument(s), allows at most %d", b.name, count, b.argMax)
 		}
 	}
-	return b.builtin(values)
+	return b.builtin(b.name, values)
 }
 
 // tailRecursiveFunc takes a set of arguments, evalutes those arguments, and
 // either returns the tail expression to be evaluated by the caller, or the
 // final return value. Examples include if, case, cond, and, or, and so on.
-type tailRecursiveFunc func(length int, pair Pair, env Environment) (interface{}, interface{}, LispError)
+type tailRecursiveFunc func(int, Pair, Environment) (interface{}, interface{}, LispError)
 
 // TailRecursive represents a tail recursive function.
 type TailRecursive interface {
 	// Call invokes the tail recursive function with the given values.
-	Call(length int, pair Pair, env Environment) (interface{}, interface{}, LispError)
+	Call(int, Pair, Environment) (interface{}, interface{}, LispError)
 }
 
 // recursiveProc is the internal implementation of TailRecursive.
