@@ -23,7 +23,6 @@ import (
 // evaluated to a value outside of the context of a specific environment.
 // These include strings, symbols, characters, and numbers.
 type Atom interface {
-	Equaler
 	// CompareTo compares other to this atom and returns:
 	//
 	//   -1 if this <  other
@@ -108,13 +107,6 @@ func (b booleanImpl) EqualTo(other Atom) (bool, error) {
 	return false, TypeMismatch
 }
 
-func (b booleanImpl) Eqv(other interface{}) bool {
-	if ob, ok := other.(Boolean); ok {
-		return bool(b) == ob.Value()
-	}
-	return false
-}
-
 // Eval returns true or false depending on the value of the Boolean.
 func (b booleanImpl) Eval() interface{} {
 	return bool(b)
@@ -179,15 +171,6 @@ func (s symbolImpl) EqualTo(other Atom) (bool, error) {
 		return ss == oss, nil
 	}
 	return false, TypeMismatch
-}
-
-func (s symbolImpl) Eqv(other interface{}) bool {
-	if os, ok := other.(Symbol); ok {
-		ss := string(s)
-		oss := os.String()
-		return ss == oss
-	}
-	return false
 }
 
 // Eval returns the name of the symbol as a string.
@@ -304,15 +287,6 @@ func (s *StringImpl) EqualTo(other Atom) (bool, error) {
 	return false, TypeMismatch
 }
 
-func (s *StringImpl) Eqv(other interface{}) bool {
-	if os, ok := other.(String); ok {
-		ost := os.Value()
-		st := s.Value()
-		return st == ost
-	}
-	return false
-}
-
 // Eval returns the String as a Go string.
 func (s *StringImpl) Eval() interface{} {
 	if s == nil {
@@ -367,15 +341,6 @@ func (is ImmutableString) EqualTo(other Atom) (bool, error) {
 		return st == ost, nil
 	}
 	return false, TypeMismatch
-}
-
-func (is ImmutableString) Eqv(other interface{}) bool {
-	if os, ok := other.(String); ok {
-		ost := os.Value()
-		st := is.Value()
-		return st == ost
-	}
-	return false
 }
 
 func (is ImmutableString) Eval() interface{} {
@@ -447,13 +412,6 @@ func (c characterImpl) EqualTo(other Atom) (bool, error) {
 	return false, TypeMismatch
 }
 
-func (c characterImpl) Eqv(other interface{}) bool {
-	if oc, ok := other.(Character); ok {
-		return c.ToRune() == oc.ToRune()
-	}
-	return false
-}
-
 // Eval returns the character itself as a rune.
 func (c characterImpl) Eval() interface{} {
 	return rune(c)
@@ -490,11 +448,6 @@ func (v Void) EqualTo(other Atom) (bool, error) {
 		return true, nil
 	}
 	return false, TypeMismatch
-}
-
-func (v Void) Eqv(other interface{}) bool {
-	_, ok := other.(Void)
-	return ok
 }
 
 // Eval returns nil since Void has no value.
@@ -592,14 +545,6 @@ func (i integerImpl) EqualTo(other Atom) (bool, error) {
 	return false, TypeMismatch
 }
 
-func (i integerImpl) Eqv(other interface{}) bool {
-	if oi, ok := other.(Integer); ok {
-		ioi := oi.ToInteger()
-		return int64(i) == int64(ioi)
-	}
-	return false
-}
-
 func (i integerImpl) Eval() interface{} {
 	return int64(i)
 }
@@ -683,13 +628,6 @@ func (f floatImpl) EqualTo(other Atom) (bool, error) {
 		return float64(f) == of.ToFloat(), nil
 	}
 	return false, TypeMismatch
-}
-
-func (f floatImpl) Eqv(other interface{}) bool {
-	if of, ok := other.(Float); ok {
-		return float64(f) == of.ToFloat()
-	}
-	return false
 }
 
 func (f floatImpl) Eval() interface{} {
@@ -778,13 +716,6 @@ func (c complexImpl) EqualTo(other Atom) (bool, error) {
 		return complex128(c) == oc.ToComplex(), nil
 	}
 	return false, TypeMismatch
-}
-
-func (c complexImpl) Eqv(other interface{}) bool {
-	if oc, ok := other.(Complex); ok {
-		return complex128(c) == oc.ToComplex()
-	}
-	return false
 }
 
 func (c complexImpl) Eval() interface{} {
@@ -887,13 +818,6 @@ func (r *rational) EqualTo(other Atom) (bool, error) {
 		return r.Cmp(or.BigRat()) == 0, nil
 	}
 	return false, TypeMismatch
-}
-
-func (r *rational) Eqv(other interface{}) bool {
-	if or, ok := other.(Rational); ok {
-		return r.Cmp(or.BigRat()) == 0
-	}
-	return false
 }
 
 func (r *rational) Eval() interface{} {

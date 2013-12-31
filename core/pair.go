@@ -1,5 +1,5 @@
 //
-// Copyright 2012 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -14,7 +14,8 @@ import (
 // be assembled to form arbitrary tree structures, or more commonly, linked
 // lists.
 type Pair interface {
-	Equaler
+	// ObjectId returns the unique identifier for this object.
+	ObjectId() uint64
 	// First returns the car of the pair.
 	First() interface{}
 	// Second returns the first non-Pair thing in cdr.
@@ -46,42 +47,34 @@ type Pair interface {
 
 // pair is a simple implementation of a Pair.
 type pair struct {
+	id    uint64      // object identifier
 	first interface{} // the car of the pair
 	rest  interface{} // the cdr of the pair
 }
 
 // NewPair returns an instance of Pair to hold the single element a.
 func NewPair(a interface{}) Pair {
-	return &pair{a, theEmptyList}
+	return Cons(a, theEmptyList)
 }
 
 // NewList constructs a list of pairs from the given inputs.
 func NewList(a ...interface{}) Pair {
-	var head *pair = nil
-	var prev *pair = nil
-	for _, v := range a {
-		next := &pair{v, theEmptyList}
-		if head == nil {
-			head = next
-		} else {
-			prev.rest = next
-		}
-		prev = next
+	var result Pair = theEmptyList
+	for ii := len(a) - 1; ii >= 0; ii-- {
+		result = Cons(a[ii], result)
 	}
-	return head
+	return result
 }
 
 // Cons constructs a pair to hold item a and b such that they are stored in a
 // single instance of Pair. This may form an improper list if b is not already
 // a proper list.
 func Cons(a, b interface{}) Pair {
-	return &pair{a, b}
-}
-
-// List constructs a proper list to hold a and b such that a and b are in
-// distinct instances of Pair, with the empty list marking the end.
-func List(a, b interface{}) Pair {
-	return &pair{a, &pair{b, theEmptyList}}
+	p := new(pair)
+	p.id = newObjectId()
+	p.first = a
+	p.rest = b
+	return p
 }
 
 // Car returns the first element in a list.
@@ -125,6 +118,14 @@ func Cxr(name string, a interface{}) interface{} {
 		}
 	}
 	return x
+}
+
+// ObjectId returns the object identifer, or zero if nil.
+func (p *pair) ObjectId() uint64 {
+	if p != nil {
+		return p.id
+	}
+	return 0
 }
 
 // setFirst stores the given item as the first item of the pair.
@@ -193,13 +194,6 @@ func (p *pair) First() interface{} {
 	return nil
 }
 
-func (p *pair) Eqv(other interface{}) bool {
-	if op, ok := other.(Pair); ok {
-		return p.Len() == 0 && op.Len() == 0
-	}
-	return false
-}
-
 // Rest returns the second item in the pair.
 func (p *pair) Rest() interface{} {
 	if p != nil {
@@ -244,47 +238,39 @@ func (p *pair) Reverse() Pair {
 	if p == nil {
 		return nil
 	}
-	var result *pair = nil
-	var penultimate *pair = nil
-	var pp Pair = p
-	for p != nil {
-		if result == nil {
-			result = &pair{pp.First(), theEmptyList}
-		} else {
-			result = &pair{pp.First(), result}
-			if penultimate == nil {
-				penultimate = result
-			}
-		}
-		if pp.Rest() == theEmptyList {
-			p = nil
-		} else if r, ok := pp.Rest().(Pair); ok {
-			pp = r
-		} else {
-			result = &pair{pp.Rest(), result}
-			p = nil
+	var result Pair = theEmptyList
+	var penultimate Pair = theEmptyList
+	var first interface{} = nil
+	iter := NewPairIterator(p)
+	for iter.HasNext() {
+		elem := iter.Next()
+		result = Cons(elem, result)
+		if first == nil {
+			first = elem
+		} else if penultimate == theEmptyList {
+			penultimate = result
 		}
 	}
-	// tighten up the end of the list
-	if penultimate != nil {
-		if r, ok := penultimate.rest.(Pair); ok {
-			penultimate.rest = r.First()
-		}
-	} else if result != nil && result.rest != theEmptyList {
-		// special case of a single Pair
-		if r, ok := result.rest.(Pair); ok {
-			result.rest = r.First()
-		}
+	if !iter.IsProper() && penultimate != theEmptyList {
+		// set an improper list
+		penultimate.setRest(first)
 	}
 	return result
 }
 
-// Len finds the length of the pair, which may be greater than two if
-// the pair is part of a list of items.
+// Len finds the length of the pair, which may be greater than two if the pair
+// is part of a list of items.
 func (p *pair) Len() int {
 	length := 0
+	pairs_seen := make(map[uint64]bool)
 	var r Pair = p
 	for p != nil {
+		_, seen := pairs_seen[r.ObjectId()]
+		if seen {
+			// must be a loop in the pairs, terminate now
+			break
+		}
+		pairs_seen[r.ObjectId()] = true
 		length++
 		if r.Rest() == theEmptyList {
 			p = nil
@@ -298,32 +284,15 @@ func (p *pair) Len() int {
 	return length
 }
 
-// Map calls function f on each element of the pair, returning
-// a new pair constructed from the values returned by f().
-func (p *pair) Map(f func(interface{}) interface{}) Pair {
-	var head *pair = nil
-	var prev *pair = nil
-	var r Pair = p
-	for p != nil {
-		q := f(r.First())
-		var s interface{} = theEmptyList
-		if r.Rest() == theEmptyList {
-			p = nil
-		} else if rr, ok := r.Rest().(Pair); ok {
-			r = rr
-		} else {
-			s = f(r.Rest())
-			p = nil
-		}
-		next := &pair{q, s}
-		if head == nil {
-			head = next
-		} else {
-			prev.rest = next
-		}
-		prev = next
+// Map calls function f on each element of the pair, returning a new pair
+// constructed from the values returned by f().
+func (p *pair) Map(funk func(interface{}) interface{}) Pair {
+	joiner := NewPairJoiner()
+	iter := NewPairIterator(p)
+	for iter.HasNext() {
+		joiner.Append(funk(iter.Next()))
 	}
-	return head
+	return joiner.List()
 }
 
 // String returns the string form of the pair.
@@ -363,11 +332,9 @@ func (e EmptyList) String() string {
 	return "()"
 }
 
-func (e EmptyList) Eqv(other interface{}) bool {
-	if op, ok := other.(Pair); ok {
-		return op.Len() == 0
-	}
-	return false
+// ObjectId of empty list is always zero.
+func (e EmptyList) ObjectId() uint64 {
+	return 0
 }
 
 // First always returns nil.

@@ -104,3 +104,56 @@ func (s *EqualsSuite) TestEq(c *gc.C) {
 	inputs[`(eq?)`] = ".* requires 2"
 	checkInterpretError(c, inputs)
 }
+
+func (s *EqualsSuite) TestEqual(c *gc.C) {
+	inputs := make(map[string]string)
+	// symbols
+	inputs[`(equal? 'foo 'bar)`] = `#f`
+	inputs[`(equal? 'foo 'foo)`] = `#t`
+	inputs[`(equal? 'foo 'FOO)`] = `#f`
+	// strings
+	inputs[`(equal? "foo" "bar")`] = `#f`
+	inputs[`(equal? "foo" "foo")`] = `#t`
+	inputs[`(equal? "foo" "FOO")`] = `#f`
+	inputs[`(equal? "" "")`] = `#t`
+	// characters
+	inputs[`(equal? #\a #\b)`] = `#f`
+	inputs[`(equal? #\a #\A)`] = `#f`
+	inputs[`(equal? #\a #\a)`] = `#t`
+	// lists
+	// inputs[`(equal? '() '())`] = `#t`
+	// inputs[`(equal? '('a 'b 'c) '('a 'b 'c))`] = `#t`
+	// inputs[`(equal? '('a ('b 'c)) '('a ('b 'c)))`] = `#t`
+	// inputs[`(equal? '('a ('b 'c)) '(('a 'b) 'c))`] = `#f`
+	// inputs[`(equal? '() (cdr '(1)))`] = `#t`
+	// inputs[`(equal? '(#\a #(1 2 3) "joe") '(#\a #(1 2 3) "joe"))`] = `#t`
+	// inputs[`(equal? '#1=(a b . #1#) '#2=(a b a b . #2#))`] = `#t`
+	inputs[`(equal? '#() '#())`] = `#t`
+	// inputs[`(equal? '(1 2 3) '(1 2 3))`] = `#t`
+	inputs[`(equal? '#(1 2 3) '#(1 2 3))`] = `#t`
+	// inputs[`(equal? '#1=#(a b . #1#) '#2=#(a b a b . #2#))`] = `#t`
+	// inputs[`(equal? '#(0 (2 2 2 2) "Anna") '#(0 (2 2 2 2) "Anna"))`] = `#t`
+	inputs[`(equal? '#u8() '#u8())`] = `#t`
+	inputs[`(equal? '#u8(1 2 3) '#u8(1 2 3))`] = `#t`
+	inputs[`(equal? '#u8(1 2 3) '#u8(1 2 4))`] = `#f`
+	// booleans
+	inputs[`(equal? #f #t)`] = `#f`
+	inputs[`(equal? #f #f)`] = `#t`
+	inputs[`(equal? #t #t)`] = `#t`
+	// numbers
+	inputs[`(equal? 1.0 1)`] = `#f`
+	inputs[`(equal? 4/1 4)`] = `#f`
+	inputs[`(equal? 1 2)`] = `#f`
+	inputs[`(equal? 2 2)`] = `#t`
+	// lambdas
+	inputs[`(equal? (lambda (x) 1) (lambda (x) 2))`] = `#f`
+	// mixed
+	inputs[`(equal? 1 #\a)`] = `#f`
+	inputs[`(equal? 1 "a")`] = `#f`
+	inputs[`(equal? 'foo "a")`] = `#f`
+	checkInterpret(c, inputs)
+	inputs = make(map[string]string)
+	inputs[`(equal? 'foobar)`] = ".* requires 2"
+	inputs[`(equal?)`] = ".* requires 2"
+	checkInterpretError(c, inputs)
+}

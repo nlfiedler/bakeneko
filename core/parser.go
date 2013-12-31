@@ -825,13 +825,6 @@ func (ps *ParsedString) EqualTo(other Atom) (bool, error) {
 	return false, TypeMismatch
 }
 
-func (ps *ParsedString) Eqv(other interface{}) bool {
-	if s, ok := other.(String); ok {
-		return ps.str.Eqv(s)
-	}
-	return false
-}
-
 func (ps *ParsedString) Eval() interface{} {
 	return ps.str.Eval()
 }

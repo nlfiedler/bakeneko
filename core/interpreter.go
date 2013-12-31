@@ -168,6 +168,7 @@ func newNullEnvironment() Environment {
 	// equivalence procedures (R7RS 6.1)
 	builtins = append(builtins, NewBuiltin(builtinEqv, "eqv?", 2, 2))
 	builtins = append(builtins, NewBuiltin(builtinEqv, "eq?", 2, 2))
+	builtins = append(builtins, NewBuiltin(builtinEqual, "equal?", 2, 2))
 	// symbol procedures (R7RS 6.5)
 	builtins = append(builtins, NewBuiltin(symbolPredicate, "symbol?", 1, 1))
 	builtins = append(builtins, NewBuiltin(symbolEqual, "symbol=?", 2, -1))
@@ -706,7 +707,7 @@ func derivedCond(length int, pair Pair, env Environment) (interface{}, interface
 				// rest of expression is assumed to be a unary procedure,
 				// return it as a procedure invocation to be evaluated
 				expr = extractFirst(epair.Rest())
-				return List(expr, test), nil
+				return NewList(expr, test), nil
 			}
 			return evalForTail(epair, env)
 		}

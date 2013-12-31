@@ -17,139 +17,50 @@ type PairSuite struct {
 
 var _ = gc.Suite(&PairSuite{})
 
-func TestPairNil(t *testing.T) {
+func (ps *PairSuite) TestPairNil(c *gc.C) {
 	var p *pair = nil
-	if p.Len() != 0 {
-		t.Errorf("nil Pair.Len() should be 0")
-	}
-	if p.First() != nil {
-		t.Errorf("nil Pair.First() should be nil")
-	}
-	if p.Second() != nil {
-		t.Errorf("nil Pair.Second() should be nil")
-	}
-	if p.Third() != nil {
-		t.Errorf("nil Pair.Third() should be nil")
-	}
-	if p.String() != "()" {
-		t.Errorf("nil Pair.String() should be ()")
-	}
-	if p.Reverse() != nil {
-		t.Errorf("nil Pair.Reverse() should be nil")
-	}
+	c.Check(p.Len(), gc.Equals, 0, gc.Commentf("nil Pair.Len() should be 0"))
+	c.Check(p.First(), gc.IsNil, gc.Commentf("nil Pair.First() should be nil"))
+	c.Check(p.Second(), gc.IsNil, gc.Commentf("nil Pair.Second() should be nil"))
+	c.Check(p.Third(), gc.IsNil, gc.Commentf("nil Pair.Third() should be nil"))
+	c.Check(p.String(), gc.Equals, "()", gc.Commentf("nil Pair.String() should be ()"))
+	c.Check(p.Reverse(), gc.IsNil, gc.Commentf("nil Pair.Reverse() should be nil"))
 }
 
-func TestPairSingle(t *testing.T) {
+func (ps *PairSuite) TestPairSingle(c *gc.C) {
 	foo := NewSymbol("foo")
 	p := NewPair(foo)
-	if p.Len() != 1 {
-		t.Errorf("expected 1, but got %d", p.Len())
-	}
-	if p.First() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.First())
-	}
-	if p.Second() != nil {
-		t.Errorf("expected nil, but got '%s'", p.Second())
-	}
-	if p.Third() != nil {
-		t.Errorf("expected nil, but got '%s'", p.Third())
-	}
-	if p.String() != "(foo)" {
-		t.Errorf("expected '(foo)' but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 1, gc.Commentf("pair single len"))
+	c.Check(p.First(), gc.Equals, foo, gc.Commentf("pair single first"))
+	c.Check(p.Second(), gc.IsNil, gc.Commentf("pair single second"))
+	c.Check(p.Third(), gc.IsNil, gc.Commentf("pair single third"))
+	c.Check(p.String(), gc.Equals, "(foo)", gc.Commentf("pair single string"))
 	p = p.Reverse()
-	if p.Len() != 1 {
-		t.Errorf("expected 1, but got %d", p.Len())
-	}
-	if p.First() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.First())
-	}
-	if p.Second() != nil {
-		t.Errorf("expected nil, but got '%s'", p.Second())
-	}
-	if p.Third() != nil {
-		t.Errorf("expected nil, but got '%s'", p.Third())
-	}
-	if p.String() != "(foo)" {
-		t.Errorf("expected (foo) but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 1, gc.Commentf("pair single len"))
+	c.Check(p.First(), gc.Equals, foo, gc.Commentf("pair single first"))
+	c.Check(p.Second(), gc.IsNil, gc.Commentf("pair single second"))
+	c.Check(p.Third(), gc.IsNil, gc.Commentf("pair single third"))
+	c.Check(p.String(), gc.Equals, "(foo)", gc.Commentf("pair single string"))
 }
 
-func TestCons(t *testing.T) {
+func (ps *PairSuite) TestCons(c *gc.C) {
 	foo := NewSymbol("foo")
 	bar := NewSymbol("bar")
 	p := Cons(foo, bar)
-	if p.Len() != 2 {
-		t.Errorf("expected 2, but got %d", p.Len())
-	}
-	if p.First() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.First())
-	}
-	if p.Second() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.Second())
-	}
-	if p.Third() != nil {
-		t.Errorf("expected nil, but got '%s'", p.Third())
-	}
-	if p.String() != "(foo . bar)" {
-		t.Errorf("expected '(foo . bar)' but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 2, gc.Commentf("improper cons len"))
+	c.Check(p.First(), gc.Equals, foo, gc.Commentf("improper cons first"))
+	c.Check(p.Second(), gc.Equals, bar, gc.Commentf("improper cons second"))
+	c.Check(p.Third(), gc.IsNil, gc.Commentf("improper cons third"))
+	c.Check(p.String(), gc.Equals, "(foo . bar)", gc.Commentf("improper cons string"))
 	p = p.Reverse()
-	if p.Len() != 2 {
-		t.Errorf("expected 2, but got %d", p.Len())
-	}
-	if p.First() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.First())
-	}
-	if p.Second() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.Second())
-	}
-	if p.Third() != nil {
-		t.Errorf("expected nil, but got '%s'", p.Third())
-	}
-	if p.String() != "(bar . foo)" {
-		t.Errorf("expected (bar . foo) but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 2, gc.Commentf("reversed improper cons len"))
+	c.Check(p.First(), gc.Equals, bar, gc.Commentf("reversed improper cons first"))
+	c.Check(p.Second(), gc.Equals, foo, gc.Commentf("reversed improper cons second"))
+	c.Check(p.Third(), gc.IsNil, gc.Commentf("reversed improper cons third"))
+	c.Check(p.String(), gc.Equals, "(bar . foo)", gc.Commentf("reversed improper cons string"))
 }
 
-func TestList(t *testing.T) {
-	foo := NewSymbol("foo")
-	bar := NewSymbol("bar")
-	p := List(foo, bar)
-	if p.Len() != 2 {
-		t.Errorf("expected 2, but got %d", p.Len())
-	}
-	if p.First() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.First())
-	}
-	if p.Second() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.Second())
-	}
-	if p.Third() != nil {
-		t.Errorf("expected nil, but got '%s'", p.Third())
-	}
-	if p.String() != "(foo bar)" {
-		t.Errorf("expected '(foo bar)' but got '%s'", p.String())
-	}
-	p = p.Reverse()
-	if p.Len() != 2 {
-		t.Errorf("expected 2, but got %d", p.Len())
-	}
-	if p.First() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.First())
-	}
-	if p.Second() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.Second())
-	}
-	if p.Third() != nil {
-		t.Errorf("expected nil, but got '%s'", p.Third())
-	}
-	if p.String() != "(bar . foo)" {
-		t.Errorf("expected (bar . foo) but got '%s'", p.String())
-	}
-}
-
-func TestConsMultiple(t *testing.T) {
+func (ps *PairSuite) TestConsMultiple(c *gc.C) {
 	foo := NewSymbol("foo")
 	bar := NewSymbol("bar")
 	baz := NewSymbol("baz")
@@ -157,40 +68,20 @@ func TestConsMultiple(t *testing.T) {
 	p := Cons(baz, qux)
 	p = Cons(bar, p)
 	p = Cons(foo, p)
-	if p.Len() != 4 {
-		t.Errorf("expected 4, but got %d", p.Len())
-	}
-	if p.First() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.First())
-	}
-	if p.Second() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.Second())
-	}
-	if p.Third() != baz {
-		t.Errorf("expected 'baz', but got '%s'", p.Third())
-	}
-	if p.String() != "(foo bar baz . qux)" {
-		t.Errorf("expected (foo bar baz . qux) but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 4, gc.Commentf("improper list len"))
+	c.Check(p.First(), gc.Equals, foo, gc.Commentf("improper list first"))
+	c.Check(p.Second(), gc.Equals, bar, gc.Commentf("improper list second"))
+	c.Check(p.Third(), gc.Equals, baz, gc.Commentf("improper list third"))
+	c.Check(p.String(), gc.Equals, "(foo bar baz . qux)", gc.Commentf("improper list string"))
 	p = p.Reverse()
-	if p.Len() != 4 {
-		t.Errorf("expected 4, but got %d", p.Len())
-	}
-	if p.First() != qux {
-		t.Errorf("expected 'qux', but got '%s'", p.First())
-	}
-	if p.Second() != baz {
-		t.Errorf("expected 'baz', but got '%s'", p.Second())
-	}
-	if p.Third() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.Third())
-	}
-	if p.String() != "(qux baz bar . foo)" {
-		t.Errorf("expected (qux baz bar . foo) but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 4, gc.Commentf("reversed improper list len"))
+	c.Check(p.First(), gc.Equals, qux, gc.Commentf("reversed improper list first"))
+	c.Check(p.Second(), gc.Equals, baz, gc.Commentf("reversed improper list second"))
+	c.Check(p.Third(), gc.Equals, bar, gc.Commentf("reversed improper list third"))
+	c.Check(p.String(), gc.Equals, "(qux baz bar . foo)", gc.Commentf("reversed improper list string"))
 }
 
-func TestAppend(t *testing.T) {
+func (ps *PairSuite) TestAppend(c *gc.C) {
 	foo := NewSymbol("foo")
 	bar := NewSymbol("bar")
 	baz := NewSymbol("baz")
@@ -199,91 +90,45 @@ func TestAppend(t *testing.T) {
 	p.Append(bar)
 	p.Append(baz)
 	p.Append(qux)
-	if p.Len() != 4 {
-		t.Errorf("expected 4, but got %d", p.Len())
-	}
-	if p.First() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.First())
-	}
-	if p.Second() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.Second())
-	}
-	if p.Third() != baz {
-		t.Errorf("expected 'baz', but got '%s'", p.Third())
-	}
-	if p.String() != "(foo bar baz qux)" {
-		t.Errorf("expected (foo bar baz qux) but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 4, gc.Commentf("append list len"))
+	c.Check(p.First(), gc.Equals, foo, gc.Commentf("append list first"))
+	c.Check(p.Second(), gc.Equals, bar, gc.Commentf("append list second"))
+	c.Check(p.Third(), gc.Equals, baz, gc.Commentf("append list third"))
+	c.Check(p.String(), gc.Equals, "(foo bar baz qux)", gc.Commentf("append list string"))
 	p = p.Reverse()
-	if p.Len() != 4 {
-		t.Errorf("expected 4, but got %d", p.Len())
-	}
-	if p.First() != qux {
-		t.Errorf("expected 'qux', but got '%s'", p.First())
-	}
-	if p.Second() != baz {
-		t.Errorf("expected 'baz', but got '%s'", p.Second())
-	}
-	if p.Third() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.Third())
-	}
-	if p.String() != "(qux baz bar . foo)" {
-		t.Errorf("expected (qux baz bar . foo) but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 4, gc.Commentf("reversed append list len"))
+	c.Check(p.First(), gc.Equals, qux, gc.Commentf("reversed append list first"))
+	c.Check(p.Second(), gc.Equals, baz, gc.Commentf("reversed append list second"))
+	c.Check(p.Third(), gc.Equals, bar, gc.Commentf("reversed append list third"))
+	c.Check(p.String(), gc.Equals, "(qux baz bar foo)", gc.Commentf("reversed append list string"))
 }
 
-func TestAppendChain(t *testing.T) {
+func (ps *PairSuite) TestAppendChain(c *gc.C) {
 	foo := NewSymbol("foo")
 	bar := NewSymbol("bar")
 	baz := NewSymbol("baz")
 	qux := NewSymbol("qux")
 	p := NewPair(foo)
 	p.Append(bar).Append(baz).Append(qux)
-	if p.Len() != 4 {
-		t.Errorf("expected 4, but got %d", p.Len())
-	}
-	if p.First() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.First())
-	}
-	if p.Second() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.Second())
-	}
-	if p.Third() != baz {
-		t.Errorf("expected 'baz', but got '%s'", p.Third())
-	}
-	if p.String() != "(foo bar baz qux)" {
-		t.Errorf("expected (foo bar baz qux) but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 4, gc.Commentf("chain list len"))
+	c.Check(p.First(), gc.Equals, foo, gc.Commentf("chain list first"))
+	c.Check(p.Second(), gc.Equals, bar, gc.Commentf("chain list second"))
+	c.Check(p.Third(), gc.Equals, baz, gc.Commentf("chain list third"))
+	c.Check(p.String(), gc.Equals, "(foo bar baz qux)", gc.Commentf("chain list string"))
 	p = p.Reverse()
-	if p.Len() != 4 {
-		t.Errorf("expected 4, but got %d", p.Len())
-	}
-	if p.First() != qux {
-		t.Errorf("expected 'qux', but got '%s'", p.First())
-	}
-	if p.Second() != baz {
-		t.Errorf("expected 'baz', but got '%s'", p.Second())
-	}
-	if p.Third() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.Third())
-	}
-	if p.String() != "(qux baz bar . foo)" {
-		t.Errorf("expected (qux baz bar . foo) but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 4, gc.Commentf("reversed chain list len"))
+	c.Check(p.First(), gc.Equals, qux, gc.Commentf("reversed chain list first"))
+	c.Check(p.Second(), gc.Equals, baz, gc.Commentf("reversed chain list second"))
+	c.Check(p.Third(), gc.Equals, bar, gc.Commentf("reversed chain list third"))
+	c.Check(p.String(), gc.Equals, "(qux baz bar foo)", gc.Commentf("reversed chain list string"))
 }
 
-func TestCar(t *testing.T) {
-	if Car(nil) != nil {
-		t.Errorf("Car(nil) should be nil")
-	}
-	if Car("foo") != nil {
-		t.Errorf("Car(\"foo\") should be nil")
-	}
+func (ps *PairSuite) TestCar(c *gc.C) {
+	c.Check(Car(nil), gc.IsNil, gc.Commentf("Car(nil) should be nil"))
+	c.Check(Car("foo"), gc.IsNil, gc.Commentf(`Car("foo") should be nil`))
 	foo := NewSymbol("foo")
 	p := NewPair(foo)
-	if Car(p) != foo {
-		t.Errorf("Car() on non-empty pair should return first element")
-	}
+	c.Check(Car(p), gc.Equals, foo, gc.Commentf(`Car() should return first of list`))
 }
 
 func TestCdr(t *testing.T) {
@@ -396,27 +241,23 @@ func TestPairMap(t *testing.T) {
 	}
 }
 
-func TestNewList(t *testing.T) {
+func (ps *PairSuite) TestNewList(c *gc.C) {
 	foo := NewSymbol("foo")
 	bar := NewSymbol("bar")
 	baz := NewSymbol("baz")
 	qux := NewSymbol("qux")
 	p := NewList(foo, bar, baz, qux)
-	if p.Len() != 4 {
-		t.Errorf("expected 4, but got %d", p.Len())
-	}
-	if p.First() != foo {
-		t.Errorf("expected 'foo', but got '%s'", p.First())
-	}
-	if p.Second() != bar {
-		t.Errorf("expected 'bar', but got '%s'", p.Second())
-	}
-	if p.Third() != baz {
-		t.Errorf("expected 'baz', but got '%s'", p.Third())
-	}
-	if p.String() != "(foo bar baz qux)" {
-		t.Errorf("expected (foo bar baz qux) but got '%s'", p.String())
-	}
+	c.Check(p.Len(), gc.Equals, 4, gc.Commentf("new list len"))
+	c.Check(p.First(), gc.Equals, foo, gc.Commentf("new list first"))
+	c.Check(p.Second(), gc.Equals, bar, gc.Commentf("new list second"))
+	c.Check(p.Third(), gc.Equals, baz, gc.Commentf("new list third"))
+	c.Check(p.String(), gc.Equals, "(foo bar baz qux)", gc.Commentf("new list string"))
+	p = p.Reverse()
+	c.Check(p.Len(), gc.Equals, 4, gc.Commentf("new list len"))
+	c.Check(p.First(), gc.Equals, qux, gc.Commentf("new list first"))
+	c.Check(p.Second(), gc.Equals, baz, gc.Commentf("new list second"))
+	c.Check(p.Third(), gc.Equals, bar, gc.Commentf("new list third"))
+	c.Check(p.String(), gc.Equals, "(qux baz bar foo)", gc.Commentf("new list string"))
 }
 
 func TestNestedList(t *testing.T) {

@@ -15,42 +15,65 @@ import (
 )
 
 // Vector represents the vector type in Scheme.
-type Vector []interface{}
+type Vector interface {
+	// ObjectId returns the unique identifier for this object.
+	ObjectId() uint64
+	// Length returns the number of elements in the vector.
+	Length() int
+	// Get returns the element in the specified (0-based) position.
+	Get(pos int) interface{}
+	// Set replaces the value at position pos with the given value.
+	Set(pos int, val interface{})
+}
 
-// NewVector wraps the given data in a Vector type.
+// vector is the internal implementation of Vector.
+type vector struct {
+	id   uint64        // object identifier
+	data []interface{} // vector data
+}
+
+// NewVector wraps the given data in a vector type.
 func NewVector(data []interface{}) Vector {
-	return Vector(data)
+	v := new(vector)
+	v.id = newObjectId()
+	v.data = data
+	return v
 }
 
-func (v Vector) Eqv(other interface{}) bool {
-	if ov, ok := other.(Vector); ok {
-		return v.Length() == 0 && ov.Length() == 0
+func (b *vector) ObjectId() uint64 {
+	if b == nil {
+		return 0
 	}
-	return false
+	return b.id
 }
 
-// Length returns the number of elements in the vector.
-func (b Vector) Length() int {
-	return len(b)
+func (b *vector) Length() int {
+	if b == nil {
+		return 0
+	}
+	return len(b.data)
 }
 
-// Get returns the element in the specified (0-based) position within the
-// vector.
-func (b Vector) Get(pos int) interface{} {
-	return b[pos]
+func (b *vector) Get(pos int) interface{} {
+	if b == nil || pos < 0 || pos >= len(b.data) {
+		return nil
+	}
+	return b.data[pos]
 }
 
-// Set replaces the value at position pos with the given value in the vector.
-func (b Vector) Set(pos int, val interface{}) {
-	b[pos] = val
+func (b *vector) Set(pos int, val interface{}) {
+	if b != nil && pos >= 0 && pos < len(b.data) {
+		b.data[pos] = val
+	}
 }
 
-// String converts the vector to a string representation of itself (e.g. "(a
-// 10 #\c)").
-func (b Vector) String() string {
+func (b *vector) String() string {
+	if b == nil {
+		return "#()"
+	}
 	buf := new(bytes.Buffer)
 	buf.WriteString("#(")
-	for _, v := range b {
+	for _, v := range b.data {
 		stringifyBuffer(v, buf)
 		buf.WriteString(" ")
 	}
