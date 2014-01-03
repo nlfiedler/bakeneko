@@ -95,7 +95,8 @@ func builtinCons(name string, args []interface{}) (interface{}, LispError) {
 
 var notAListMsg = "The object %v, passed as an argument to append, is not a list."
 
-// builtinAppend builds a new Pair consisting of the arguments.
+// builtinAppend builds a new list consisting of the members of the argument
+// lists. The last argument may be of any type.
 func builtinAppend(name string, args []interface{}) (interface{}, LispError) {
 	var results Pair = theEmptyList
 	var tail Pair = theEmptyList
@@ -130,4 +131,58 @@ func builtinAppend(name string, args []interface{}) (interface{}, LispError) {
 		}
 	}
 	return results, nil
+}
+
+// builtinList builds a new list consisting of the arguments. Unlike append,
+// all of the arguments can be of any type.
+func builtinList(name string, args []interface{}) (interface{}, LispError) {
+	var results Pair = theEmptyList
+	for ii := len(args) - 1; ii >= 0; ii-- {
+		results = Cons(args[ii], results)
+	}
+	return results, nil
+}
+
+// builtinIsPair returns true if the argument is a non-empty list, otherwise false.
+func builtinIsPair(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok && pair.Len() > 0 {
+		return BooleanTrue, nil
+	}
+	return BooleanFalse, nil
+}
+
+// builtinIsNull returns true if the argument is the empty list, otherwise false.
+func builtinIsNull(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok && pair.Len() == 0 {
+		return BooleanTrue, nil
+	}
+	return BooleanFalse, nil
+}
+
+// builtinIsList returns true if the argument is a proper list, otherwise false.
+func builtinIsList(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		iter := NewPairIterator(pair)
+		for iter.HasNext() {
+			iter.Next()
+		}
+		return BooleanFromBool(iter.IsProper()), nil
+	}
+	return BooleanFalse, nil
+}
+
+// builtinLength returns length of the given list.
+func builtinLength(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		return NewInteger(int64(pair.Len())), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a list, not %v", name, args[0])
+}
+
+// builtinReverse returns the given list with its elements in reverse order.
+func builtinReverse(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		return pair.Reverse(), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a list, not %v", name, args[0])
 }

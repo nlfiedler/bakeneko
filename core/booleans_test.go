@@ -22,7 +22,7 @@ func (ls *BooleansSuite) TestBuiltinNot(c *gc.C) {
 	inputs[`(not (quote (3)))`] = `#f`
 	inputs[`(not #f)`] = `#t`
 	inputs[`(not '())`] = `#f`
-	// inputs[`(not (list))`] = `#f` TODO when (list) is added
+	inputs[`(not (list))`] = `#f`
 	inputs[`(not 'nil)`] = `#f`
 	checkInterpret(c, inputs)
 	// error cases

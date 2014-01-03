@@ -15,6 +15,20 @@ type ListSuite struct {
 
 var _ = gc.Suite(&ListSuite{})
 
+func (ls *ListSuite) TestBuiltinIsPair(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs[`(pair? '(x . y))`] = `#t`
+	inputs[`(pair? '(a b c))`] = `#t`
+	inputs[`(pair? '())`] = `#f`
+	inputs[`(pair? '#(a b))`] = `#f`
+	checkInterpret(c, inputs)
+	// error cases
+	inputs = make(map[string]string)
+	inputs[`(pair? 'a 'b)`] = ".* requires 1"
+	inputs[`(pair?)`] = ".* requires 1"
+	checkInterpretError(c, inputs)
+}
+
 func (ls *ListSuite) TestBuiltinCons(c *gc.C) {
 	inputs := make(map[string]string)
 	inputs[`(cons 'a '())`] = `(a)`
@@ -27,6 +41,21 @@ func (ls *ListSuite) TestBuiltinCons(c *gc.C) {
 	inputs = make(map[string]string)
 	inputs[`(cons 'a 'b 'c)`] = ".* requires 2"
 	inputs[`(cons 'a)`] = ".* requires 2"
+	checkInterpretError(c, inputs)
+}
+
+func (ls *ListSuite) TestBuiltinLength(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs[`(length '(x . y))`] = `2`
+	inputs[`(length '(a b c))`] = `3`
+	inputs[`(length '(a (b) (c d e)))`] = `3`
+	inputs[`(length '())`] = `0`
+	checkInterpret(c, inputs)
+	// error cases
+	inputs = make(map[string]string)
+	inputs[`(length 'a)`] = ".* expects a list.*"
+	inputs[`(length '(a) '(b))`] = ".* requires 1"
+	inputs[`(length)`] = ".* requires 1"
 	checkInterpretError(c, inputs)
 }
 
@@ -44,6 +73,29 @@ func (ls *ListSuite) TestBuiltinAppend(c *gc.C) {
 	inputs[`(append 'a '(b c))`] = ".* is not a list."
 	inputs[`(append '(a . b) '(c d))`] = ".* is not a list."
 	checkInterpretError(c, inputs)
+}
+
+func (ls *ListSuite) TestBuiltinReverse(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs[`(reverse '(x . y))`] = `(y . x)`
+	inputs[`(reverse '(a b c))`] = `(c b a)`
+	inputs[`(reverse '(a (b c) d (e (f))))`] = `((e (f)) d (b c) a)`
+	inputs[`(reverse '())`] = `()`
+	checkInterpret(c, inputs)
+	// error cases
+	inputs = make(map[string]string)
+	inputs[`(reverse 'a)`] = ".* expects a list.*"
+	inputs[`(reverse '(a) '(b))`] = ".* requires 1"
+	inputs[`(reverse)`] = ".* requires 1"
+	checkInterpretError(c, inputs)
+}
+
+func (ls *ListSuite) TestBuiltinList(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs[`(list 'x 'y)`] = `(x y)`
+	inputs[`(list 'a (+ 3 4) 'c)`] = `(a 7 c)`
+	inputs[`(list)`] = `()`
+	checkInterpret(c, inputs)
 }
 
 func (ls *ListSuite) TestBuiltinCar(c *gc.C) {
@@ -83,4 +135,32 @@ func (ls *ListSuite) TestCxr(c *gc.C) {
 	inputs["(caddr '(a b c d e f))"] = "c"
 	inputs["(cadddr '(a b c d e f))"] = "d"
 	checkInterpret(c, inputs)
+}
+
+func (ls *ListSuite) TestBuiltinIsNull(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs[`(null? '(x . y))`] = `#f`
+	inputs[`(null? '())`] = `#t`
+	inputs[`(null? 3)`] = `#f`
+	checkInterpret(c, inputs)
+	// error cases
+	inputs = make(map[string]string)
+	inputs[`(null? 'a 'b)`] = ".* requires 1"
+	inputs[`(null?)`] = ".* requires 1"
+	checkInterpretError(c, inputs)
+}
+
+func (ls *ListSuite) TestBuiltinIsList(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs[`(list? '(a b c))`] = `#t`
+	inputs[`(list? '())`] = `#t`
+	inputs[`(list? '(x . y))`] = `#f`
+	inputs[`(list? '#(a b))`] = `#f`
+	inputs[`(list? 3)`] = `#f`
+	checkInterpret(c, inputs)
+	// error cases
+	inputs = make(map[string]string)
+	inputs[`(list? 'a 'b)`] = ".* requires 1"
+	inputs[`(list?)`] = ".* requires 1"
+	checkInterpretError(c, inputs)
 }
