@@ -39,6 +39,8 @@ type Pair interface {
 	// Join finds the first available slot in the chained Pairs
 	// and attaches the given thing there.
 	Join(a interface{})
+	// ToSlice constructs a Go slice containing the values in the list of pairs.
+	ToSlice() []interface{}
 	// setFirst replaces the car of the pair with a.
 	setFirst(a interface{})
 	// setRest replaces the cdr of the pair with a.
@@ -295,6 +297,24 @@ func (p *pair) Map(funk func(interface{}) interface{}) Pair {
 	return joiner.List()
 }
 
+// ToSlice constructs a Go slice containing the values in the list of pairs.
+func (p *pair) ToSlice() []interface{} {
+	args := make([]interface{}, 0)
+	var r Pair = p
+	for p != nil {
+		args = append(args, r.First())
+		if r.Rest() == theEmptyList {
+			p = nil
+		} else if rr, ok := r.Rest().(Pair); ok {
+			r = rr
+		} else {
+			args = append(args, r.Rest())
+			p = nil
+		}
+	}
+	return args
+}
+
 // String returns the string form of the pair.
 func (p *pair) String() string {
 	buf := new(bytes.Buffer)
@@ -376,6 +396,11 @@ func (e EmptyList) Append(a interface{}) Pair {
 
 // Join does nothing on an empty list. EmptyList is empty.
 func (e EmptyList) Join(a interface{}) {
+}
+
+// ToSlice on the empty list always returns nil.
+func (e EmptyList) ToSlice() []interface{} {
+	return nil
 }
 
 // setFirst does nothing on an empty list. EmptyList is empty.
@@ -467,15 +492,4 @@ func (pj *PairJoiner) Append(elem interface{}) *PairJoiner {
 // List returns the head of the list constructed by this PairJoiner.
 func (pj *PairJoiner) List() Pair {
 	return pj.head
-}
-
-// Slice constructs a Go slice containing the values in the list of pairs.
-func (pj *PairJoiner) Slice() []interface{} {
-	args := make([]interface{}, 0)
-	var curr interface{} = pj.head
-	for curr != nil {
-		args = append(args, Car(curr))
-		curr = Cdr(curr)
-	}
-	return args
 }

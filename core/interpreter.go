@@ -241,6 +241,20 @@ func newNullEnvironment() Environment {
 	builtins = append(builtins, NewBuiltin(builtinDivide, "/", 1, -1))
 	builtins = append(builtins, NewBuiltin(builtinAbs, "abs", 1, 1))
 	builtins = append(builtins, NewBuiltin(builtinQuotient, "quotient", 2, 2))
+	// control features (R7RS 6.10)
+	// builtins = append(builtins, NewBuiltin(builtinIsProcedure, "procedure?", 1, 1))
+	builtins = append(builtins, NewBuiltin(builtinApply, "apply", 2, -1))
+	builtins = append(builtins, NewBuiltin(builtinMap, "map", 2, -1))
+	// builtins = append(builtins, NewBuiltin(builtinStringMap, "string-map", 2, -1))
+	// builtins = append(builtins, NewBuiltin(builtinVectorMap, "vector-map", 2, -1))
+	// builtins = append(builtins, NewBuiltin(builtinForEach, "for-each", 2, -1))
+	// builtins = append(builtins, NewBuiltin(builtinStringForEach, "string-for-each", 2, -1))
+	// builtins = append(builtins, NewBuiltin(builtinVectorForEach, "vector-for-each", 2, -1))
+	// builtins = append(builtins, NewBuiltin(builtinCallcc, "call-with-current-continuation", 1, 1))
+	// builtins = append(builtins, NewBuiltin(builtinCallcc, "call/cc", 1, 1))
+	// builtins = append(builtins, NewBuiltin(builtinValues, "values", 1, -1))
+	// builtins = append(builtins, NewBuiltin(builtinCallWithValues, "call-with-values", 2, 2))
+	// builtins = append(builtins, NewBuiltin(builtinDynamicWind, "dynamic-wind", 3, 3))
 	// map the procedures into the environment
 	for _, fun := range builtins {
 		mapping[NewSymbol(fun.Name())] = fun
@@ -556,7 +570,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 			exps := joinr.List()
 			fun, args := exps.First(), exps.Rest()
 			if builtin, ok := fun.(Procedure); ok {
-				return builtin.Call(joinr.Slice()[1:])
+				return builtin.Call(exps.ToSlice()[1:])
 			} else if clos, ok := fun.(Closure); ok {
 				if arg_list, ok := args.(Pair); ok {
 					expr = clos.Body()

@@ -93,7 +93,7 @@ func builtinCons(name string, args []interface{}) (interface{}, LispError) {
 	return Cons(args[0], args[1]), nil
 }
 
-var notAListMsg = "The object %v, passed as an argument to append, is not a list."
+var notAListMsg = "The object %v, passed as an argument to %s, is not a list."
 
 // builtinAppend builds a new list consisting of the members of the argument
 // lists. The last argument may be of any type.
@@ -114,10 +114,10 @@ func builtinAppend(name string, args []interface{}) (interface{}, LispError) {
 				} else if idx == last {
 					tail.Join(elem)
 				} else {
-					return nil, NewLispErrorf(EARGUMENT, notAListMsg, elem)
+					return nil, NewLispErrorf(EARGUMENT, notAListMsg, elem, name)
 				}
 				if !iter.IsProper() && idx < last {
-					return nil, NewLispErrorf(EARGUMENT, notAListMsg, elem)
+					return nil, NewLispErrorf(EARGUMENT, notAListMsg, elem, name)
 				}
 			}
 		} else if idx == last {
@@ -127,7 +127,7 @@ func builtinAppend(name string, args []interface{}) (interface{}, LispError) {
 				tail.Join(arg)
 			}
 		} else {
-			return nil, NewLispErrorf(EARGUMENT, notAListMsg, arg)
+			return nil, NewLispErrorf(EARGUMENT, notAListMsg, arg, name)
 		}
 	}
 	return results, nil

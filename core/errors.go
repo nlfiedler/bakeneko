@@ -32,6 +32,7 @@ const (
 	ESYMBOL                    // e.g. undefined
 	ELEXER                     // lexer error
 	EIO                        // I/O error
+	EINTERNAL                  // something bad happened
 )
 
 // Locatable is any Scheme element whose location within the parsed text is

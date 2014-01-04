@@ -35,6 +35,9 @@ func (ps *PairSuite) TestPairSingle(c *gc.C) {
 	c.Check(p.Second(), gc.IsNil, gc.Commentf("pair single second"))
 	c.Check(p.Third(), gc.IsNil, gc.Commentf("pair single third"))
 	c.Check(p.String(), gc.Equals, "(foo)", gc.Commentf("pair single string"))
+	slice := p.ToSlice()
+	c.Check(len(slice), gc.Equals, 1)
+	c.Check(slice[0], gc.Equals, foo)
 	p = p.Reverse()
 	c.Check(p.Len(), gc.Equals, 1, gc.Commentf("pair single len"))
 	c.Check(p.First(), gc.Equals, foo, gc.Commentf("pair single first"))
@@ -52,6 +55,10 @@ func (ps *PairSuite) TestCons(c *gc.C) {
 	c.Check(p.Second(), gc.Equals, bar, gc.Commentf("improper cons second"))
 	c.Check(p.Third(), gc.IsNil, gc.Commentf("improper cons third"))
 	c.Check(p.String(), gc.Equals, "(foo . bar)", gc.Commentf("improper cons string"))
+	slice := p.ToSlice()
+	c.Check(len(slice), gc.Equals, 2)
+	c.Check(slice[0], gc.Equals, foo)
+	c.Check(slice[1], gc.Equals, bar)
 	p = p.Reverse()
 	c.Check(p.Len(), gc.Equals, 2, gc.Commentf("reversed improper cons len"))
 	c.Check(p.First(), gc.Equals, bar, gc.Commentf("reversed improper cons first"))
@@ -330,6 +337,21 @@ func (ps *PairSuite) TestPairIteratorImproper(c *gc.C) {
 	c.Check(iter.HasNext(), gc.Equals, false)
 }
 
+func (ps *PairSuite) TestPairImproperSlice(c *gc.C) {
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
+	baz := NewSymbol("baz")
+	qux := NewSymbol("qux")
+	p := NewList(foo, bar, baz)
+	p.Join(qux)
+	slice := p.ToSlice()
+	c.Check(len(slice), gc.Equals, 4)
+	c.Check(slice[0], gc.Equals, NewSymbol("foo"))
+	c.Check(slice[1], gc.Equals, NewSymbol("bar"))
+	c.Check(slice[2], gc.Equals, NewSymbol("baz"))
+	c.Check(slice[3], gc.Equals, NewSymbol("qux"))
+}
+
 func (ps *PairSuite) TestPairIteratorEmpty(c *gc.C) {
 	iter := NewPairIterator(theEmptyList)
 	c.Check(iter.HasNext(), gc.Equals, false)
@@ -353,7 +375,7 @@ func (ps *PairSuite) TestPairJoiner(c *gc.C) {
 	c.Check(joiner.List().String(), gc.Equals, "(foo bar)")
 	joiner.Append(NewSymbol("qux"))
 	c.Check(joiner.List().String(), gc.Equals, "(foo bar qux)")
-	slice := joiner.Slice()
+	slice := joiner.List().ToSlice()
 	c.Check(len(slice), gc.Equals, 3)
 	c.Check(slice[0], gc.Equals, NewSymbol("foo"))
 	c.Check(slice[1], gc.Equals, NewSymbol("bar"))
