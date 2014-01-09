@@ -317,10 +317,9 @@ func (p *parserImpl) parseWithinScope(t token) (interface{}, LispError) {
 	scope := make(map[string]interface{})
 	p.labels = append(p.labels, scope)
 	// defer removal of that scope
-	pop_scope := func() {
+	defer func() {
 		p.labels = p.labels[:len(p.labels)-1]
-	}
-	defer pop_scope()
+	}()
 	switch t.typ {
 	case tokenOpenParen:
 		t, ok := <-p.tokens
@@ -645,7 +644,7 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			return p.expandListSafely(pair, toplevel)
 
 		} else if atomsEqual(sym, includeSym) {
-			return p.parseInclude(pair, toplevel)
+			return p.expandInclude(pair, toplevel)
 
 		} else if atomsEqual(sym, includeCaseSym) {
 			save_case := p.foldcase
@@ -653,7 +652,7 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			defer func() {
 				p.foldcase = save_case
 			}()
-			return p.parseInclude(pair, toplevel)
+			return p.expandInclude(pair, toplevel)
 
 		} else if atomsEqual(sym, lambdaSym) {
 			// (lambda (x) e1 e2) => (lambda (x) (begin e1 e2))
@@ -719,9 +718,9 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 	return p.expandListSafely(pair, false)
 }
 
-// parseInclude processes the (include ...) expression by reading the
-// named files into the parsed syntax tree..
-func (p *parserImpl) parseInclude(pair Pair, toplevel bool) (Pair, LispError) {
+// expandInclude processes the (include ...) expression by reading the
+// named files into the parsed syntax tree.
+func (p *parserImpl) expandInclude(pair Pair, toplevel bool) (Pair, LispError) {
 	if pair.Len() < 2 {
 		return nil, NewLispErrorl(EARGUMENT, pair, "include requires filenames")
 	}
