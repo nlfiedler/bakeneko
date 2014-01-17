@@ -267,13 +267,13 @@ func (p *pair) Len() int {
 	pairs_seen := make(map[uint64]bool)
 	var r Pair = p
 	for p != nil {
+		length++
 		_, seen := pairs_seen[r.ObjectId()]
 		if seen {
 			// must be a loop in the pairs, terminate now
 			break
 		}
 		pairs_seen[r.ObjectId()] = true
-		length++
 		if r.Rest() == theEmptyList {
 			p = nil
 		} else if rr, ok := r.Rest().(Pair); ok {
@@ -292,6 +292,7 @@ func (p *pair) Map(funk func(interface{}) interface{}) Pair {
 	joiner := NewPairJoiner()
 	iter := NewPairIterator(p)
 	for iter.HasNext() {
+		// TODO: what about improper lists?
 		joiner.Append(funk(iter.Next()))
 	}
 	return joiner.List()

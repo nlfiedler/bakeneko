@@ -17,7 +17,10 @@ import (
 //
 
 // Indentifiable objects implement this interface to provide their unique
-// object identifier.
+// object identifier. While objects may mutate, their identifier should
+// remain the same. The primary purpose of the identifier is to avoid
+// infinite loops when traversing nested, possibly self-referencing,
+// structures.
 type Identifiable interface {
 	// ObjectId returns the unique identifier for this object.
 	ObjectId() uint64
@@ -81,12 +84,18 @@ func builtinEqv(name string, args []interface{}) (interface{}, LispError) {
 // compareByteVectors compares the contents of two byte vectors for equality,
 // returning true if their bytes are identical, false otherwise.
 func compareByteVectors(bv1, bv2 ByteVector) bool {
+	// byte vectors cannot have nested structures, so comparing the length
+	// is a valid shortcut
 	if bv1.Length() != bv2.Length() {
 		return false
 	}
-	for ii := bv1.Length() - 1; ii >= 0; ii-- {
-		if bv1.Get(ii) != bv2.Get(ii) {
-			return false
+	id1 := bv1.ObjectId()
+	id2 := bv2.ObjectId()
+	if id1 != id2 {
+		for ii := bv1.Length() - 1; ii >= 0; ii-- {
+			if bv1.Get(ii) != bv2.Get(ii) {
+				return false
+			}
 		}
 	}
 	return true
@@ -96,58 +105,61 @@ func compareByteVectors(bv1, bv2 ByteVector) bool {
 // vectors, and byte vectors. A deep comparison is made, visiting all members
 // of all nested sequences.
 func sequenceComparator(thing1, thing2 interface{}) bool {
-	// seqs_seen := make(map[uint64]bool)
+
+	// chibi-scheme's approach:
+	// 1. Perform a fast comparison bounded by depth and iterations
+	//    (native code, directly comparing the bytes of the structs);
+	//    tail-call optimized, visiting last element in the sequence
+	//    using 'goto' beginning of the equalp function
+	// 2. If that returns #f, then done
+	// 3. If that returns a positive number, return #t
+	// 4. Else, in Scheme: memoize the results of comparing a thing to other things
+	//    (map of maps: first map keyed by element 'a', second map keyed by
+	//     element 'b'; it's value is the result (always #t since otherwise
+	//     the elements did not match and the function would exit)),
+	//    iterate through all lists and vectors without bound or depth.
+
 	var compareThings func(thing1, thing2 interface{}) bool = nil
 	compareVectors := func(vec1 Vector, vec2 Vector) bool {
-		if vec1.Length() != vec2.Length() {
-			// TODO: what of data labels and infinite and equal sequences
-			// (equal? ’#1=(a b . #1#) ’#2=(a b a b . #2#)) => #t
-			return false
-		}
 		id1 := vec1.ObjectId()
 		id2 := vec2.ObjectId()
-		if id1 == id2 {
-			return true
-		}
-		// _, seen1 := seqs_seen[id1]
-		// _, seen2 := seqs_seen[id2]
-		// if seen1 && seen2 {
-		// 	// TODO: this is not really correct, seeing is not the same as equality and vice versa
-		// 	return true
-		// }
-		// seqs_seen[id1] = true
-		// seqs_seen[id2] = true
-		for ii := vec1.Length() - 1; ii >= 0; ii-- {
-			if !compareThings(vec1.Get(ii), vec2.Get(ii)) {
-				return false
+		if id1 != id2 {
+			var length int = 0
+			if vec1.Length() > vec2.Length() {
+				length = vec1.Length()
+			} else {
+				length = vec2.Length()
+			}
+			for ii := 0; ii < length; ii++ {
+				if !compareThings(vec1.Get(ii), vec2.Get(ii)) {
+					return false
+				}
 			}
 		}
 		// if we got this far, they are the same
 		return true
 	}
-	// comparePairs := func(pair1 Pair, pair2 Pair) bool {
-	// 	id1 := pair1.ObjectId()
-	// 	id2 := pair2.ObjectId()
-	// 	if id1 == id2 {
-	// 		return true
-	// 	}
-	// 	len1 := pair1.Len()
-	// 	len2 := pair2.Len()
-	// 	if len1 > len2 {
-	// TODO: use the longest length and iterate that many times; infinite lists should continue infinitely
-	// 		iter1 := NewPairIterator(pair1)
-	// 		iter2 := NewPairIterator(pair2)
-	// 		for ii := 0; ii < len1; ii++ {
-	// 			p1 := iter1.Next()
-	// 			p2 := iter2.Next()
-	// 			if !compareThings(p1, p2) {
-	// 				return false
-	// 			}
-	// 		}
-	// 		// } else if len1 < len2 {
-	// 	}
-	// 	return true
-	// }
+	comparePairs := func(pair1 Pair, pair2 Pair) bool {
+		id1 := pair1.ObjectId()
+		id2 := pair2.ObjectId()
+		if id1 == id2 {
+			return true
+		}
+		len1 := pair1.Len()
+		len2 := pair2.Len()
+		if len1 > len2 {
+			iter1 := NewPairIterator(pair1)
+			iter2 := NewPairIterator(pair2)
+			for ii := 0; ii < len1; ii++ {
+				p1 := iter1.Next()
+				p2 := iter2.Next()
+				if !compareThings(p1, p2) {
+					return false
+				}
+			}
+		}
+		return true
+	}
 	compareThings = func(thing1, thing2 interface{}) bool {
 		vec1, is_vec1 := thing1.(Vector)
 		vec2, is_vec2 := thing2.(Vector)
@@ -159,11 +171,11 @@ func sequenceComparator(thing1, thing2 interface{}) bool {
 		if is_bv1 && is_bv2 {
 			return compareByteVectors(bv1, bv2)
 		}
-		// pair1, is_pair1 := thing1.(Pair)
-		// pair2, is_pair2 := thing2.(Pair)
-		// if is_pair1 && is_pair2 {
-		// 	return comparePairs(pair1, pair2)
-		// }
+		pair1, is_pair1 := thing1.(Pair)
+		pair2, is_pair2 := thing2.(Pair)
+		if is_pair1 && is_pair2 {
+			return comparePairs(pair1, pair2)
+		}
 		atom1, is_atom1 := thing1.(Atom)
 		atom2, is_atom2 := thing2.(Atom)
 		if is_atom1 && is_atom2 {

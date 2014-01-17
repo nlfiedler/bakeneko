@@ -47,7 +47,7 @@ func verifyExpandError(c *gc.C, expected map[string]string) {
 		parser := NewParser()
 		pair, err := parser.Parse(input)
 		if err != nil {
-			c.Fatalf("failed to parse %q: %s", input, err)
+			c.Errorf("failed to parse %q: %s", input, err)
 		} else {
 			_, err = parser.Expand(pair)
 			c.Check(err, gc.ErrorMatches, expected)
@@ -78,11 +78,10 @@ func verifyParseMap(mapping map[string]string, t *testing.T) {
 func verifyParseError(t *testing.T, expected map[string]string) {
 	for input, errmsg := range expected {
 		parser := NewParser()
-		_, err := parser.Parse(input)
+		result, err := parser.Parse(input)
 		if err == nil {
-			t.Fatalf("parse() should have failed with %q", input)
-		}
-		if !strings.Contains(err.String(), errmsg) {
+			t.Errorf("parse() of %q should have failed, got %q", input, result)
+		} else if !strings.Contains(err.String(), errmsg) {
 			t.Errorf("expected [%s] but got [%s] for input %q", errmsg, err, input)
 		}
 	}
@@ -424,6 +423,7 @@ func TestParseDatumLabels(t *testing.T) {
 	mapping[`#1=#\b (foo #1#)`] = `(#\b (foo #\b))`
 	mapping[`(foo #1=#\a "bcb" #1#)`] = `((foo #\a "bcb" #\a))`
 	mapping[`#1=#\b (foo #1=#\a "bcb" #1#) #1#`] = `(#\b (foo #\a "bcb" #\a) #\b)`
+	// TODO: the None in the middle results in a double-space
 	mapping[`(foo #;(#1=#\a "bcb" #1#) 'bar)`] = `((foo  (quote bar)))`
 	mapping[`#1=#\b (foo "bcb" #1#) #1#`] = `(#\b (foo "bcb" #\b) #\b)`
 	verifyParseMap(mapping, t)
@@ -431,7 +431,8 @@ func TestParseDatumLabels(t *testing.T) {
 
 func TestParseDatumLabelsError(t *testing.T) {
 	mapping := make(map[string]string)
-	mapping[`(foo "bcb" #1#)`] = "label reference before assignment"
+	mapping[`(foo "bcb" #101#)`] = "label reference before assignment"
+	mapping[`#(foo "bcb" #102#)`] = "label reference before assignment"
 	verifyParseError(t, mapping)
 }
 

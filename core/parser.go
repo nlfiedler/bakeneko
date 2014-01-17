@@ -55,6 +55,13 @@ func (n None) String() string {
 	return ""
 }
 
+// forwardDatumRef is a placeholder for datum references that are found
+// within the expression to which the datum label is being applied, and
+// hence the final expression is not yet available (e.g. #1=(a b . #1#)).
+type forwardDatumRef struct {
+	label string // the datum label, e.g. "1"
+}
+
 // macroTable stores the globally defined macros, mapping instances of
 // Symbol to instances of Closure.
 var macroTable = make(map[Symbol]Closure)
@@ -97,6 +104,7 @@ type Parser interface {
 type parserImpl struct {
 	tokens    chan token               // channel of lexer tokens
 	inComment bool                     // true if parsing a datum comment
+	withLabel bool                     // true if parsing a labeled datum
 	labels    []map[string]interface{} // collection of labeled datum, organized by scope
 	name      string                   // name of input; usually a file name
 	include   string                   // path for file includes, may be '.'
@@ -109,7 +117,7 @@ func NewParser() Parser {
 	labels := make([]map[string]interface{}, 0)
 	scope := make(map[string]interface{})
 	labels = append(labels, scope)
-	return &parserImpl{nil, false, labels, "<input>", ".", false}
+	return &parserImpl{nil, false, false, labels, "<input>", ".", false}
 }
 
 // Parse is the default implementation the Parse() method of Parser.
@@ -204,8 +212,6 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 			// lexer probably messed up
 			return nil, NewLispErrorf(ESYNTAX, "unrecognized character: %s", t.val)
 		}
-		// fmt.Printf("char: %s %d:%d %d len\n", t.val, t.row, t.col, len(t.val))
-		// char: #\z 1:3 3 len
 		return NewParsedCharacter(t.val, t.row, t.col-len(t.val)), nil
 	case tokenQuote:
 		var quote Symbol
@@ -239,7 +245,9 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 		return theNone, nil
 	case tokenLabelDefinition:
 		// datum label definition
+		p.withLabel = true
 		datum, err := p.parseNext()
+		p.withLabel = false
 		if err != nil {
 			return nil, err
 		}
@@ -247,6 +255,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 			// disregard datum label definitions while parsing a comment
 			label := t.val[1 : len(t.val)-1]
 			p.labels[len(p.labels)-1][label] = datum
+			return p.resolveForwardRefs(datum)
 		}
 		return datum, nil
 	case tokenLabelReference:
@@ -261,9 +270,70 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 				return datum, nil
 			}
 		}
-		return nil, NewLispErrorf(ESYNTAX, "label reference before assignment: %s", t.val)
+		if p.withLabel {
+			return &forwardDatumRef{label}, nil
+		}
+		return nil, NewLispErrorf(ESYNTAX, "label reference before assignment: %s", label)
 	}
 	panic("unreachable code")
+}
+
+// resolveForwardRefs finds any forwardDatumRef instances and replaces them
+// with the actual datum to which they refer. If any cannot be resolved, an
+// error is returned.
+func (p *parserImpl) resolveForwardRefs(datum interface{}) (interface{}, LispError) {
+	var examineThing func(thing interface{}) (interface{}, LispError) = nil
+	examinePair := func(pair Pair) (val interface{}, err LispError) {
+		var r Pair = pair
+		for {
+			val, err := examineThing(r.First())
+			if err != nil {
+				return nil, err
+			}
+			r.setFirst(val)
+			if r.Rest() == theEmptyList {
+				break
+			} else if rr, ok := r.Rest().(Pair); ok {
+				r = rr
+			} else {
+				val, err := examineThing(r.Rest())
+				if err != nil {
+					return nil, err
+				}
+				r.setRest(val)
+				break
+			}
+		}
+		return pair, nil
+	}
+	examineVector := func(vec Vector) (interface{}, LispError) {
+		for ii := vec.Length() - 1; ii >= 0; ii-- {
+			val, err := examineThing(vec.Get(ii))
+			if err != nil {
+				return nil, err
+			}
+			vec.Set(ii, val)
+		}
+		return vec, nil
+	}
+	examineThing = func(thing interface{}) (interface{}, LispError) {
+		switch v := thing.(type) {
+		case Pair:
+			return examinePair(v)
+		case Vector:
+			return examineVector(v)
+		case *forwardDatumRef:
+			for idx := len(p.labels) - 1; idx >= 0; idx-- {
+				if val, ok := p.labels[idx][v.label]; ok {
+					return val, nil
+				}
+			}
+			return nil, NewLispErrorf(ESYNTAX, "label reference before assignment: %s", v.label)
+		default:
+			return v, nil
+		}
+	}
+	return examineThing(datum)
 }
 
 // parserReadPair expects to read the contents of a list, whether a proper

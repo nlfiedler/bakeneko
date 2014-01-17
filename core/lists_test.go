@@ -48,8 +48,16 @@ func (ls *ListSuite) TestBuiltinLength(c *gc.C) {
 	inputs := make(map[string]string)
 	inputs[`(length '(x . y))`] = `2`
 	inputs[`(length '(a b c))`] = `3`
+	inputs[`(length '(a b . c))`] = `3`
 	inputs[`(length '(a (b) (c d e)))`] = `3`
 	inputs[`(length '())`] = `0`
+	inputs[`(length '#1=(a b . #1#))`] = `3`
+	inputs[`(length '#2=(a b a b . #2#))`] = `5`
+	inputs[`(length '#1=(a b #1#))`] = `3`
+	inputs[`(length '#2=(a b a b #2#))`] = `5`
+	// TODO: blows up the stack
+	// inputs[`(length '#3=#(a b #3#))`] = `3`
+	// inputs[`(length '#4=#(a b a b #4#))`] = `5`
 	checkInterpret(c, inputs)
 	// error cases
 	inputs = make(map[string]string)
@@ -90,6 +98,20 @@ func (ls *ListSuite) TestBuiltinReverse(c *gc.C) {
 	checkInterpretError(c, inputs)
 }
 
+func (ls *ListSuite) TestBuiltinAssoc(c *gc.C) {
+	inputs := make(map[string]string)
+	// TODO: implement assoc and test
+	// inputs[`(assoc (list 'a) '(((a)) ((b)) ((c))))`] = `((a))`
+	// inputs[`(assoc 2.0 '((1 1) (2 4) (3 9)) =)`] = `(2 4)`
+	// checkInterpret(c, inputs)
+	// error cases
+	inputs = make(map[string]string)
+	inputs[`(assoc 'a 'b)`] = ".* expects a list.*"
+	inputs[`(assoc 'a)`] = ".* requires at least 2"
+	inputs[`(assoc)`] = ".* requires at least 2"
+	checkInterpretError(c, inputs)
+}
+
 func (ls *ListSuite) TestBuiltinList(c *gc.C) {
 	inputs := make(map[string]string)
 	inputs[`(list 'x 'y)`] = `(x y)`
@@ -116,6 +138,7 @@ func (ls *ListSuite) TestBuiltinCdr(c *gc.C) {
 	inputs[`(cdr '(a b c))`] = `(b c)`
 	inputs[`(cdr '((a) b c d))`] = `(b c d)`
 	inputs[`(cdr '(1 . 2))`] = `2`
+	inputs[`(cdr '(a . (b c)))`] = `(b c)`
 	checkInterpret(c, inputs)
 	// error cases
 	inputs = make(map[string]string)

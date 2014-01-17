@@ -186,3 +186,13 @@ func builtinReverse(name string, args []interface{}) (interface{}, LispError) {
 	}
 	return nil, NewLispErrorf(EARGUMENT, "%s expects a list, not %v", name, args[0])
 }
+
+// builtinAssoc finds the first pair in the list argument whose car field
+// is the object given. An optional compare argument is used to compare the
+// object with the car of each pair; otherwise equal? is used.
+func builtinAssoc(name string, args []interface{}) (interface{}, LispError) {
+	if _, ok := args[1].(Pair); ok {
+		return nil, nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a list, not %v", name, args[1])
+}

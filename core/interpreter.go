@@ -213,7 +213,7 @@ func newNullEnvironment() Environment {
 	// builtins = append(builtins, NewBuiltin(builtinMember, "member", 2, 2))
 	// builtins = append(builtins, NewBuiltin(builtinAssq, "assq", 2, 2))
 	// builtins = append(builtins, NewBuiltin(builtinAssv, "assv", 2, 2))
-	// builtins = append(builtins, NewBuiltin(builtinAssoc, "assoc", 2, 2))
+	builtins = append(builtins, NewBuiltin(builtinAssoc, "assoc", 2, 3))
 	// builtins = append(builtins, NewBuiltin(builtinListCopy, "list-copy", 1, 1))
 	// number procedures (R7RS 6.2)
 	builtins = append(builtins, NewBuiltin(builtinIsNumber, "number?", 1, 1))

@@ -381,3 +381,19 @@ func (ps *PairSuite) TestPairJoiner(c *gc.C) {
 	c.Check(slice[1], gc.Equals, NewSymbol("bar"))
 	c.Check(slice[2], gc.Equals, NewSymbol("qux"))
 }
+
+func (ps *PairSuite) TestPairInfinite(c *gc.C) {
+	foo := NewSymbol("foo")
+	bar := NewSymbol("bar")
+	pair := NewList(foo, bar)
+	pair.Append(pair)
+	c.Check(pair.Len(), gc.Equals, 3)
+	reversed := pair.Reverse()
+	c.Check(reversed.Len(), gc.Equals, 3)
+	// TODO: should first be the new reversed list, instead of the old list?
+	c.Check(reversed.First(), gc.Equals, pair)
+	c.Check(reversed.Second(), gc.Equals, bar)
+	c.Check(reversed.Third(), gc.Equals, foo)
+	// TODO: test String(); should not loop indefinitely; perhaps use datum labels?
+	// TODO: test String() with a sublist that refers to the superlist
+}
