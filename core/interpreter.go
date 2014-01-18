@@ -371,6 +371,43 @@ func NewLambda(body interface{}, params Pair) *lambda {
 	return &lambda{body, params}
 }
 
+// BindArguments binds the argument names to the given values, allowing for
+// extra arguments to be assigned to the last name if the list is improper.
+// Returns the new environment ready for evaluation.
+func BindArguments(env Environment, names Pair, values Pair) (Environment, LispError) {
+	result := NewEnvironment(env)
+	// map the symbols in names to the given values, storing in result
+	name_iter := NewPairIterator(names)
+	value_iter := NewPairIterator(values)
+	for name_iter.HasNext() {
+		name := name_iter.Next()
+		sym, ok := name.(Symbol)
+		if !ok {
+			// parser should have handled this already
+			return nil, NewLispErrorf(EARGUMENT, "name %s is not a symbol", name)
+		}
+		if !value_iter.HasNext() {
+			return nil, NewLispErrorf(EARGUMENT, "too few arguments to (lambda %v)", names)
+		}
+		if !name_iter.IsProper() {
+			// join the remaining values into a list and assign to the final argument
+			results := NewPairJoiner()
+			for value_iter.HasNext() {
+				value := value_iter.Next()
+				results.Append(value)
+			}
+			result.Define(sym, results.List())
+		} else {
+			value := value_iter.Next()
+			result.Define(sym, value)
+		}
+	}
+	if value_iter.HasNext() {
+		return nil, NewLispErrorf(EARGUMENT, "too many arguments to (lambda %v)", names)
+	}
+	return result, nil
+}
+
 // Closure represents a procedure that can be invoked. It has an associated
 // environment in which the procedure was defined, and any evaluations will be
 // done in the context of that environment.
@@ -380,6 +417,9 @@ type Closure interface {
 	Bind(values Pair) (Environment, LispError)
 	// Body returns the body of the closure for evaluation.
 	Body() interface{}
+	// Apply evaluates the body of the closure within the given
+	// environment, returning the result, or an error.
+	Apply(env Environment) (interface{}, LispError)
 }
 
 // closure is an implementation of the Closure interface. It consists of a
@@ -401,42 +441,17 @@ func NewClosure(body interface{}, params Pair, env Environment) Closure {
 // list will have the remaining values assigned to the final argument as a
 // single list of values.
 func (c *closure) Bind(values Pair) (Environment, LispError) {
-	env := NewEnvironment(c.env)
-	// map the symbols in c.params to given values, storing in env
-	name_iter := NewPairIterator(c.params)
-	value_iter := NewPairIterator(values)
-	for name_iter.HasNext() {
-		name := name_iter.Next()
-		sym, ok := name.(Symbol)
-		if !ok {
-			// parser should have handled this already
-			return nil, NewLispErrorf(EARGUMENT, "name %s is not a symbol", name)
-		}
-		if !value_iter.HasNext() {
-			return nil, NewLispErrorf(EARGUMENT, "too few arguments to (lambda %v)", c.params)
-		}
-		if !name_iter.IsProper() {
-			// join the remaining values into a list and assign to the final argument
-			results := NewPairJoiner()
-			for value_iter.HasNext() {
-				value := value_iter.Next()
-				results.Append(value)
-			}
-			env.Define(sym, results.List())
-		} else {
-			value := value_iter.Next()
-			env.Define(sym, value)
-		}
-	}
-	if value_iter.HasNext() {
-		return nil, NewLispErrorf(EARGUMENT, "too many arguments to (lambda %v)", c.params)
-	}
-	return env, nil
+	return BindArguments(c.env, c.params, values)
 }
 
 // Body returns the body of the closure for evaluation.
 func (c *closure) Body() interface{} {
 	return c.body
+}
+
+// Apply evaluates the body of this closure within the given environment.
+func (c *closure) Apply(env Environment) (interface{}, LispError) {
+	return Eval(c.body, env)
 }
 
 // Interpret parses the given Scheme program, evaluates each of the top-
@@ -487,7 +502,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 			if val != nil {
 				return val, nil
 			} else {
-				return nil, NewLispErrorf(EARGUMENT, "Unbound variable: %s", sym)
+				return nil, NewLispErrorf(EARGUMENT, "unbound variable: %s", sym)
 			}
 		}
 		pair, is_pair := expr.(Pair)

@@ -24,12 +24,11 @@ func builtinApply(name string, args []interface{}) (interface{}, LispError) {
 		pargs := arg_list.ToSlice()
 		return proc.Call(pargs)
 	} else if clos, ok := args[0].(Closure); ok {
-		expr := clos.Body()
 		env, err := clos.Bind(arg_list)
 		if err != nil {
 			return nil, err
 		}
-		return Eval(expr, env)
+		return clos.Apply(env)
 	}
 	return nil, NewLispErrorf(EARGUMENT, "%s: %v is not a procedure", name, args[0])
 }
@@ -70,12 +69,11 @@ func builtinMap(name string, args []interface{}) (interface{}, LispError) {
 		}
 	} else if clos, ok := args[0].(Closure); ok {
 		mapper = func(elem interface{}) (interface{}, LispError) {
-			expr := clos.Body()
 			env, err := clos.Bind(NewPair(elem))
 			if err != nil {
 				return nil, err
 			}
-			return Eval(expr, env)
+			return clos.Apply(env)
 		}
 	} else {
 		return nil, NewLispErrorf(EARGUMENT, "%s: %v is not a procedure", name, args[0])

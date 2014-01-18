@@ -634,7 +634,7 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			if pair.Len() != 2 {
 				return nil, NewLispErrorl(ESYNTAX, pair, "quote requires datum")
 			}
-			return x, nil
+			return pair, nil
 
 		} else if atomsEqual(sym, ifSym) {
 			if pair.Len() == 3 {
