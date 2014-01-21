@@ -15,6 +15,34 @@ type VirtMachSuite struct {
 
 var _ = gc.Suite(&VirtMachSuite{})
 
+func virtmachErrorTest(c *gc.C, table map[string]string) {
+	for input, expected := range table {
+		expr := parseAndExpandForTest(input, c)
+		code, err := Compile("compilerErrorTest", expr)
+		c.Assert(err, gc.IsNil, gc.Commentf("compilation failed: %s", err))
+		c.Assert(code, gc.NotNil, gc.Commentf("compiler did not produce code"))
+		env := NewEnvironment(theReportEnvironment)
+		result, err := EvaluateCode(code, env)
+		c.Assert(err, gc.NotNil, gc.Commentf("VM should have raised error"))
+		c.Assert(result, gc.IsNil, gc.Commentf("error in VM should yield nil result"))
+		c.Check(err, gc.ErrorMatches, expected)
+	}
+}
+
+func virtmachPassTest(c *gc.C, table map[string]string) {
+	for input, expected := range table {
+		expr := parseAndExpandForTest(input, c)
+		code, err := Compile("virtmachPassTest", expr)
+		c.Assert(err, gc.IsNil, gc.Commentf("compilation failed: %s", err))
+		c.Assert(code, gc.NotNil)
+		env := NewEnvironment(theReportEnvironment)
+		result, err := EvaluateCode(code, env)
+		c.Assert(err, gc.IsNil)
+		c.Assert(result, gc.NotNil)
+		c.Check(stringify(result), gc.Equals, expected)
+	}
+}
+
 func (ps *VirtMachSuite) TestConstant(c *gc.C) {
 	expr := NewInteger(123)
 	name := "TestConstant"
@@ -185,4 +213,60 @@ func (vms *VirtMachSuite) TestClosure(c *gc.C) {
 	c.Assert(result, gc.NotNil, gc.Commentf("lambda failed to yield result"))
 	num := result.(Integer)
 	c.Check(num.ToInteger(), gc.Equals, int64(10))
+}
+
+func (vms *VirtMachSuite) TestLambdaArgs(c *gc.C) {
+	input := `((lambda (x y . z) z) 3 4 5 6)` // => (5 6)  # see R7RS 4.1.4
+	name := "TestLambdaArgs"
+	code, err := CompileString(name, input)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
+	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
+	env := NewEnvironment(theReportEnvironment)
+	result, err := EvaluateCode(code, env)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to evaluate code: %s", err))
+	c.Assert(result, gc.NotNil, gc.Commentf("lambda failed to yield result"))
+	pair := result.(Pair)
+	c.Assert(pair.Len(), gc.Equals, 2)
+	checkInteger(pair.First(), 5, c)
+	checkInteger(pair.Second(), 6, c)
+}
+
+func (vms *VirtMachSuite) TestRecursiveFib(c *gc.C) {
+	input := `(define fibonacci
+  (lambda (n)
+    (fibonacci-kernel 0 1 n)))
+
+(define fibonacci-kernel
+  (lambda (current next remaining)
+    (if (= 0 remaining)
+        current
+        (fibonacci-kernel next (+ current next) (- remaining 1)))))
+
+(fibonacci 100)`
+	name := "TestRecursiveFib"
+	code, err := CompileString(name, input)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
+	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
+	env := NewEnvironment(theReportEnvironment)
+	result, err := EvaluateCode(code, env)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to evaluate code: %s", err))
+	c.Assert(result, gc.NotNil, gc.Commentf("lambda failed to yield result"))
+	c.Check(result, gc.Equals, NewInteger(3736710778780434371))
+}
+
+func (cs *CompilerSuite) TestCompilerLambdaErrors(c *gc.C) {
+	table := make(map[string]string)
+	table[`((lambda x x) 3 4 5 6)`] = ".* too many arguments .*"
+	table[`(1 2 3 4)`] = ".* is not applicable.*"
+	virtmachErrorTest(c, table)
+}
+
+func (cs *CompilerSuite) TestLambdaApplication(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs[`(apply + (list 3 4))`] = `7`
+	inputs[`(apply + (list 3 4) 10)`] = `17`
+	// TODO: compiler/VM bug, run out of stack frames
+	// inputs[`(map cadr '((a b) (d e) (g h)))`] = `(b e h)`
+	// inputs[`(map (lambda (n) (* n n)) '(1 2 3 4 5))`] = `(1 4 9 16 25)`
+	virtmachPassTest(c, inputs)
 }

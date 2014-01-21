@@ -27,7 +27,7 @@ func parseAndExpandForTest(input string, c *gc.C) interface{} {
 	return expr
 }
 
-func (ps *CompilerSuite) TestConstant(c *gc.C) {
+func (cs *CompilerSuite) TestConstant(c *gc.C) {
 	expr := NewInteger(123)
 	name := "TestConstant"
 	code, err := Compile(name, expr)
@@ -41,7 +41,7 @@ func (ps *CompilerSuite) TestConstant(c *gc.C) {
 	c.Check(code.GetConstant(0), gc.Equals, expr)
 }
 
-func (ps *CompilerSuite) TestSymbol(c *gc.C) {
+func (cs *CompilerSuite) TestSymbol(c *gc.C) {
 	expr := NewSymbol("foo")
 	name := "TestSymbol"
 	code, err := Compile(name, expr)
@@ -55,7 +55,7 @@ func (ps *CompilerSuite) TestSymbol(c *gc.C) {
 	c.Check(code.ConstantLen(), gc.Equals, uint(0))
 }
 
-func (ps *CompilerSuite) TestSetVar(c *gc.C) {
+func (cs *CompilerSuite) TestSetVar(c *gc.C) {
 	set := NewSymbol("set!")
 	foo := NewSymbol("foo")
 	val := NewInteger(1973)
@@ -74,7 +74,7 @@ func (ps *CompilerSuite) TestSetVar(c *gc.C) {
 	c.Check(code.GetConstant(0), gc.Equals, val)
 }
 
-func (ps *CompilerSuite) TestDefine(c *gc.C) {
+func (cs *CompilerSuite) TestDefine(c *gc.C) {
 	def := NewSymbol("define")
 	foo := NewSymbol("foo")
 	val := NewInteger(1972)
@@ -95,7 +95,7 @@ func (ps *CompilerSuite) TestDefine(c *gc.C) {
 	c.Check(code.GetConstant(0), gc.Equals, val)
 }
 
-func (ps *CompilerSuite) TestQuote(c *gc.C) {
+func (cs *CompilerSuite) TestQuote(c *gc.C) {
 	expr := parseAndExpandForTest(`(quote (+ 1 2))`, c)
 	name := "TestQuote"
 	code, err := Compile(name, expr)
@@ -110,7 +110,7 @@ func (ps *CompilerSuite) TestQuote(c *gc.C) {
 	c.Check(thing, gc.FitsTypeOf, expr)
 }
 
-func (ps *CompilerSuite) TestIf(c *gc.C) {
+func (cs *CompilerSuite) TestIf(c *gc.C) {
 	expr := parseAndExpandForTest(`(if #t 1)`, c)
 	name := "TestIf"
 	code, err := Compile(name, expr)
@@ -138,7 +138,7 @@ func (ps *CompilerSuite) TestIf(c *gc.C) {
 	c.Check(list.Len(), gc.Equals, 0)
 }
 
-func (ps *CompilerSuite) TestIfElse(c *gc.C) {
+func (cs *CompilerSuite) TestIfElse(c *gc.C) {
 	expr := parseAndExpandForTest(`(if #t 1 2)`, c)
 	name := "TestIfElse"
 	code, err := Compile(name, expr)
@@ -166,7 +166,7 @@ func (ps *CompilerSuite) TestIfElse(c *gc.C) {
 	c.Check(num.ToInteger(), gc.Equals, int64(2))
 }
 
-func (ps *CompilerSuite) TestBegin(c *gc.C) {
+func (cs *CompilerSuite) TestBegin(c *gc.C) {
 	expr := parseAndExpandForTest(`(begin (if #t 1 2) (if #f 3 4))`, c)
 	name := "TestBegin"
 	code, err := Compile(name, expr)
@@ -212,7 +212,7 @@ func (ps *CompilerSuite) TestBegin(c *gc.C) {
 	c.Check(num.ToInteger(), gc.Equals, int64(4))
 }
 
-func (ps *CompilerSuite) TestLambda(c *gc.C) {
+func (cs *CompilerSuite) TestLambda(c *gc.C) {
 	expr := parseAndExpandForTest(`(lambda (x y) (if #t x y))`, c)
 	name := "TestLambda"
 	code, err := Compile(name, expr)
@@ -230,7 +230,7 @@ func (ps *CompilerSuite) TestLambda(c *gc.C) {
 	c.Check(stringify(fun.Arguments().Second()), gc.Equals, "y")
 }
 
-func (ps *CompilerSuite) TestDefLambda(c *gc.C) {
+func (cs *CompilerSuite) TestDefLambda(c *gc.C) {
 	expr := parseAndExpandForTest(`(define (test x y) (if #t x y))`, c)
 	name := "TestDefLambda"
 	code, err := Compile(name, expr)
@@ -252,7 +252,7 @@ func (ps *CompilerSuite) TestDefLambda(c *gc.C) {
 	c.Check(stringify(fun.Arguments().Second()), gc.Equals, "y")
 }
 
-func (ps *CompilerSuite) TestApplication(c *gc.C) {
+func (cs *CompilerSuite) TestApplication(c *gc.C) {
 	expr := parseAndExpandForTest(`(+ 1 2 3)`, c)
 	name := "TestApplication"
 	code, err := Compile(name, expr)
@@ -281,7 +281,7 @@ func (ps *CompilerSuite) TestApplication(c *gc.C) {
 	c.Check(code.GetSymbol(0).String(), gc.Equals, "+")
 }
 
-func (ps *CompilerSuite) TestLocationInfo(c *gc.C) {
+func (cs *CompilerSuite) TestLocationInfo(c *gc.C) {
 	input := `; multiple lines
 (define (f x)
   (+ 1 2 3))
