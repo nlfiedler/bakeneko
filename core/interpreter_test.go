@@ -17,6 +17,18 @@ type InterpreterSuite struct {
 
 var _ = gc.Suite(&InterpreterSuite{})
 
+var fibonacciRecursiveText string = `(define fibonacci
+  (lambda (n)
+    (fibonacci-kernel 0 1 n)))
+
+(define fibonacci-kernel
+  (lambda (current next remaining)
+    (if (= 0 remaining)
+        current
+        (fibonacci-kernel next (+ current next) (- remaining 1)))))
+
+(fibonacci 100)`
+
 // verifyInterpret takes a map of inputs to expected outputs, running the
 // inputs through the interpreter and checking the output.
 func verifyInterpret(t *testing.T, inputs map[string]string) {
@@ -423,18 +435,7 @@ func (s *InterpreterSuite) TestInterpreterLambdaErrors(c *gc.C) {
 }
 
 func (s *InterpreterSuite) TestInterpreterFibRecursive(c *gc.C) {
-	input := `(define fibonacci
-  (lambda (n)
-    (fibonacci-kernel 0 1 n)))
-
-(define fibonacci-kernel
-  (lambda (current next remaining)
-    (if (= 0 remaining)
-        current
-        (fibonacci-kernel next (+ current next) (- remaining 1)))))
-
-(fibonacci 100)`
-	result, err := Interpret(input)
+	result, err := Interpret(fibonacciRecursiveText)
 	if err != nil {
 		c.Errorf("Interpret() failed: %v", err)
 	} else {
@@ -456,6 +457,26 @@ func (s *InterpreterSuite) TestInterpreterTailRecursive(c *gc.C) {
 			c.Errorf("Interpret() failed: %v", err)
 		} else {
 			c.Check(stringify(result), gc.Equals, expected)
+		}
+	}
+}
+
+func BenchmarkEvalSexpr(b *testing.B) {
+	parser := NewParser()
+	body, err := parser.Parse(fibonacciRecursiveText)
+	if err != nil {
+		b.Fatalf("error parsing input: %s", err)
+	}
+	expr, err := parser.Expand(wrapWithBegin(body))
+	if err != nil {
+		b.Fatalf("error expanding input: %s", err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		env := NewEnvironment(theReportEnvironment)
+		_, err = Eval(expr, env)
+		if err != nil {
+			b.Fatalf("error interpreting input: %s", err)
 		}
 	}
 }

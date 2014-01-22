@@ -8,6 +8,7 @@ package core
 
 import (
 	gc "launchpad.net/gocheck"
+	"testing"
 )
 
 type VirtMachSuite struct {
@@ -232,19 +233,8 @@ func (vms *VirtMachSuite) TestLambdaArgs(c *gc.C) {
 }
 
 func (vms *VirtMachSuite) TestRecursiveFib(c *gc.C) {
-	input := `(define fibonacci
-  (lambda (n)
-    (fibonacci-kernel 0 1 n)))
-
-(define fibonacci-kernel
-  (lambda (current next remaining)
-    (if (= 0 remaining)
-        current
-        (fibonacci-kernel next (+ current next) (- remaining 1)))))
-
-(fibonacci 100)`
 	name := "TestRecursiveFib"
-	code, err := CompileString(name, input)
+	code, err := CompileString(name, fibonacciRecursiveText)
 	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
 	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
 	env := NewEnvironment(theReportEnvironment)
@@ -268,4 +258,17 @@ func (cs *CompilerSuite) TestLambdaApplication(c *gc.C) {
 	inputs[`(map cadr '((a b) (d e) (g h)))`] = `(b e h)`
 	inputs[`(map (lambda (n) (* n n)) '(1 2 3 4 5))`] = `(1 4 9 16 25)`
 	virtmachPassTest(c, inputs)
+}
+
+func BenchmarkEvalBytes(b *testing.B) {
+	name := "BenchmarkEvalBytes"
+	code, err := CompileString(name, fibonacciRecursiveText)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		env := NewEnvironment(theReportEnvironment)
+		_, err = EvaluateCode(code, env)
+		if err != nil {
+			b.Fatalf("error running input: %s", err)
+		}
+	}
 }

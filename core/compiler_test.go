@@ -8,6 +8,7 @@ package core
 
 import (
 	gc "launchpad.net/gocheck"
+	"testing"
 )
 
 type CompilerSuite struct {
@@ -299,4 +300,24 @@ func (cs *CompilerSuite) TestLocationInfo(c *gc.C) {
 	c.Check(code.LineForOffset(3), gc.Equals, 2)
 	c.Check(code.LineForOffset(4), gc.Equals, 0)
 	c.Check(code.LineForOffset(5), gc.Equals, 0)
+}
+
+func BenchmarkCompile(b *testing.B) {
+	parser := NewParser()
+	body, err := parser.Parse(fibonacciRecursiveText)
+	if err != nil {
+		b.Fatalf("error parsing input: %s", err)
+	}
+	expr, err := parser.Expand(wrapWithBegin(body))
+	if err != nil {
+		b.Fatalf("error expanding input: %s", err)
+	}
+	name := "BenchmarkCompile"
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err = Compile(name, expr)
+		if err != nil {
+			b.Fatalf("error compiling input: %s", err)
+		}
+	}
 }

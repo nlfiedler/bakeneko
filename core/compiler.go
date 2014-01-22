@@ -549,12 +549,7 @@ func CompileString(name string, prog string) (CodeObject, LispError) {
 	// By ensuring that the program is wrapped inside a (begin ...) we
 	// create what constitutes the "halt" continuation, as well as the
 	// "step" function.
-	if parsed.Len() >= 1 {
-		if sym, ok := parsed.First().(Symbol); !ok || !atomsEqual(sym, beginSym) {
-			parsed = Cons(beginSym, parsed)
-		}
-	}
-	expanded, err := parser.Expand(parsed)
+	expanded, err := parser.Expand(wrapWithBegin(parsed))
 	if err != nil {
 		return nil, err
 	}
