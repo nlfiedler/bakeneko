@@ -283,23 +283,43 @@ func (cs *CompilerSuite) TestApplication(c *gc.C) {
 }
 
 func (cs *CompilerSuite) TestLocationInfo(c *gc.C) {
-	input := `; multiple lines
-(define (f x)
-  (+ 1 2 3))
-(f 10)`
+	// Use something simple that spans multiple lines; using a closure and
+	// application results in nested code objects and weird location info.
+	input := `(*
+  (+ 1 2)
+  (/ 10 5)
+  (- 12 4)
+  (* 4 2))`
 	expr := parseAndExpandForTest(input, c)
 	name := "TestLocationInfo"
 	code, err := Compile(name, expr)
 	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
 	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
 	c.Check(code.Name(), gc.Equals, name)
-	c.Assert(code.CodeLen(), gc.Equals, uint(6))
-	c.Check(code.LineForOffset(0), gc.Equals, 4)
-	c.Check(code.LineForOffset(1), gc.Equals, 2)
-	c.Check(code.LineForOffset(2), gc.Equals, 2)
-	c.Check(code.LineForOffset(3), gc.Equals, 2)
-	c.Check(code.LineForOffset(4), gc.Equals, 0)
-	c.Check(code.LineForOffset(5), gc.Equals, 0)
+	c.Assert(code.CodeLen(), gc.Equals, uint(18))
+	// LineInfo:
+	//     0 => 1
+	//     4 => 3
+	//     8 => 4
+	//     12 => 5
+	c.Check(code.LineForOffset(0), gc.Equals, 1)
+	c.Check(code.LineForOffset(1), gc.Equals, 1)
+	c.Check(code.LineForOffset(2), gc.Equals, 1)
+	c.Check(code.LineForOffset(3), gc.Equals, 1)
+	c.Check(code.LineForOffset(4), gc.Equals, 3)
+	c.Check(code.LineForOffset(5), gc.Equals, 3)
+	c.Check(code.LineForOffset(6), gc.Equals, 3)
+	c.Check(code.LineForOffset(7), gc.Equals, 3)
+	c.Check(code.LineForOffset(8), gc.Equals, 4)
+	c.Check(code.LineForOffset(9), gc.Equals, 4)
+	c.Check(code.LineForOffset(10), gc.Equals, 4)
+	c.Check(code.LineForOffset(11), gc.Equals, 4)
+	c.Check(code.LineForOffset(12), gc.Equals, 5)
+	c.Check(code.LineForOffset(13), gc.Equals, 5)
+	c.Check(code.LineForOffset(14), gc.Equals, 5)
+	c.Check(code.LineForOffset(15), gc.Equals, 5)
+	c.Check(code.LineForOffset(16), gc.Equals, 5)
+	c.Check(code.LineForOffset(17), gc.Equals, 5)
 }
 
 func BenchmarkCompile(b *testing.B) {

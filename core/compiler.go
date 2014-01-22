@@ -7,6 +7,7 @@
 package core
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 )
@@ -146,6 +147,7 @@ func (i *instruction) String() string {
 
 // CodeObject encapsulates a compiled script or procedure.
 type CodeObject interface {
+	fmt.Stringer
 	// Name returns the name of the original source file, primarily used
 	// for error reporting.
 	Name() string
@@ -184,6 +186,10 @@ func (a byteLinePairs) Len() int           { return len(a) }
 func (a byteLinePairs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byteLinePairs) Less(i, j int) bool { return a[i].offset < a[j].offset }
 
+func (blp byteLinePair) String() string {
+	return fmt.Sprintf("%d => %d", blp.offset, blp.line)
+}
+
 // bytecode is the in-memory representation of compiled byte code.
 type bytecode struct {
 	name      string         // name for this code object, typically source file
@@ -210,12 +216,25 @@ func NewCodeObject(name string, args Pair, codes []Instruction, cons []interface
 	copy(bc.constants, cons)
 	bc.symbols = make([]Symbol, len(syms))
 	copy(bc.symbols, syms)
-	bylines := make([]byteLinePair, 0, len(lines))
-	for k, v := range lines {
-		bylines = append(bylines, byteLinePair{v, k})
+	if len(lines) > 0 {
+		bylines := make([]byteLinePair, 0, len(lines))
+		for k, v := range lines {
+			bylines = append(bylines, byteLinePair{v, k})
+		}
+		// sort the byte-line pairings and remove duplicates
+		sort.Sort(byteLinePairs(bylines))
+		bc.bylines = make([]byteLinePair, 1, len(bylines))
+		bc.bylines[0] = bylines[0]
+		previous := bylines[0].offset
+		for _, byline := range bylines[1:] {
+			if byline.offset > previous {
+				bc.bylines = append(bc.bylines, byline)
+				previous = byline.offset
+			}
+		}
+	} else {
+		bc.bylines = make([]byteLinePair, 0)
 	}
-	sort.Sort(byteLinePairs(bylines))
-	bc.bylines = bylines
 	return bc
 }
 
@@ -232,12 +251,14 @@ func (bc *bytecode) Arguments() Pair {
 }
 
 func (bc *bytecode) LineForOffset(pos uint) int {
+	line := 1
 	for _, blp := range bc.bylines {
-		if blp.offset >= pos {
-			return blp.line
+		if blp.offset > pos {
+			break
 		}
+		line = blp.line
 	}
-	return 0
+	return line
 }
 
 func (bc *bytecode) ConstantLen() uint {
@@ -262,6 +283,29 @@ func (bc *bytecode) CodeLen() uint {
 
 func (bc *bytecode) GetInstruction(pos uint) Instruction {
 	return bc.byte_code[pos]
+}
+
+func (bc *bytecode) String() string {
+	buf := new(bytes.Buffer)
+	fmt.Fprintf(buf, "Name: %s\n", bc.name)
+	fmt.Fprintf(buf, "Arguments: %s\n", bc.arguments)
+	buf.WriteString("Constants:\n")
+	for _, cons := range bc.constants {
+		fmt.Fprintf(buf, "    %v\n", cons)
+	}
+	buf.WriteString("Symbols:\n")
+	for _, sym := range bc.symbols {
+		fmt.Fprintf(buf, "    %v\n", sym)
+	}
+	buf.WriteString("Instructions:\n")
+	for _, instr := range bc.byte_code {
+		fmt.Fprintf(buf, "    %v\n", instr)
+	}
+	buf.WriteString("LineInfo:\n")
+	for _, line := range bc.bylines {
+		fmt.Fprintf(buf, "    %v\n", line)
+	}
+	return buf.String()
 }
 
 // Compiler constructs a CodeObject one piece at a time and assembles the
@@ -309,7 +353,15 @@ func (c *compiler) AddInstruction(code Opcode, arg interface{}) {
 }
 
 func (c *compiler) FindOrAddConstant(con interface{}) uint {
+	con_a, con_is_atom := con.(Atom)
 	for idx, val := range c.constants {
+		if con_is_atom {
+			if val_a, val_is_atom := val.(Atom); val_is_atom {
+				if atomsEqual(con_a, val_a) {
+					return uint(idx)
+				}
+			}
+		}
 		if val == con {
 			return uint(idx)
 		}
@@ -321,7 +373,7 @@ func (c *compiler) FindOrAddConstant(con interface{}) uint {
 
 func (c *compiler) FindOrAddSymbol(sym Symbol) uint {
 	for idx, val := range c.symbols {
-		if val == sym {
+		if atomsEqual(val, sym) {
 			return uint(idx)
 		}
 	}
@@ -339,17 +391,18 @@ func (c *compiler) createLabel() Instruction {
 // addLineNumber adds line number information to the pending CodeObject for
 // the purpose of error reporting.
 func (c *compiler) addLineNumber(expr interface{}) {
-	if pair, is_pair := expr.(Pair); is_pair {
+	if pair, is_pair := expr.(Pair); is_pair && pair.Len() > 0 {
 		expr = pair.First()
 	}
 	if loco, is_loc := expr.(Locatable); is_loc {
+		offset := uint(len(c.codes))
 		line, _ := loco.Location()
 		if bite, have := c.lineno[line]; have {
-			if uint(len(c.codes)) < bite {
-				c.lineno[line] = uint(len(c.codes))
+			if offset < bite {
+				c.lineno[line] = offset
 			}
 		} else {
-			c.lineno[line] = uint(len(c.codes))
+			c.lineno[line] = offset
 		}
 	}
 }
