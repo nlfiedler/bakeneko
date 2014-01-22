@@ -73,18 +73,19 @@ func (ef *executionFrame) Symbol(pos uint) Symbol {
 	return ef.code.GetSymbol(pos)
 }
 
-// Closure represents a procedure that can be invoked. It has an associated
-// environment in which the procedure was defined, and any evaluations will be
-// done in the context of that environment.
+// byteClosure represents a compiled procedure that can be invoked. It has an
+// associated environment in which the procedure was defined, and any
+// evaluations will be done in the context of that environment.
 type byteClosure struct {
-	body CodeObject  // procedure definition
-	env  Environment // defining environment
+	body CodeObject     // procedure definition
+	env  Environment    // defining environment
+	vm   VirtualMachine // for running the closure
 }
 
 // NewByteClosure returns an implementation of Closure that applies to a
-// compiled procedure, bound to the given environment.
-func NewByteClosure(body CodeObject, env Environment) Closure {
-	return &byteClosure{body, env}
+// compiled procedure, bound to the given environment and virtual machine.
+func NewByteClosure(body CodeObject, env Environment, vm VirtualMachine) Closure {
+	return &byteClosure{body, env, vm}
 }
 
 func (bc *byteClosure) Bind(values Pair) (Environment, LispError) {
@@ -96,7 +97,7 @@ func (bc *byteClosure) Body() interface{} {
 }
 
 func (bc *byteClosure) Apply(env Environment) (interface{}, LispError) {
-	return EvaluateCode(bc.body, env)
+	return bc.vm.RunClosure(bc.body, env)
 }
 
 // VirtualMachine contains the state of a virtual machine that executes
@@ -106,12 +107,18 @@ type VirtualMachine interface {
 	// context of a virtual machine and returns the result, or an error if
 	// evaluation failed for any reason.
 	Run(code CodeObject, env Environment) (interface{}, LispError)
+	// RunClosure wraps the Run() function with an additional frame on the
+	// stack since the closure will pop a frame when it returns. When applied
+	// via built-in procedures, there is no OP_CALL executed and thus no frame
+	// pushed onto the stack.
+	RunClosure(code CodeObject, env Environment) (interface{}, LispError)
 }
 
 // virtualMachine is the internal implementation of a VirtualMachine.
 type virtualMachine struct {
-	values []interface{}
-	frames []ExecutionFrame
+	values []interface{}    // stack of argument values
+	frames []ExecutionFrame // stack of execution frames
+	empty  CodeObject       // empty code object to force closures to end
 }
 
 // NewVirtualMachine constructs an instance of VirtualMachine.
@@ -119,6 +126,13 @@ func NewVirtualMachine() VirtualMachine {
 	vm := new(virtualMachine)
 	vm.values = make([]interface{}, 0)
 	vm.frames = make([]ExecutionFrame, 0)
+	// Construct an artificial code object to which all closures "return" when
+	// they are finished, so the Run() will terminate appropriately.
+	codes := make([]Instruction, 0)
+	consts := make([]interface{}, 0)
+	syms := make([]Symbol, 0)
+	lines := make(map[int]uint)
+	vm.empty = NewCodeObject("closure", theEmptyList, codes, consts, syms, lines)
 	return vm
 }
 
@@ -134,6 +148,12 @@ func (vm *virtualMachine) popFrame() ExecutionFrame {
 	var frame ExecutionFrame
 	frame, vm.frames = vm.frames[len(vm.frames)-1], vm.frames[:len(vm.frames)-1]
 	return frame
+}
+
+func (vm *virtualMachine) RunClosure(code CodeObject, env Environment) (interface{}, LispError) {
+	// add a frame that forces a return from the closure
+	vm.frames = append(vm.frames, NewExecutionFrame(vm.empty, env))
+	return vm.Run(code, env)
 }
 
 func (vm *virtualMachine) Run(code CodeObject, env Environment) (interface{}, LispError) {
@@ -190,7 +210,7 @@ MainLoop:
 			}
 		case OP_FUNCTION:
 			funco := frame.Constant(instr.Argument()).(CodeObject)
-			clos := NewByteClosure(funco, frame.Environment())
+			clos := NewByteClosure(funco, frame.Environment(), vm)
 			vm.values = append(vm.values, clos)
 		case OP_CALL:
 			// arguments are in reverse order on the argument stack
@@ -234,6 +254,8 @@ MainLoop:
 	default:
 		result = nil
 	}
+	// wipe out the stored values lest they accumulate indefinitely
+	vm.values = vm.values[0:0]
 	return result, nil
 }
 

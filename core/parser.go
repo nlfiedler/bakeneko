@@ -86,6 +86,18 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 	}
 }
 
+// wrapWithBegin ensures that the given s-expression is written with (begin).
+func wrapWithBegin(expr interface{}) interface{} {
+	if pair, is_pair := expr.(Pair); is_pair && pair.Len() > 0 {
+		if sym, is_sym := pair.First().(Symbol); !is_sym || !atomsEqual(sym, beginSym) {
+			return Cons(beginSym, pair)
+		}
+	} else {
+		return Cons(beginSym, expr)
+	}
+	return expr
+}
+
 // Parser knows how to convert a string represetation of Scheme code into
 // a runnable program, which can be passed to the Eval() function.
 type Parser interface {
@@ -747,15 +759,7 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			} else {
 				return nil, NewLispErrorl(ESYNTAX, pair, "lambda arguments must be a list or a symbol")
 			}
-			if blist, islist := body.(Pair); islist {
-				if blist.Len() == 1 {
-					body = blist.First()
-				} else {
-					body = Cons(beginSym, body)
-				}
-			} else {
-				return nil, NewLispErrorl(ESYNTAX, pair, "lambda body must be a list")
-			}
+			body = wrapWithBegin(body)
 			body, err := p.expand(body, false)
 			if err != nil {
 				return nil, err

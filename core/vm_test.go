@@ -265,8 +265,7 @@ func (cs *CompilerSuite) TestLambdaApplication(c *gc.C) {
 	inputs := make(map[string]string)
 	inputs[`(apply + (list 3 4))`] = `7`
 	inputs[`(apply + (list 3 4) 10)`] = `17`
-	// TODO: compiler/VM bug, run out of stack frames
-	// inputs[`(map cadr '((a b) (d e) (g h)))`] = `(b e h)`
-	// inputs[`(map (lambda (n) (* n n)) '(1 2 3 4 5))`] = `(1 4 9 16 25)`
+	inputs[`(map cadr '((a b) (d e) (g h)))`] = `(b e h)`
+	inputs[`(map (lambda (n) (* n n)) '(1 2 3 4 5))`] = `(1 4 9 16 25)`
 	virtmachPassTest(c, inputs)
 }

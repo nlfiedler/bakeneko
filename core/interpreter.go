@@ -467,12 +467,7 @@ func Interpret(prog string) (interface{}, LispError) {
 	// By ensuring that the program is wrapped inside a (begin ...) we
 	// create what constitutes the "halt" continuation, as well as the
 	// "step" function.
-	if body.Len() >= 1 {
-		if sym, ok := body.First().(Symbol); !ok || !atomsEqual(sym, beginSym) {
-			body = Cons(beginSym, body)
-		}
-	}
-	expr, err := parser.Expand(body)
+	expr, err := parser.Expand(wrapWithBegin(body))
 	if err != nil {
 		return nil, err
 	}

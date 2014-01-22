@@ -75,7 +75,7 @@ const (
 	OP_POP                    // arg: <none>; stack: <removes one>
 	OP_JUMP                   // arg: bytecode offset
 	OP_FJUMP                  // arg: bytecode offset; stack: predicate
-	OP_RETURN                 // arg: <none>; stack: <???>
+	OP_RETURN                 // arg: <none>; stack: <none>
 	OP_CALL                   // arg: number of arguments; stack: arguments
 )
 
@@ -526,7 +526,7 @@ func Compile(name string, expr interface{}) (CodeObject, LispError) {
 }
 
 // CompileLambda compiles the given expression assuming that it is a
-// lambda expression, and takes the given arguments.
+// lambda expression which accepts the given arguments.
 func CompileLambda(args Pair, expr interface{}) (CodeObject, LispError) {
 	compiler := NewCompiler()
 	err := compiler.Compile(expr)
