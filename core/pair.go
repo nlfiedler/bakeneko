@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -8,6 +8,7 @@ package core
 
 import (
 	"bytes"
+	"reflect"
 )
 
 // Pair represents a pair of items, which themselves may be pairs. Pairs can
@@ -15,7 +16,7 @@ import (
 // lists.
 type Pair interface {
 	// ObjectId returns the unique identifier for this object.
-	ObjectId() uint64
+	ObjectId() uintptr
 	// First returns the car of the pair.
 	First() interface{}
 	// Second returns the first non-Pair thing in cdr.
@@ -49,7 +50,6 @@ type Pair interface {
 
 // pair is a simple implementation of a Pair.
 type pair struct {
-	id    uint64      // object identifier
 	first interface{} // the car of the pair
 	rest  interface{} // the cdr of the pair
 }
@@ -72,11 +72,7 @@ func NewList(a ...interface{}) Pair {
 // single instance of Pair. This may form an improper list if b is not already
 // a proper list.
 func Cons(a, b interface{}) Pair {
-	p := new(pair)
-	p.id = newObjectId()
-	p.first = a
-	p.rest = b
-	return p
+	return &pair{a, b}
 }
 
 // Car returns the first element in a list.
@@ -123,9 +119,9 @@ func Cxr(name string, a interface{}) interface{} {
 }
 
 // ObjectId returns the object identifer, or zero if nil.
-func (p *pair) ObjectId() uint64 {
+func (p *pair) ObjectId() uintptr {
 	if p != nil {
-		return p.id
+		return reflect.ValueOf(p).Pointer()
 	}
 	return 0
 }
@@ -264,7 +260,7 @@ func (p *pair) Reverse() Pair {
 // is part of a list of items.
 func (p *pair) Len() int {
 	length := 0
-	pairs_seen := make(map[uint64]bool)
+	pairs_seen := make(map[uintptr]bool)
 	var r Pair = p
 	for p != nil {
 		length++
@@ -354,7 +350,7 @@ func (e EmptyList) String() string {
 }
 
 // ObjectId of empty list is always zero.
-func (e EmptyList) ObjectId() uint64 {
+func (e EmptyList) ObjectId() uintptr {
 	return 0
 }
 
@@ -486,6 +482,18 @@ func (pj *PairJoiner) Append(elem interface{}) *PairJoiner {
 		pj.tail = pj.head
 	} else {
 		pj.tail = pj.tail.Append(elem)
+	}
+	return pj
+}
+
+// Join adds the given element to the end of the list managed by this
+// PairJoiner instance in an improper fashion, forming an improper list.
+func (pj *PairJoiner) Join(elem interface{}) *PairJoiner {
+	if pj.head == theEmptyList {
+		pj.head = NewPair(elem)
+		pj.tail = pj.head
+	} else {
+		pj.tail.Join(elem)
 	}
 	return pj
 }

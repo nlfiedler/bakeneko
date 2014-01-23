@@ -1,16 +1,10 @@
 //
-// Copyright 2013 Nathan Fiedler. All rights reserved.
+// Copyright 2013-2014 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
 
 package core
-
-import (
-	"hash/fnv"
-	"math/rand"
-	"time"
-)
 
 //
 // Equivalence procedures
@@ -23,31 +17,7 @@ import (
 // structures.
 type Identifiable interface {
 	// ObjectId returns the unique identifier for this object.
-	ObjectId() uint64
-}
-
-// newObjectId produces a unique unsigned 64-bit identifier to be used in
-// uniquely identifying objects created by the interpreter. Typically this is
-// used in pairs, vectors, and byte vectors in order to detect loops.
-func newObjectId() uint64 {
-	// On a 2.4 GHz Intel Core 2 Duo this produces 1 million values in less
-	// than a second, so should be fast enough for our needs.
-	hasher := fnv.New64()
-	// Nanosecond time and a random number should provide unique values.
-	now_bytes, _ := time.Now().MarshalBinary()
-	hasher.Write(now_bytes)
-	rand_int := rand.Int63()
-	rand_buf := make([]byte, 8, 8)
-	rand_buf[0] = byte(rand_int >> 56)
-	rand_buf[1] = byte(rand_int >> 48)
-	rand_buf[2] = byte(rand_int >> 40)
-	rand_buf[3] = byte(rand_int >> 32)
-	rand_buf[4] = byte(rand_int >> 24)
-	rand_buf[5] = byte(rand_int >> 16)
-	rand_buf[6] = byte(rand_int >> 8)
-	rand_buf[7] = byte(rand_int)
-	hasher.Write(rand_buf)
-	return hasher.Sum64()
+	ObjectId() uintptr
 }
 
 // builtinEqv implements the eqv? and eq? procedures (because no additional

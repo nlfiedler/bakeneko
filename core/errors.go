@@ -17,6 +17,9 @@ var OutOfBounds = errors.New("index out of bounds")
 var StringIsImmutable = errors.New("immutable string cannot be set!")
 var ParserError = errors.New("unexpected parser error")
 var TypeMismatch = errors.New("type mismatch in atom comparison")
+var BadMagicNumber = errors.New("magic number does not match")
+var BadCodeVersion = errors.New("byte code version not supported")
+var UnknownType = errors.New("unknown type, cannot serialize")
 
 // ErrorCode indicates the error status of the Scheme evaluation, with EOK
 // representing no error.

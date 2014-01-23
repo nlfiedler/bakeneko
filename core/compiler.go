@@ -7,8 +7,6 @@
 package core
 
 import (
-	"bytes"
-	"fmt"
 	"sort"
 )
 
@@ -16,299 +14,6 @@ import (
 // byte code compiler borrowed from Eli Bendersky's bobscheme
 // (https://github.com/eliben/bobscheme)
 //
-
-// TODO: serialized data needs to have a magic number (4 bytes) at the start of the file
-// TODO: serialized data needs to have a major.minor version of the byte code
-// TODO: serialized data basically looks like this:
-//   version          uint32      // should incorporate Go version if we use gob for anything
-//   source_name      string      // path/name of source file
-//   source_lines     [...]???    // list of byte-code-offsets => line-numbers
-//   code_length      uint32      // number of bytes of byte codes
-//   byte_code        [...]byte   // the byte codes
-//   constants_length uint32      // number of bytes of serialized constants
-//   constants        [...]byte   // serialized Go objects; probably need a type code preceding each value
-//   symbols_length   uint32      // number of bytes of serialized strings
-//   symbols          [...]string // serialized Go strings
-
-// TODO: derived expressions (using Scheme and macros); see R7RS 7.3
-//  cond
-//  case
-//  and
-//  or
-//  when
-//  unless
-//  let
-//  let*
-//  letrec
-//  letrec*
-//  let-values
-//  let*-values
-//  define-values
-//  do
-//  delay-force
-//  delay
-//  make-promise
-//  make-parameter
-//  parameterize
-//  guard
-//  case-lambda
-//  cond-expand
-
-// TODO: see chibi-scheme for more good stuff, all BSD licensed
-// TODO: see http://srfi.schemers.org for SRFI implementations
-
-// Opcode represents an operation byte code, such as "load variable",
-// "return", or "function call". The compiler produces a set of opcodes
-// which are typically followed by a single argument. Other values are
-// typically pushed onto an argument stack prior to the opcode being
-// processed.
-type Opcode byte
-
-// Operation code constants
-const (
-	OP_NOP      Opcode = iota // no operation, used to signal end of code
-	OP_LABEL                  // placeholder in intermediate code; arg is label number
-	OP_CONST                  // arg: constants index
-	OP_LOADVAR                // arg: symbols index
-	OP_STOREVAR               // arg: symbols index; stack: value
-	OP_DEFVAR                 // arg: symbols index; stack: value
-	OP_FUNCTION               // arg: constants index
-	OP_POP                    // arg: <none>; stack: <removes one>
-	OP_JUMP                   // arg: bytecode offset
-	OP_FJUMP                  // arg: bytecode offset; stack: predicate
-	OP_RETURN                 // arg: <none>; stack: <none>
-	OP_CALL                   // arg: number of arguments; stack: arguments
-)
-
-func (o Opcode) String() string {
-	switch o {
-	case OP_NOP:
-		return "NOP"
-	case OP_LABEL:
-		return "LABEL"
-	case OP_CONST:
-		return "CONST"
-	case OP_LOADVAR:
-		return "LOADVAR"
-	case OP_STOREVAR:
-		return "STOREVAR"
-	case OP_DEFVAR:
-		return "DEFVAR"
-	case OP_FUNCTION:
-		return "FUNCTION"
-	case OP_POP:
-		return "POP"
-	case OP_JUMP:
-		return "JUMP"
-	case OP_FJUMP:
-		return "FJUMP"
-	case OP_RETURN:
-		return "RETURN"
-	case OP_CALL:
-		return "CALL"
-	default:
-		return "OP_???"
-	}
-}
-
-// Instruction represents a single opcode and its argument, if any.
-type Instruction interface {
-	// Code returns the opcode for this instruction (e.g. OP_CALL).
-	Code() Opcode
-	// Argument returns the optional argument for this opcode. Not all
-	// operations take an argument, such as OP_POP and OP_RETURN. Typically
-	// this is an index into either the constants or symbols table.
-	Argument() uint
-}
-
-// instruction is the internal implementation of an Instruction.
-type instruction struct {
-	code Opcode // opcode for this instruction
-	arg  uint   // argument for this opcode
-}
-
-// NewInstruction creates an instance of Instruction based on the
-// arguments.
-func NewInstruction(code Opcode, arg uint) Instruction {
-	return &instruction{code, arg}
-}
-
-func (i *instruction) Code() Opcode {
-	return i.code
-}
-
-func (i *instruction) Argument() uint {
-	return i.arg
-}
-
-func (i *instruction) String() string {
-	return fmt.Sprintf("<%s: %d>", i.code, i.arg)
-}
-
-// CodeObject encapsulates a compiled script or procedure.
-type CodeObject interface {
-	fmt.Stringer
-	// Name returns the name of the original source file, primarily used
-	// for error reporting.
-	Name() string
-	// setName is used to modify the name of the code object after it has
-	// been compiled, but prior to producing the final result.
-	setName(name string)
-	// Arguments returns the arguments for the compiled procedure.
-	Arguments() Pair
-	// LineForOffset returns the line number in the original source code
-	// which corresponds to the given byte code offset, primarily used
-	// for error reporting.
-	LineForOffset(pos uint) int
-	// ConstantLen returns the number of constants contained within.
-	ConstantLen() uint
-	// GetConstant returns a constant from the constants table.
-	GetConstant(pos uint) interface{}
-	// SymbolLen returns the number of symbols contained within.
-	SymbolLen() uint
-	// GetSymbol returns a symbol from the symbols table.
-	GetSymbol(pos uint) Symbol
-	// CodeLen returns the number of instructions contained within.
-	CodeLen() uint
-	// GetInstruction returns an instruction from the set of instructions.
-	GetInstruction(pos uint) Instruction
-}
-
-// byteLinePair associates a byte code offset with a line number.
-type byteLinePair struct {
-	offset uint // byte code offset
-	line   int  // line number
-}
-
-type byteLinePairs []byteLinePair
-
-func (a byteLinePairs) Len() int {
-	return len(a)
-}
-
-func (a byteLinePairs) Swap(i, j int) {
-	a[i], a[j] = a[j], a[i]
-}
-
-func (a byteLinePairs) Less(i, j int) bool {
-	return a[i].offset < a[j].offset && a[i].line < a[j].line
-}
-
-func (blp byteLinePair) String() string {
-	return fmt.Sprintf("%d => %d", blp.offset, blp.line)
-}
-
-// bytecode is the in-memory representation of compiled byte code.
-type bytecode struct {
-	name      string         // name for this code object, typically source file
-	arguments Pair           // procedure arguments
-	byte_code []Instruction  // the byte code instructions
-	constants []interface{}  // table of constant values (typically Atoms)
-	symbols   []Symbol       // table of symbol names
-	bylines   []byteLinePair // byte code offsets and their line numbers
-}
-
-// NewCodeObject constructs a new instance of CodeObject given the name,
-// arguments, byte codes, constants, symbols, and mapping of line numbers
-// to byte code offsets.
-func NewCodeObject(name string, args Pair, codes []Instruction, cons []interface{},
-	syms []Symbol, lines []byteLinePair) CodeObject {
-	bc := new(bytecode)
-	bc.name = name
-	bc.arguments = args
-	// CodeObject instances are meant to be immutable, so copy the incoming
-	// data to private structures.
-	bc.byte_code = make([]Instruction, len(codes))
-	copy(bc.byte_code, codes)
-	bc.constants = make([]interface{}, len(cons))
-	copy(bc.constants, cons)
-	bc.symbols = make([]Symbol, len(syms))
-	copy(bc.symbols, syms)
-	bc.bylines = make([]byteLinePair, 0)
-	if len(lines) > 0 {
-		// sort the byte-line pairings and remove duplicates
-		sort.Sort(byteLinePairs(lines))
-		bc.bylines = append(bc.bylines, lines[0])
-		prev_pair := lines[0]
-		for _, line := range lines[1:] {
-			if line.line > prev_pair.line && line.offset > prev_pair.offset {
-				bc.bylines = append(bc.bylines, line)
-				prev_pair = line
-			}
-		}
-	}
-	return bc
-}
-
-func (bc *bytecode) Name() string {
-	return bc.name
-}
-
-func (bc *bytecode) setName(name string) {
-	bc.name = name
-}
-
-func (bc *bytecode) Arguments() Pair {
-	return bc.arguments
-}
-
-func (bc *bytecode) LineForOffset(pos uint) int {
-	line := 1
-	for _, blp := range bc.bylines {
-		if blp.offset > pos {
-			break
-		}
-		line = blp.line
-	}
-	return line
-}
-
-func (bc *bytecode) ConstantLen() uint {
-	return uint(len(bc.constants))
-}
-
-func (bc *bytecode) GetConstant(pos uint) interface{} {
-	return bc.constants[pos]
-}
-
-func (bc *bytecode) SymbolLen() uint {
-	return uint(len(bc.symbols))
-}
-
-func (bc *bytecode) GetSymbol(pos uint) Symbol {
-	return bc.symbols[pos]
-}
-
-func (bc *bytecode) CodeLen() uint {
-	return uint(len(bc.byte_code))
-}
-
-func (bc *bytecode) GetInstruction(pos uint) Instruction {
-	return bc.byte_code[pos]
-}
-
-func (bc *bytecode) String() string {
-	buf := new(bytes.Buffer)
-	fmt.Fprintf(buf, "Name: %s\n", bc.name)
-	fmt.Fprintf(buf, "Arguments: %s\n", bc.arguments)
-	buf.WriteString("Constants:\n")
-	for _, cons := range bc.constants {
-		fmt.Fprintf(buf, "    %v\n", cons)
-	}
-	buf.WriteString("Symbols:\n")
-	for _, sym := range bc.symbols {
-		fmt.Fprintf(buf, "    %v\n", sym)
-	}
-	buf.WriteString("Instructions:\n")
-	for _, instr := range bc.byte_code {
-		fmt.Fprintf(buf, "    %v\n", instr)
-	}
-	buf.WriteString("LineInfo:\n")
-	for _, line := range bc.bylines {
-		fmt.Fprintf(buf, "    %v\n", line)
-	}
-	return buf.String()
-}
 
 // Compiler constructs a CodeObject one piece at a time and assembles the
 // final result on demand.
@@ -552,15 +257,35 @@ func (c *compiler) Assemble(name string, args Pair) CodeObject {
 			instr := arg_value.(Instruction)
 			arg_num = offsets[instr.Argument()]
 		case OP_CONST, OP_FUNCTION:
-			arg_num = c.FindOrAddConstant(arg_value)
+			if ws, ok := arg_value.(WireStripper); ok {
+				arg_num = c.FindOrAddConstant(ws.StripLocation())
+			} else {
+				arg_num = c.FindOrAddConstant(arg_value)
+			}
 		case OP_LOADVAR, OP_STOREVAR, OP_DEFVAR:
-			arg_num = c.FindOrAddSymbol(arg_value.(Symbol))
+			// strip the parser's location information
+			sym := NewSymbol(arg_value.(Symbol).String())
+			arg_num = c.FindOrAddSymbol(sym)
 		case OP_CALL:
 			arg_num = arg_value.(uint)
 		}
 		codes = append(codes, NewInstruction(code, arg_num))
 	}
-	return NewCodeObject(name, args, codes, c.constants, c.symbols, c.lines)
+
+	// sort the byte-line pairings and remove duplicates
+	lines := make([]byteLinePair, 0)
+	if len(c.lines) > 0 {
+		sort.Sort(byteLinePairs(c.lines))
+		lines = append(lines, c.lines[0])
+		prev_pair := c.lines[0]
+		for _, line := range c.lines[1:] {
+			if line.line > prev_pair.line && line.offset > prev_pair.offset {
+				lines = append(lines, line)
+				prev_pair = line
+			}
+		}
+	}
+	return NewCodeObject(name, args, codes, c.constants, c.symbols, lines)
 }
 
 // Compile converts the parsed and expanded s-expression into a CodeObject

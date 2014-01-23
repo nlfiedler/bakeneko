@@ -128,11 +128,7 @@ func NewVirtualMachine() VirtualMachine {
 	vm.frames = make([]ExecutionFrame, 0)
 	// Construct an artificial code object to which all closures "return" when
 	// they are finished, so the Run() will terminate appropriately.
-	codes := make([]Instruction, 0)
-	consts := make([]interface{}, 0)
-	syms := make([]Symbol, 0)
-	lines := make([]byteLinePair, 0)
-	vm.empty = NewCodeObject("closure", theEmptyList, codes, consts, syms, lines)
+	vm.empty = emptyCodeObject("closure")
 	return vm
 }
 

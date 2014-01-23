@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -55,11 +55,37 @@ func (n None) String() string {
 	return ""
 }
 
+// ForwardReference provides a means for temporarily referring to an object
+// that is being referenced before it is completely defined. An example
+// would be a list of pairs that contains a reference to itself.
+type ForwardReference interface {
+	// Label returns the identifier for the forward reference.
+	Label() string
+	// Resolve returns the datum referred to by this reference. A nil value
+	// signals an error (Scheme nil is represented using an instance of the
+	// None type).
+	Resolve() interface{}
+}
+
 // forwardDatumRef is a placeholder for datum references that are found
 // within the expression to which the datum label is being applied, and
 // hence the final expression is not yet available (e.g. #1=(a b . #1#)).
 type forwardDatumRef struct {
-	label string // the datum label, e.g. "1"
+	label  string      // the datum label, e.g. "1"
+	parser *parserImpl // parser from which we can resolve labels
+}
+
+func (fr *forwardDatumRef) Label() string {
+	return fr.label
+}
+
+func (fr *forwardDatumRef) Resolve() interface{} {
+	for idx := len(fr.parser.labels) - 1; idx >= 0; idx-- {
+		if val, ok := fr.parser.labels[idx][fr.label]; ok {
+			return val
+		}
+	}
+	return nil
 }
 
 // macroTable stores the globally defined macros, mapping instances of
@@ -267,7 +293,7 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 			// disregard datum label definitions while parsing a comment
 			label := t.val[1 : len(t.val)-1]
 			p.labels[len(p.labels)-1][label] = datum
-			return p.resolveForwardRefs(datum)
+			return resolveForwardRefs(datum)
 		}
 		return datum, nil
 	case tokenLabelReference:
@@ -283,17 +309,17 @@ func (p *parserImpl) parserRead(t token) (interface{}, LispError) {
 			}
 		}
 		if p.withLabel {
-			return &forwardDatumRef{label}, nil
+			return &forwardDatumRef{label, p}, nil
 		}
 		return nil, NewLispErrorf(ESYNTAX, "label reference before assignment: %s", label)
 	}
 	panic("unreachable code")
 }
 
-// resolveForwardRefs finds any forwardDatumRef instances and replaces them
-// with the actual datum to which they refer. If any cannot be resolved, an
-// error is returned.
-func (p *parserImpl) resolveForwardRefs(datum interface{}) (interface{}, LispError) {
+// resolveForwardRefs finds any ForwardReference instances and replaces
+// them with the actual datum to which they refer. If any cannot be
+// resolved, an error is returned.
+func resolveForwardRefs(datum interface{}) (interface{}, LispError) {
 	var examineThing func(thing interface{}) (interface{}, LispError) = nil
 	examinePair := func(pair Pair) (val interface{}, err LispError) {
 		var r Pair = pair
@@ -334,13 +360,14 @@ func (p *parserImpl) resolveForwardRefs(datum interface{}) (interface{}, LispErr
 			return examinePair(v)
 		case Vector:
 			return examineVector(v)
-		case *forwardDatumRef:
-			for idx := len(p.labels) - 1; idx >= 0; idx-- {
-				if val, ok := p.labels[idx][v.label]; ok {
-					return val, nil
-				}
+		case ForwardReference:
+			val := v.Resolve()
+			if val == nil {
+				form := "label reference before assignment: %s"
+				return nil, NewLispErrorf(ESYNTAX, form, v.Label())
+			} else {
+				return val, nil
 			}
-			return nil, NewLispErrorf(ESYNTAX, "label reference before assignment: %s", v.label)
 		default:
 			return v, nil
 		}
@@ -870,6 +897,14 @@ func expandQuasiquote(x interface{}) (interface{}, LispError) {
 	return NewList(consSym, fexpr, rexpr), nil
 }
 
+// WireStripper removes the location information from a locatable element
+// and returns the underlying element. That is, a parsed string becomes a
+// normal string, and a parsed number becomes a normal number.
+type WireStripper interface {
+	// StripLocation returns this element without location information.
+	StripLocation() interface{}
+}
+
 // ParsedString is a Locatable String type.
 type ParsedString struct {
 	// embedding String would have been nice, but having the same name for
@@ -922,6 +957,10 @@ func (ps *ParsedString) Location() (int, int) {
 	return ps.row, ps.col
 }
 
+func (ps *ParsedString) StripLocation() interface{} {
+	return ps.str
+}
+
 // ParsedBoolean is a Locatable Boolean type.
 type ParsedBoolean struct {
 	Boolean     // Boolean object
@@ -936,6 +975,10 @@ func NewParsedBoolean(val string, row, col int) Boolean {
 
 func (pb *ParsedBoolean) Location() (int, int) {
 	return pb.row, pb.col
+}
+
+func (pb *ParsedBoolean) StripLocation() interface{} {
+	return pb.Boolean
 }
 
 // ParsedSymbol is a Locatable Symbol type.
@@ -958,6 +1001,10 @@ func (ps *ParsedSymbol) Location() (int, int) {
 	return ps.row, ps.col
 }
 
+func (ps *ParsedSymbol) StripLocation() interface{} {
+	return ps.Symbol
+}
+
 // ParsedInteger is a Locatable Integer type.
 type ParsedInteger struct {
 	Integer     // Integer object
@@ -972,6 +1019,10 @@ func NewParsedInteger(val int64, row, col int) Integer {
 
 func (pi *ParsedInteger) Location() (int, int) {
 	return pi.row, pi.col
+}
+
+func (pi *ParsedInteger) StripLocation() interface{} {
+	return pi.Integer
 }
 
 // ParsedFloat is a Locatable Float type.
@@ -990,6 +1041,10 @@ func (pf *ParsedFloat) Location() (int, int) {
 	return pf.row, pf.col
 }
 
+func (pf *ParsedFloat) StripLocation() interface{} {
+	return pf.Float
+}
+
 // ParsedComplex is a Locatable Complex type.
 type ParsedComplex struct {
 	Complex     // Complex object
@@ -1006,6 +1061,10 @@ func (pc *ParsedComplex) Location() (int, int) {
 	return pc.row, pc.col
 }
 
+func (pc *ParsedComplex) StripLocation() interface{} {
+	return pc.Complex
+}
+
 // ParsedRational is a Locatable Rational type.
 type ParsedRational struct {
 	Rational     // Rational object
@@ -1018,8 +1077,12 @@ func NewParsedRational(a, b int64, row, col int) Rational {
 	return &ParsedRational{NewRational(a, b), row, col}
 }
 
-func (pc *ParsedRational) Location() (int, int) {
-	return pc.row, pc.col
+func (pr *ParsedRational) Location() (int, int) {
+	return pr.row, pr.col
+}
+
+func (pr *ParsedRational) StripLocation() interface{} {
+	return pr.Rational
 }
 
 // ParsedCharacter is a Locatable Character type.
@@ -1036,4 +1099,8 @@ func NewParsedCharacter(val string, row, col int) Character {
 
 func (pc *ParsedCharacter) Location() (int, int) {
 	return pc.row, pc.col
+}
+
+func (pc *ParsedCharacter) StripLocation() interface{} {
+	return pc.Character
 }

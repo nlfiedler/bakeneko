@@ -375,11 +375,14 @@ func (ps *PairSuite) TestPairJoiner(c *gc.C) {
 	c.Check(joiner.List().String(), gc.Equals, "(foo bar)")
 	joiner.Append(NewSymbol("qux"))
 	c.Check(joiner.List().String(), gc.Equals, "(foo bar qux)")
+	joiner.Join(NewSymbol("baz"))
+	c.Check(joiner.List().String(), gc.Equals, "(foo bar qux . baz)")
 	slice := joiner.List().ToSlice()
-	c.Check(len(slice), gc.Equals, 3)
+	c.Check(len(slice), gc.Equals, 4)
 	c.Check(slice[0], gc.Equals, NewSymbol("foo"))
 	c.Check(slice[1], gc.Equals, NewSymbol("bar"))
 	c.Check(slice[2], gc.Equals, NewSymbol("qux"))
+	c.Check(slice[3], gc.Equals, NewSymbol("baz"))
 }
 
 func (ps *PairSuite) TestPairInfinite(c *gc.C) {
