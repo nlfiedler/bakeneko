@@ -182,9 +182,17 @@ type byteLinePair struct {
 
 type byteLinePairs []byteLinePair
 
-func (a byteLinePairs) Len() int           { return len(a) }
-func (a byteLinePairs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byteLinePairs) Less(i, j int) bool { return a[i].offset < a[j].offset }
+func (a byteLinePairs) Len() int {
+	return len(a)
+}
+
+func (a byteLinePairs) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
+func (a byteLinePairs) Less(i, j int) bool {
+	return a[i].offset < a[j].offset && a[i].line < a[j].line
+}
 
 func (blp byteLinePair) String() string {
 	return fmt.Sprintf("%d => %d", blp.offset, blp.line)
@@ -204,7 +212,7 @@ type bytecode struct {
 // arguments, byte codes, constants, symbols, and mapping of line numbers
 // to byte code offsets.
 func NewCodeObject(name string, args Pair, codes []Instruction, cons []interface{},
-	syms []Symbol, lines map[int]uint) CodeObject {
+	syms []Symbol, lines []byteLinePair) CodeObject {
 	bc := new(bytecode)
 	bc.name = name
 	bc.arguments = args
@@ -216,24 +224,18 @@ func NewCodeObject(name string, args Pair, codes []Instruction, cons []interface
 	copy(bc.constants, cons)
 	bc.symbols = make([]Symbol, len(syms))
 	copy(bc.symbols, syms)
+	bc.bylines = make([]byteLinePair, 0)
 	if len(lines) > 0 {
-		bylines := make([]byteLinePair, 0, len(lines))
-		for k, v := range lines {
-			bylines = append(bylines, byteLinePair{v, k})
-		}
 		// sort the byte-line pairings and remove duplicates
-		sort.Sort(byteLinePairs(bylines))
-		bc.bylines = make([]byteLinePair, 1, len(bylines))
-		bc.bylines[0] = bylines[0]
-		previous := bylines[0].offset
-		for _, byline := range bylines[1:] {
-			if byline.offset > previous {
-				bc.bylines = append(bc.bylines, byline)
-				previous = byline.offset
+		sort.Sort(byteLinePairs(lines))
+		bc.bylines = append(bc.bylines, lines[0])
+		prev_pair := lines[0]
+		for _, line := range lines[1:] {
+			if line.line > prev_pair.line && line.offset > prev_pair.offset {
+				bc.bylines = append(bc.bylines, line)
+				prev_pair = line
 			}
 		}
-	} else {
-		bc.bylines = make([]byteLinePair, 0)
 	}
 	return bc
 }
@@ -328,12 +330,12 @@ type Compiler interface {
 
 // compiler is the internal implementation of a Compiler.
 type compiler struct {
-	codes     []Opcode      // sequence of opcodes for the code object under construction
-	arguments []interface{} // arguments, one for each opcode; may be nil
-	constants []interface{} // table of constant values (typically Atoms)
-	symbols   []Symbol      // table of symbol names
-	labels    uint          // number of labels so far, used to generate unique labels
-	lineno    map[int]uint  // map of line numbers to smallest byte code offset
+	codes     []Opcode       // sequence of opcodes for the code object under construction
+	arguments []interface{}  // arguments, one for each opcode; may be nil
+	constants []interface{}  // table of constant values (typically Atoms)
+	symbols   []Symbol       // table of symbol names
+	labels    uint           // number of labels so far, used to generate unique labels
+	lines     []byteLinePair // byte offset and line number pairings
 }
 
 // NewCompiler constructs an instance of Compiler.
@@ -343,7 +345,7 @@ func NewCompiler() Compiler {
 	comp.arguments = make([]interface{}, 0)
 	comp.constants = make([]interface{}, 0)
 	comp.symbols = make([]Symbol, 0)
-	comp.lineno = make(map[int]uint)
+	comp.lines = make([]byteLinePair, 0)
 	return comp
 }
 
@@ -397,13 +399,7 @@ func (c *compiler) addLineNumber(expr interface{}) {
 	if loco, is_loc := expr.(Locatable); is_loc {
 		offset := uint(len(c.codes))
 		line, _ := loco.Location()
-		if bite, have := c.lineno[line]; have {
-			if offset < bite {
-				c.lineno[line] = offset
-			}
-		} else {
-			c.lineno[line] = offset
-		}
+		c.lines = append(c.lines, byteLinePair{offset, line})
 	}
 }
 
@@ -564,7 +560,7 @@ func (c *compiler) Assemble(name string, args Pair) CodeObject {
 		}
 		codes = append(codes, NewInstruction(code, arg_num))
 	}
-	return NewCodeObject(name, args, codes, c.constants, c.symbols, c.lineno)
+	return NewCodeObject(name, args, codes, c.constants, c.symbols, c.lines)
 }
 
 // Compile converts the parsed and expanded s-expression into a CodeObject

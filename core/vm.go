@@ -131,7 +131,7 @@ func NewVirtualMachine() VirtualMachine {
 	codes := make([]Instruction, 0)
 	consts := make([]interface{}, 0)
 	syms := make([]Symbol, 0)
-	lines := make(map[int]uint)
+	lines := make([]byteLinePair, 0)
 	vm.empty = NewCodeObject("closure", theEmptyList, codes, consts, syms, lines)
 	return vm
 }

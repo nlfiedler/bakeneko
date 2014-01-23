@@ -299,13 +299,14 @@ func (cs *CompilerSuite) TestLocationInfo(c *gc.C) {
 	c.Assert(code.CodeLen(), gc.Equals, uint(18))
 	// LineInfo:
 	//     0 => 1
+	//     1 => 2
 	//     4 => 3
 	//     8 => 4
 	//     12 => 5
 	c.Check(code.LineForOffset(0), gc.Equals, 1)
-	c.Check(code.LineForOffset(1), gc.Equals, 1)
-	c.Check(code.LineForOffset(2), gc.Equals, 1)
-	c.Check(code.LineForOffset(3), gc.Equals, 1)
+	c.Check(code.LineForOffset(1), gc.Equals, 2)
+	c.Check(code.LineForOffset(2), gc.Equals, 2)
+	c.Check(code.LineForOffset(3), gc.Equals, 2)
 	c.Check(code.LineForOffset(4), gc.Equals, 3)
 	c.Check(code.LineForOffset(5), gc.Equals, 3)
 	c.Check(code.LineForOffset(6), gc.Equals, 3)
