@@ -9,24 +9,18 @@ done, touched on briefly in the TODO section below.
 
 ## Installation ##
 
+Install [Bazaar](http://bazaar.canonical.com/en/) in order to retrieve the
+[gocheck](http://labix.org/gocheck) package, which is used by the unit tests.
+
+Install [Git](http://git-scm.com) in order to fetch the other dependencies.
+
 Run the `go` tool like so:
 
-    go get github.com/nlfiedler/bakeneko
+    go get -t github.com/nlfiedler/bakeneko
 
 ## TODO ##
 
-- Syntactic keywords:
-    - case
-    - let
-    - let*
-    - letrec
-    - do
-    - =>
-    - delay
-    - else
-    - quasiquote
-    - unquote
-    - unquote-splicing
+- Derived expressions: case, let, do, etc
 - Macro expansion
 - Quasi-quoting
 - Many standard procedures
