@@ -241,6 +241,7 @@ func newNullEnvironment() Environment {
 	builtins = append(builtins, NewBuiltin(builtinDivide, "/", 1, -1))
 	builtins = append(builtins, NewBuiltin(builtinAbs, "abs", 1, 1))
 	builtins = append(builtins, NewBuiltin(builtinQuotient, "quotient", 2, 2))
+	builtins = append(builtins, NewBuiltin(builtinSqrt, "sqrt", 1, 1))
 	// control features (R7RS 6.10)
 	// builtins = append(builtins, NewBuiltin(builtinIsProcedure, "procedure?", 1, 1))
 	builtins = append(builtins, NewBuiltin(builtinApply, "apply", 2, -1))

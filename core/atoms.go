@@ -760,6 +760,8 @@ type Rational interface {
 	Number
 	// BigRat returns the actual math/big/Rat instance.
 	BigRat() *big.Rat
+	// toFloat returns the float64 of the rational number.
+	toFloat() float64
 }
 
 type rational struct {

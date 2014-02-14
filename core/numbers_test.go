@@ -7,8 +7,14 @@
 package core
 
 import (
+	gc "launchpad.net/gocheck"
 	"testing"
 )
+
+type NumbersSuite struct {
+}
+
+var _ = gc.Suite(&NumbersSuite{})
 
 func TestBuiltinIsNumber(t *testing.T) {
 	inputs := make(map[string]string)
@@ -448,4 +454,44 @@ func TestBuiltinQuotient(t *testing.T) {
 	inputs[`(quotient 4 3.0)`] = "integer arguments"
 	inputs[`(quotient 1 0)`] = "division by zero"
 	verifyInterpretError(t, inputs)
+}
+
+func (s *NumbersSuite) TestIsqrt(c *gc.C) {
+	c.Check(isqrt(1), gc.Equals, uint32(1))
+	c.Check(isqrt(2), gc.Equals, uint32(1))
+	c.Check(isqrt(3), gc.Equals, uint32(1))
+	c.Check(isqrt(4), gc.Equals, uint32(2))
+	c.Check(isqrt(9), gc.Equals, uint32(3))
+	c.Check(isqrt(16), gc.Equals, uint32(4))
+	c.Check(isqrt(25), gc.Equals, uint32(5))
+	c.Check(isqrt(36), gc.Equals, uint32(6))
+	c.Check(isqrt(49), gc.Equals, uint32(7))
+	c.Check(isqrt(64), gc.Equals, uint32(8))
+	c.Check(isqrt(81), gc.Equals, uint32(9))
+	c.Check(isqrt(100), gc.Equals, uint32(10))
+	c.Check(isqrt(10000), gc.Equals, uint32(100))
+}
+
+func (s *NumbersSuite) TestBuiltinSqrt(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs[`(sqrt 2)`] = `1`
+	inputs[`(sqrt 4)`] = `2`
+	inputs[`(sqrt 9)`] = `3`
+	inputs[`(sqrt 16)`] = `4`
+	inputs[`(sqrt 24.0)`] = `4.898979485566356`
+	inputs[`(sqrt 36)`] = `6`
+	inputs[`(sqrt 48.0)`] = `6.928203230275509`
+	inputs[`(sqrt 64)`] = `8`
+	inputs[`(sqrt 81)`] = `9`
+	inputs[`(sqrt 100)`] = `10`
+	inputs[`(sqrt -1)`] = `0+0i`
+	inputs[`(sqrt 7+9i)`] = `3.033294764030639+1.4835353468979733i`
+	inputs[`(sqrt 12/3)`] = `2`
+	inputs[`(sqrt 4/9)`] = `0.6666666666666666`
+	virtmachPassTest(c, inputs)
+	inputs = make(map[string]string)
+	inputs[`(sqrt)`] = ".* requires 1"
+	inputs[`(sqrt 4 4)`] = ".* requires 1"
+	inputs[`(sqrt "str")`] = ".* numeric argument"
+	virtmachErrorTest(c, inputs)
 }

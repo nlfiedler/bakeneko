@@ -8,6 +8,7 @@ package core
 
 import (
 	"math"
+	"math/cmplx"
 )
 
 // mathRound rounds the given floating point number to the nearest integer,
@@ -469,4 +470,41 @@ func builtinQuotient(name string, args []interface{}) (val interface{}, err Lisp
 		return nil, NewLispError(EARGUMENT, "division by zero")
 	}
 	return dividend.Divide(divisor), nil
+}
+
+// isqrt returns the integer square root of the input value.
+func isqrt(x int64) uint32 {
+	var res uint32 = 0
+	var add uint32 = 0x80000000
+	for i := 0; i < 32; i++ {
+		var temp uint32 = res | add
+		var g2 int64 = int64(temp) * int64(temp)
+		if x >= g2 {
+			res = temp
+		}
+		add >>= 1
+	}
+	return res
+}
+
+// builtinSqrt implements the sqrt procedure.
+func builtinSqrt(name string, args []interface{}) (val interface{}, err LispError) {
+	switch num := args[0].(type) {
+	case Integer:
+		in := num.ToInteger()
+		if in < 0 {
+			val = NewComplex(complex(0, float64(isqrt(in))))
+		} else {
+			val = isqrt(in)
+		}
+	case Float:
+		val = NewFloat(math.Sqrt(num.ToFloat()))
+	case Complex:
+		val = NewComplex(cmplx.Sqrt(num.ToComplex()))
+	case Rational:
+		val = NewFloat(math.Sqrt(num.toFloat()))
+	default:
+		err = NewLispError(EARGUMENT, "sqrt requires a numeric argument")
+	}
+	return
 }
