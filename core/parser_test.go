@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -20,25 +20,14 @@ type ParserSuite struct {
 
 var _ = gc.Suite(&ParserSuite{})
 
-func verifyExpandMap(mapping map[string]string, t *testing.T) {
+func verifyExpandMap(mapping map[string]string, c *gc.C) {
 	for input, expected := range mapping {
 		parser := NewParser()
 		pair, err := parser.Parse(input)
-		if err != nil {
-			t.Fatalf("failed to parse %q: %s", input, err)
-		}
+		c.Assert(err, gc.IsNil, gc.Commentf("failed to parse %q: %s", input, err))
 		x, err := parser.Expand(pair.First())
-		if err != nil {
-			t.Fatalf("failed to expand %q: %s", input, err)
-		}
-		_, ok := x.(Pair)
-		if !ok {
-			t.Fatalf("expand returned non-pair for %q: %T", input, x)
-		}
-		s := stringify(x)
-		if s != expected {
-			t.Errorf(`expected <<%s>> but got <<%s>>`, expected, s)
-		}
+		c.Assert(err, gc.IsNil, gc.Commentf("failed to expand %q: %s", input, err))
+		c.Check(stringify(x), gc.Equals, expected)
 	}
 }
 
@@ -150,19 +139,18 @@ func TestParseQuotes(t *testing.T) {
 	mapping["`(list ,(+ 1 2) 4)"] = "((quasiquote (list (unquote (+ 1 2)) 4)))"
 	mapping["`(a ,(+ 1 2) ,@(map abs '(4 -5 6)) b)"] =
 		"((quasiquote (a (unquote (+ 1 2)) (unquote-splicing (map abs (quote (4 -5 6)))) b)))"
-	// test support for `#() vector quasi-quoting...
-	// mapping["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] =
-	// 	"(quasiquote #(10 5 (unquote (sqrt 4)) (unquote-splicing (map sqrt (quote (16 9)))) 8))"
+	mapping["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] =
+		"((quasiquote #(10 5 (unquote (sqrt 4)) (unquote-splicing (map sqrt (quote (16 9)))) 8)))"
 	verifyParseMap(mapping, t)
 }
 
 func TestParseComments(t *testing.T) {
 	mapping := make(map[string]string)
 	mapping["#;(foo 'x)"] = "()"
-	mapping["(bar #;(foo 'x) quux)"] = "((bar  quux))"
+	mapping["(bar #;(foo 'x) quux)"] = "((bar quux))"
 	mapping["#; (foo 'x)"] = "()"
-	mapping[`#1=#\b #; (foo #1=#\a 'x) #1#`] = `(#\b  #\b)`
-	mapping[`#1=#\b #;#1=#\a #1#`] = `(#\b  #\b)`
+	mapping[`#1=#\b #; (foo #1=#\a 'x) #1#`] = `(#\b #\b)`
+	mapping[`#1=#\b #;#1=#\a #1#`] = `(#\b #\b)`
 	mapping["#;()"] = "()"
 	mapping["#;(foo (+ 1 2) 'a)"] = "()"
 	verifyParseMap(mapping, t)
@@ -178,7 +166,7 @@ func TestParseVector(t *testing.T) {
 	} else {
 		result := pair.First()
 		if slice, ok := result.(Vector); ok {
-			if slice.Length() == 3 {
+			if slice.Len() == 3 {
 				expected := new([3]Integer)
 				expected[0] = NewInteger(1)
 				expected[1] = NewInteger(2)
@@ -194,7 +182,7 @@ func TestParseVector(t *testing.T) {
 					}
 				}
 			} else {
-				t.Errorf("expected slice of length three but got %d", slice.Length())
+				t.Errorf("expected slice of length three but got %d", slice.Len())
 			}
 		} else {
 			t.Errorf("expected slice but got %T", result)
@@ -213,7 +201,7 @@ func TestParseByteVector(t *testing.T) {
 	} else {
 		result := pair.First()
 		if bv, ok := result.(ByteVector); ok {
-			if bv.Length() == 3 {
+			if bv.Len() == 3 {
 				expected := new([3]uint8)
 				expected[0] = uint8(0)
 				expected[1] = uint8(10)
@@ -224,7 +212,7 @@ func TestParseByteVector(t *testing.T) {
 					}
 				}
 			} else {
-				t.Errorf("expected slice of length three but got %d", bv.Length())
+				t.Errorf("expected slice of length three but got %d", bv.Len())
 			}
 		} else {
 			t.Errorf("expected slice but got %T", result)
@@ -274,7 +262,7 @@ func TestParseExprNumbers(t *testing.T) {
 	verifyParseMap(mapping, t)
 }
 
-func TestExpand(t *testing.T) {
+func (s *ParserSuite) TestExpand(c *gc.C) {
 	mapping := make(map[string]string)
 	mapping[`(if #t (display "foo"))`] = `(if #t (display "foo") ())`
 	mapping[`(if #t 1 2)`] = `(if #t 1 2)`
@@ -291,10 +279,24 @@ func TestExpand(t *testing.T) {
 	mapping[`(lambda (x) e1)`] = `(lambda (x) (begin e1))`
 	mapping[`(lambda (x) e1 e2)`] = `(lambda (x) (begin e1 e2))`
 	mapping[`(foo (if #t (quote bar)))`] = `(foo (if #t (quote bar) ()))`
+	verifyExpandMap(mapping, c)
+}
+
+func (s *ParserSuite) TestExpandQuotes(c *gc.C) {
+	mapping := make(map[string]string)
+	mapping["(foo 'x)"] = "(foo (quote x))"
 	mapping["(foo `x)"] = "(foo (quote x))"
 	mapping["(foo `,x)"] = "(foo x)"
 	mapping["(foo `(,@x y))"] = "(foo (append x (cons (quote y) (quote ()))))"
-	verifyExpandMap(mapping, t)
+	mapping["(foo ,x)"] = "(foo (unquote x))"
+	mapping["(foo ,@x)"] = "(foo (unquote-splicing x))"
+	mapping["`(list ,(+ 1 2) 4)"] =
+		"(cons (quote list) (cons (+ 1 2) (cons (quote 4) (quote ()))))"
+	mapping["`(a ,(+ 1 2) ,@(map abs '(4 -5 6)) b)"] =
+		"(cons (quote a) (cons (+ 1 2) (append (map abs (quote (4 -5 6))) (cons (quote b) (quote ())))))"
+	mapping["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] =
+		"#(cons (quote 10) #(cons (quote 5) #(cons (sqrt 4) (append (map sqrt (quote (16 9))) #(cons (quote 8) (quote #()))))))"
+	verifyExpandMap(mapping, c)
 }
 
 func (s *ParserSuite) TestExpandErrors(c *gc.C) {
@@ -423,8 +425,7 @@ func TestParseDatumLabels(t *testing.T) {
 	mapping[`#1=#\b (foo #1#)`] = `(#\b (foo #\b))`
 	mapping[`(foo #1=#\a "bcb" #1#)`] = `((foo #\a "bcb" #\a))`
 	mapping[`#1=#\b (foo #1=#\a "bcb" #1#) #1#`] = `(#\b (foo #\a "bcb" #\a) #\b)`
-	// TODO: the None in the middle results in a double-space
-	mapping[`(foo #;(#1=#\a "bcb" #1#) 'bar)`] = `((foo  (quote bar)))`
+	mapping[`(foo #;(#1=#\a "bcb" #1#) 'bar)`] = `((foo (quote bar)))`
 	mapping[`#1=#\b (foo "bcb" #1#) #1#`] = `(#\b (foo "bcb" #\b) #\b)`
 	verifyParseMap(mapping, t)
 }

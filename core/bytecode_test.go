@@ -72,8 +72,8 @@ func compareCodeObjects(obtained, expected CodeObject, c *gc.C) {
 		// c.Check(obtained.GetConstant(pos), gc.DeepEquals, expected.GetConstant(pos))
 	}
 	// compare arguments
-	oiter := NewPairIterator(obtained.Arguments())
-	eiter := NewPairIterator(expected.Arguments())
+	oiter := obtained.Arguments().Iterator()
+	eiter := expected.Arguments().Iterator()
 	for oiter.HasNext() && eiter.HasNext() {
 		oelem := stringify(oiter.Next())
 		eelem := stringify(eiter.Next())
@@ -170,14 +170,14 @@ func (cs *CompilerSuite) TestEncodingValues(c *gc.C) {
 	vector.Set(4, vector)
 	thing1 := cs.testEncodeValue(vector, c)
 	if ovector, ok := thing1.(Vector); ok {
-		c.Check(ovector.Length(), gc.Equals, 5)
+		c.Check(ovector.Len(), gc.Equals, 5)
 		c.Check(ovector.Get(0), gc.DeepEquals, data[0])
 		c.Check(ovector.Get(1), gc.DeepEquals, data[1])
 		c.Check(ovector.Get(2), gc.DeepEquals, data[2])
 		c.Check(ovector.Get(3), gc.DeepEquals, data[3])
 		thing3 := ovector.Get(4)
 		if nvector, ok := thing3.(Vector); ok {
-			c.Check(nvector.Length(), gc.Equals, 5)
+			c.Check(nvector.Len(), gc.Equals, 5)
 		} else {
 			c.Error("nested object is not a Vector")
 		}

@@ -40,13 +40,13 @@ type mapListsFunc func(interface{}) (interface{}, LispError)
 // given function for each element of each list. The results of each
 // function invocation are added to a list, which is returned.
 func mapSliceOfLists(name string, args []interface{}, f mapListsFunc) (Pair, LispError) {
-	joinr := NewPairJoiner()
+	joinr := NewPairBuilder()
 	for _, arg := range args {
 		arg_list, ok := arg.(Pair)
 		if !ok {
 			return nil, NewLispErrorf(EARGUMENT, notAListMsg, arg, name)
 		}
-		iter := NewPairIterator(arg_list)
+		iter := arg_list.Iterator()
 		for iter.HasNext() {
 			thing, err := f(iter.Next())
 			if err != nil {

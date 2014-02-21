@@ -260,6 +260,18 @@ func (cs *CompilerSuite) TestLambdaApplication(c *gc.C) {
 	virtmachPassTest(c, inputs)
 }
 
+func (cs *CompilerSuite) TestQuasiquotation(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs["'(foo x)"] = "(foo x)"
+	inputs["`(list ,(+ 1 2) 4)"] = "(list 3 4)"
+	inputs["`(a ,(+ 1 2) ,@(map abs '(4 -5 6)) b)"] = "(a 3 4 5 6 b)"
+	inputs["`(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] = "(10 5 2 4 3 8)"
+	inputs["`((foo ,(- 10 3)) ,@(cdr '(c)) . ,(car '(cons)))"] = "((foo 7) . cons)"
+	// TODO: issue 23 vector quasi-quoting
+	// inputs["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] = "#(10 5 2 4 3 8)"
+	virtmachPassTest(c, inputs)
+}
+
 func BenchmarkEvalBytes(b *testing.B) {
 	name := "BenchmarkEvalBytes"
 	code, err := CompileString(name, fibonacciRecursiveText)

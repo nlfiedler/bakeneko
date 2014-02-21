@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -50,11 +50,8 @@ func verifyInterpret(t *testing.T, inputs map[string]string) {
 func checkInterpret(c *gc.C, inputs map[string]string) {
 	for input, expected := range inputs {
 		result, err := Interpret(input)
-		if err != nil {
-			c.Errorf("Interpret() failed for '%s' with: %v", input, err)
-		} else {
-			c.Check(stringify(result), gc.Equals, expected, gc.Commentf(input))
-		}
+		c.Assert(err, gc.IsNil, gc.Commentf("Interpret() failed for %q: %v", input, err))
+		c.Check(stringify(result), gc.Equals, expected, gc.Commentf(input))
 	}
 }
 
@@ -81,11 +78,8 @@ func verifyInterpretError(t *testing.T, inputs map[string]string) {
 func checkInterpretError(c *gc.C, inputs map[string]string) {
 	for input, expected := range inputs {
 		result, err := Interpret(input)
-		if err == nil {
-			c.Errorf("Interpret() should have failed for '%s', but got %v", input, result)
-		} else {
-			c.Check(err, gc.ErrorMatches, expected, gc.Commentf(input))
-		}
+		c.Assert(err, gc.NotNil, gc.Commentf("expected %q to fail, got %v", input, result))
+		c.Check(err, gc.ErrorMatches, expected, gc.Commentf(input))
 	}
 }
 
@@ -246,7 +240,7 @@ func TestInterpretQuote(t *testing.T) {
 	input = `((quote if) #f 1 2)`
 	result, err = Interpret(input)
 	if err == nil {
-		t.Error("Interpret() should have failed")
+		t.Fatal("Interpret() should have failed")
 	}
 	if !strings.Contains(err.ErrorMessage(), "is not applicable") {
 		t.Error("((quote if) ...) should have failed with 'not applicable'")
@@ -444,21 +438,26 @@ func (s *InterpreterSuite) TestInterpreterFibRecursive(c *gc.C) {
 }
 
 func (s *InterpreterSuite) TestInterpreterTailRecursive(c *gc.C) {
-	table := make(map[string]string)
-	table[`(define iffi (lambda (n) (if (> n 1000) n (iffi (+ n 1))))) (iffi 1)`] = "1001"
-	table[`(define iffi (lambda (n) (if (< n 1000) (iffi (+ n 1)) n))) (iffi 1)`] = "1000"
-	table[`(define cr (lambda (n) (cond ((< n 1000) (cr (+ n 1))) (else n)))) (cr 1)`] = "1000"
-	table[`(define cr (lambda (n) (cond ((> n 1000) n) (else (cr (+ n 1)))))) (cr 1)`] = "1001"
-	table[`(define andr (lambda (n) (and (< n 1000) (andr (+ n 1))))) (andr 1)`] = "#f"
-	table[`(define orr (lambda (n) (or (> n 1000) (orr (+ n 1))))) (orr 1)`] = "#t"
-	for input, expected := range table {
-		result, err := Interpret(input)
-		if err != nil {
-			c.Errorf("Interpret() failed: %v", err)
-		} else {
-			c.Check(stringify(result), gc.Equals, expected)
-		}
-	}
+	inputs := make(map[string]string)
+	inputs[`(define iffi (lambda (n) (if (> n 1000) n (iffi (+ n 1))))) (iffi 1)`] = "1001"
+	inputs[`(define iffi (lambda (n) (if (< n 1000) (iffi (+ n 1)) n))) (iffi 1)`] = "1000"
+	inputs[`(define cr (lambda (n) (cond ((< n 1000) (cr (+ n 1))) (else n)))) (cr 1)`] = "1000"
+	inputs[`(define cr (lambda (n) (cond ((> n 1000) n) (else (cr (+ n 1)))))) (cr 1)`] = "1001"
+	inputs[`(define andr (lambda (n) (and (< n 1000) (andr (+ n 1))))) (andr 1)`] = "#f"
+	inputs[`(define orr (lambda (n) (or (> n 1000) (orr (+ n 1))))) (orr 1)`] = "#t"
+	checkInterpret(c, inputs)
+}
+
+func (s *InterpreterSuite) TestInterpreterQuasiquote(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs["'(foo x)"] = "(foo x)"
+	inputs["`(list ,(+ 1 2) 4)"] = "(list 3 4)"
+	inputs["`(a ,(+ 1 2) ,@(map abs '(4 -5 6)) b)"] = "(a 3 4 5 6 b)"
+	inputs["`(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] = "(10 5 2 4 3 8)"
+	inputs["`((foo ,(- 10 3)) ,@(cdr '(c)) . ,(car '(cons)))"] = "((foo 7) . cons)"
+	// TODO: issue 23 vector quasi-quoting
+	// inputs["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] = "#(10 5 2 4 3 8)"
+	checkInterpret(c, inputs)
 }
 
 func BenchmarkEvalSexpr(b *testing.B) {

@@ -566,7 +566,7 @@ func (bce *bytecodeEncoder) encodeValue(val interface{}) (err error) {
 
 func (bce *bytecodeEncoder) encodePair(p Pair) (err error) {
 	// discover if the list is proper, and determine its length
-	iter := NewPairIterator(p)
+	iter := p.Iterator()
 	count := 0
 	for iter.HasNext() {
 		iter.Next()
@@ -580,7 +580,7 @@ func (bce *bytecodeEncoder) encodePair(p Pair) (err error) {
 	if err != nil {
 		return
 	}
-	iter = NewPairIterator(p)
+	iter = p.Iterator()
 	for iter.HasNext() {
 		val := iter.Next()
 		err = bce.encodeValue(val)
@@ -592,7 +592,7 @@ func (bce *bytecodeEncoder) encodePair(p Pair) (err error) {
 }
 
 func (bce *bytecodeEncoder) encodeVector(v Vector) (err error) {
-	length := v.Length()
+	length := v.Len()
 	err = bce.encoder.Encode(length)
 	if err != nil {
 		return
@@ -764,7 +764,7 @@ func (bcd *bytecodeDecoder) decodePair() (val Pair, err error) {
 		proper = false
 		count = 0 - count
 	}
-	joinr := NewPairJoiner()
+	joinr := NewPairBuilder()
 	for count > 0 {
 		count--
 		var elem interface{}

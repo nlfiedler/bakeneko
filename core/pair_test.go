@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -30,6 +30,9 @@ func (ps *PairSuite) TestPairNil(c *gc.C) {
 func (ps *PairSuite) TestPairSingle(c *gc.C) {
 	foo := NewSymbol("foo")
 	p := NewPair(foo)
+	c.Check(p, gc.NotNil)
+	var seq Sequence
+	c.Check(p, gc.Implements, &seq)
 	c.Check(p.Len(), gc.Equals, 1, gc.Commentf("pair single len"))
 	c.Check(p.First(), gc.Equals, foo, gc.Commentf("pair single first"))
 	c.Check(p.Second(), gc.IsNil, gc.Commentf("pair single second"))
@@ -306,7 +309,7 @@ func (ps *PairSuite) TestPairIterator(c *gc.C) {
 	baz := NewSymbol("baz")
 	qux := NewSymbol("qux")
 	p := NewList(foo, bar, baz, qux)
-	iter := NewPairIterator(p)
+	iter := p.Iterator()
 	c.Check(iter.HasNext(), gc.Equals, true)
 	c.Check(iter.Next(), gc.Equals, foo)
 	c.Check(iter.IsProper(), gc.Equals, true)
@@ -320,13 +323,14 @@ func (ps *PairSuite) TestPairIterator(c *gc.C) {
 	c.Check(iter.Next(), gc.Equals, qux)
 	c.Check(iter.IsProper(), gc.Equals, true)
 	c.Check(iter.HasNext(), gc.Equals, false)
+	c.Check(iter.Next(), gc.IsNil)
 }
 
 func (ps *PairSuite) TestPairIteratorImproper(c *gc.C) {
 	foo := NewSymbol("foo")
 	bar := NewSymbol("bar")
 	p := Cons(foo, bar)
-	iter := NewPairIterator(p)
+	iter := p.Iterator()
 	c.Check(iter.IsProper(), gc.Equals, true)
 	c.Check(iter.HasNext(), gc.Equals, true)
 	c.Check(iter.Next(), gc.Equals, foo)
@@ -353,21 +357,14 @@ func (ps *PairSuite) TestPairImproperSlice(c *gc.C) {
 }
 
 func (ps *PairSuite) TestPairIteratorEmpty(c *gc.C) {
-	iter := NewPairIterator(theEmptyList)
+	iter := theEmptyList.Iterator()
 	c.Check(iter.HasNext(), gc.Equals, false)
 	c.Check(iter.IsProper(), gc.Equals, true)
 	c.Check(iter.Next(), gc.IsNil)
 }
 
-func (ps *PairSuite) TestPairIteratorNil(c *gc.C) {
-	iter := NewPairIterator(nil)
-	c.Check(iter.HasNext(), gc.Equals, false)
-	c.Check(iter.IsProper(), gc.Equals, true)
-	c.Check(iter.Next(), gc.IsNil)
-}
-
-func (ps *PairSuite) TestPairJoiner(c *gc.C) {
-	joiner := NewPairJoiner()
+func (ps *PairSuite) TestPairBuilder(c *gc.C) {
+	joiner := NewPairBuilder()
 	c.Check(joiner.List(), gc.Equals, theEmptyList)
 	joiner.Append(NewSymbol("foo"))
 	c.Check(joiner.List().String(), gc.Equals, "(foo)")

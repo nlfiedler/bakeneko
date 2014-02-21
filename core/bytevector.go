@@ -32,7 +32,7 @@ func (b ByteVector) ObjectId() uintptr {
 	return reflect.ValueOf(b).Pointer()
 }
 
-func (b ByteVector) Length() int {
+func (b ByteVector) Len() int {
 	if b == nil {
 		return 0
 	}

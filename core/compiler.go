@@ -115,6 +115,7 @@ func (c *compiler) Compile(expr interface{}) LispError {
 	case Symbol:
 		// symbol reference
 		c.AddInstruction(OP_LOADVAR, obj)
+	// TODO: use Sequence instead of Pair?
 	case Pair:
 		// most of the time they're pairs
 		length := obj.Len()
@@ -189,7 +190,7 @@ func (c *compiler) Compile(expr interface{}) LispError {
 				}
 			} else if atomsEqual(sym, beginSym) {
 				// (begin exp+)
-				iter := NewPairIterator(obj)
+				iter := obj.Iterator()
 				iter.Next()
 				for iter.HasNext() {
 					err := c.Compile(iter.Next())
@@ -209,7 +210,7 @@ func (c *compiler) Compile(expr interface{}) LispError {
 		}
 		if application {
 			// compile all of the arguments in left-to-right order
-			iter := NewPairIterator(obj)
+			iter := obj.Iterator()
 			iter.Next()
 			var arg_count uint = 0
 			for iter.HasNext() {

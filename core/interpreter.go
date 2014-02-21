@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2013 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -337,12 +337,12 @@ func (b *builtinProc) Call(values []interface{}) (interface{}, LispError) {
 // tailRecursiveFunc takes a set of arguments, evalutes those arguments, and
 // either returns the tail expression to be evaluated by the caller, or the
 // final return value. Examples include if, case, cond, and, or, and so on.
-type tailRecursiveFunc func(int, Pair, Environment) (interface{}, interface{}, LispError)
+type tailRecursiveFunc func(int, Sequence, Environment) (interface{}, interface{}, LispError)
 
 // TailRecursive represents a tail recursive function.
 type TailRecursive interface {
 	// Call invokes the tail recursive function with the given values.
-	Call(int, Pair, Environment) (interface{}, interface{}, LispError)
+	Call(int, Sequence, Environment) (interface{}, interface{}, LispError)
 }
 
 // recursiveProc is the internal implementation of TailRecursive.
@@ -357,29 +357,29 @@ func NewRecursive(f tailRecursiveFunc) TailRecursive {
 }
 
 // Call invokes the tail recursive function and returns the results.
-func (r *recursiveProc) Call(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
-	return r.recursive(length, pair, env)
+func (r *recursiveProc) Call(length int, seq Sequence, env Environment) (interface{}, interface{}, LispError) {
+	return r.recursive(length, seq, env)
 }
 
 // lambda is a function body and its set of parameters.
 type lambda struct {
 	body   interface{} // procedure definition
-	params Pair        // formal parameter list
+	params Sequence    // formal parameter list
 }
 
 // NewLambda constructs a new lambda for the given function body and parameters.
-func NewLambda(body interface{}, params Pair) *lambda {
+func NewLambda(body interface{}, params Sequence) *lambda {
 	return &lambda{body, params}
 }
 
 // BindArguments binds the argument names to the given values, allowing for
 // extra arguments to be assigned to the last name if the list is improper.
 // Returns the new environment ready for evaluation.
-func BindArguments(env Environment, names Pair, values Pair) (Environment, LispError) {
+func BindArguments(env Environment, names Sequence, values Sequence) (Environment, LispError) {
 	result := NewEnvironment(env)
 	// map the symbols in names to the given values, storing in result
-	name_iter := NewPairIterator(names)
-	value_iter := NewPairIterator(values)
+	name_iter := names.Iterator()
+	value_iter := values.Iterator()
 	for name_iter.HasNext() {
 		name := name_iter.Next()
 		sym, ok := name.(Symbol)
@@ -392,7 +392,7 @@ func BindArguments(env Environment, names Pair, values Pair) (Environment, LispE
 		}
 		if !name_iter.IsProper() {
 			// join the remaining values into a list and assign to the final argument
-			results := NewPairJoiner()
+			results := NewPairBuilder()
 			for value_iter.HasNext() {
 				value := value_iter.Next()
 				results.Append(value)
@@ -415,7 +415,7 @@ func BindArguments(env Environment, names Pair, values Pair) (Environment, LispE
 type Closure interface {
 	// Bind this closure with the given arguments and return the new
 	// environment, suitable for evaluating this closure.
-	Bind(values Pair) (Environment, LispError)
+	Bind(values Sequence) (Environment, LispError)
 	// Body returns the body of the closure for evaluation.
 	Body() interface{}
 	// Apply evaluates the body of the closure within the given
@@ -432,7 +432,7 @@ type closure struct {
 
 // NewClosure constructs a new Closure with the given definition, defining
 // environment, and parameters.
-func NewClosure(body interface{}, params Pair, env Environment) Closure {
+func NewClosure(body interface{}, params Sequence, env Environment) Closure {
 	lam := NewLambda(body, params)
 	return &closure{lam, env}
 }
@@ -441,7 +441,7 @@ func NewClosure(body interface{}, params Pair, env Environment) Closure {
 // with the arguments expected by the contained lambda. An improper argument
 // list will have the remaining values assigned to the final argument as a
 // single list of values.
-func (c *closure) Bind(values Pair) (Environment, LispError) {
+func (c *closure) Bind(values Sequence) (Environment, LispError) {
 	return BindArguments(c.env, c.params, values)
 }
 
@@ -501,48 +501,48 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				return nil, NewLispErrorf(EARGUMENT, "unbound variable: %s", sym)
 			}
 		}
-		pair, is_pair := expr.(Pair)
-		if !is_pair {
+		seq, is_seq := expr.(Sequence)
+		if !is_seq {
 			// atom
 			return expr, nil
 		}
-		length := pair.Len()
+		length := seq.Len()
 		if length == 0 {
 			// empty list
-			return pair, nil
+			return seq, nil
 		}
-		first := pair.First()
+		first := seq.First()
 		// assume that the first is a primitive lambda until we learn otherwise
 		keyword := true
 		if sym, issym := first.(Symbol); issym {
 			// the primitive lambdas
 			if atomsEqual(sym, quoteSym) {
 				// (quote exp)
-				return pair.Second(), nil
+				return seq.Second(), nil
 			} else if atomsEqual(sym, ifSym) {
 				// (if test conseq alt)
-				test := pair.Second()
+				test := seq.Second()
 				result, err := Eval(test, env)
 				if err != nil {
 					return nil, err
 				}
 				if isTrue(result) {
-					expr = pair.Third()
+					expr = seq.Third()
 				} else {
-					expr = Cxr("cadddr", pair)
+					expr = Cxr("cadddr", seq)
 				}
 			} else if atomsEqual(sym, setSym) {
 				// (set! var exp)
-				return primitiveSet(pair, env)
+				return primitiveSet(seq, env)
 			} else if atomsEqual(sym, defineSym) {
 				// (define var exp)
-				return primitiveDefine(pair, env)
+				return primitiveDefine(seq, env)
 			} else if atomsEqual(sym, lambdaSym) {
 				// (lambda (var*) exp)
-				return primitiveLambda(pair, env)
+				return primitiveLambda(seq, env)
 			} else if atomsEqual(sym, beginSym) {
 				// (begin exp+)
-				exp, err := evalForTail(pair.Rest(), env)
+				exp, err := evalForTail(seq.Rest(), env)
 				if err != nil {
 					return nil, err
 				}
@@ -551,7 +551,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				val := env.Find(sym)
 				if tr, ok := val.(TailRecursive); ok {
 					// invoke the tail recursive function
-					exp, val, err := tr.Call(length, pair, env)
+					exp, val, err := tr.Call(length, seq, env)
 					if exp != nil {
 						expr = exp
 					} else {
@@ -567,8 +567,8 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 		}
 		if !keyword {
 			// evaluate all of the list elements in order
-			joinr := NewPairJoiner()
-			iter := NewPairIterator(pair)
+			joinr := NewPairBuilder()
+			iter := seq.Iterator()
 			for iter.HasNext() {
 				exp := iter.Next()
 				val, err := Eval(exp, env)
@@ -583,7 +583,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 			if builtin, ok := fun.(Procedure); ok {
 				return builtin.Call(exps.ToSlice()[1:])
 			} else if clos, ok := fun.(Closure); ok {
-				if arg_list, ok := args.(Pair); ok {
+				if arg_list, ok := args.(Sequence); ok {
 					expr = clos.Body()
 					var err LispError
 					env, err = clos.Bind(arg_list)
@@ -592,7 +592,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 					}
 				} else {
 					return nil, NewLispErrorf(EARGUMENT,
-						"Combination must be a proper list: %v", pair)
+						"Combination must be a proper list: %v", seq)
 				}
 			} else {
 				return nil, NewLispErrorf(ESUPPORT,
@@ -607,10 +607,10 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 // returning the last expression as-is to be evaluated in a tail-call fashion.
 func evalForTail(expr interface{}, env Environment) (interface{}, LispError) {
 	// if the input is not a list, return it for evaluation
-	if pair, ok := expr.(Pair); ok {
+	if seq, ok := expr.(Sequence); ok {
 		// otherwise, evaluate all but the last expression in the list
-		length := pair.Len()
-		iter := NewPairIterator(pair)
+		length := seq.Len()
+		iter := seq.Iterator()
 		for index := 1; index < length; index++ {
 			_, err := Eval(iter.Next(), env)
 			if err != nil {
@@ -627,22 +627,22 @@ func evalForTail(expr interface{}, env Environment) (interface{}, LispError) {
 // is indeed a list and it contains exactly one item. Otherwise the input is
 // returned unchanged.
 func extractFirst(expr interface{}) interface{} {
-	if pair, ok := expr.(Pair); ok {
-		if pair.Len() == 1 {
-			expr = pair.First()
+	if seq, ok := expr.(Sequence); ok {
+		if seq.Len() == 1 {
+			expr = seq.First()
 		}
 	}
 	return expr
 }
 
 // primitiveSet implements the derived lambda set!
-func primitiveSet(pair Pair, env Environment) (interface{}, LispError) {
-	exp := pair.Third()
+func primitiveSet(seq Sequence, env Environment) (interface{}, LispError) {
+	exp := seq.Third()
 	val, err := Eval(exp, env)
 	if err != nil {
 		return nil, err
 	}
-	name := pair.Second()
+	name := seq.Second()
 	if ns, ok := name.(Symbol); ok {
 		env.Set(ns, val)
 	} else {
@@ -652,13 +652,13 @@ func primitiveSet(pair Pair, env Environment) (interface{}, LispError) {
 }
 
 // primitiveDefine implements the derived lambda define
-func primitiveDefine(pair Pair, env Environment) (interface{}, LispError) {
-	exp := pair.Third()
+func primitiveDefine(seq Sequence, env Environment) (interface{}, LispError) {
+	exp := seq.Third()
 	val, err := Eval(exp, env)
 	if err != nil {
 		return nil, err
 	}
-	name := pair.Second()
+	name := seq.Second()
 	if ns, ok := name.(Symbol); ok {
 		env.Define(ns, val)
 	} else {
@@ -668,22 +668,22 @@ func primitiveDefine(pair Pair, env Environment) (interface{}, LispError) {
 }
 
 // primitiveLambda implements the derived lambda lambda
-func primitiveLambda(pair Pair, env Environment) (interface{}, LispError) {
-	vars := pair.Second()
-	body := pair.Third()
-	if vlist, ok := vars.(Pair); ok {
+func primitiveLambda(seq Sequence, env Environment) (interface{}, LispError) {
+	vars := seq.Second()
+	body := seq.Third()
+	if vlist, ok := vars.(Sequence); ok {
 		return NewClosure(body, vlist, env), nil
 	}
 	return nil, NewLispErrorf(EARGUMENT, "lambda arguments wrong type: %v", vars)
 }
 
 // derivedAnd implements the derived lambda and
-func derivedAnd(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+func derivedAnd(length int, seq Sequence, env Environment) (interface{}, interface{}, LispError) {
 	if length == 1 {
 		// (and) => #t
 		return nil, BooleanTrue, nil
 	}
-	iter := NewPairIterator(pair)
+	iter := seq.Iterator()
 	iter.Next()
 	// up to the last expression is evaluated in place
 	for index := 2; index < length; index++ {
@@ -701,12 +701,12 @@ func derivedAnd(length int, pair Pair, env Environment) (interface{}, interface{
 }
 
 // derivedOr implements the derived lambda or
-func derivedOr(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+func derivedOr(length int, seq Sequence, env Environment) (interface{}, interface{}, LispError) {
 	if length == 1 {
 		// (or) => #f
 		return nil, BooleanFalse, nil
 	}
-	iter := NewPairIterator(pair)
+	iter := seq.Iterator()
 	iter.Next()
 	// up to the last expression is evaluated in place
 	for index := 2; index < length; index++ {
@@ -724,13 +724,13 @@ func derivedOr(length int, pair Pair, env Environment) (interface{}, interface{}
 }
 
 // derivedCond implements the derived lambda cond
-func derivedCond(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+func derivedCond(length int, seq Sequence, env Environment) (interface{}, interface{}, LispError) {
 	// evalExpr evaluates the expression(s) for the clause, returning the
 	// last expression in the sequence for evaluation in tail-call fashion.
 	evalExpr := func(test, expr interface{}) (interface{}, LispError) {
 		// we assume this is not an 'else' clause and that there are
 		// non-zero expressions to be evaluated
-		if epair, ok := expr.(Pair); ok {
+		if epair, ok := expr.(Sequence); ok {
 			if sym, ok := epair.First().(Symbol); ok && atomsEqual(sym, arrowSym) {
 				// rest of expression is assumed to be a unary procedure,
 				// return it as a procedure invocation to be evaluated
@@ -743,11 +743,11 @@ func derivedCond(length int, pair Pair, env Environment) (interface{}, interface
 		return nil, NewLispError(ESYNTAX, "malformed cond clause?")
 	}
 
-	iter := NewPairIterator(pair)
+	iter := seq.Iterator()
 	iter.Next()
 	for iter.HasNext() {
 		clause := iter.Next()
-		if clair, ok := clause.(Pair); ok {
+		if clair, ok := clause.(Sequence); ok {
 			if clair.Len() < 1 {
 				return nil, nil, NewLispErrorf(EARGUMENT,
 					"cond clause must not be empty: %v", clause)
@@ -783,7 +783,7 @@ func derivedCond(length int, pair Pair, env Environment) (interface{}, interface
 }
 
 // derivedCase implements the derived lambda case
-func derivedCase(length int, pair Pair, env Environment) (interface{}, interface{}, LispError) {
+func derivedCase(length int, seq Sequence, env Environment) (interface{}, interface{}, LispError) {
 	// implement syntactic case (need Atom.EqualTo() first)
 	return nil, nil, nil
 }

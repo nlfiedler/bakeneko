@@ -103,7 +103,7 @@ func builtinAppend(name string, args []interface{}) (interface{}, LispError) {
 	last := len(args) - 1
 	for idx, arg := range args {
 		if pair, ok := arg.(Pair); ok {
-			iter := NewPairIterator(pair)
+			iter := pair.Iterator()
 			for iter.HasNext() {
 				elem := iter.Next()
 				if results == theEmptyList {
@@ -162,7 +162,7 @@ func builtinIsNull(name string, args []interface{}) (interface{}, LispError) {
 // builtinIsList returns true if the argument is a proper list, otherwise false.
 func builtinIsList(name string, args []interface{}) (interface{}, LispError) {
 	if pair, ok := args[0].(Pair); ok {
-		iter := NewPairIterator(pair)
+		iter := pair.Iterator()
 		for iter.HasNext() {
 			iter.Next()
 		}

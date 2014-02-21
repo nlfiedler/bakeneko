@@ -101,8 +101,9 @@ func stringify(x interface{}) string {
 }
 
 // stringifyBuffer converts the tree of elements to a string, which is
-// written to the given buffer.
-func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
+// written to the given buffer. Returns the number of bytes written.
+func stringifyBuffer(x interface{}, buf *bytes.Buffer) int {
+	pos := buf.Len()
 	switch i := x.(type) {
 	case nil:
 		buf.WriteString("()")
@@ -110,13 +111,23 @@ func stringifyBuffer(x interface{}, buf *bytes.Buffer) {
 		// this handles Atom and Pair
 		fmt.Fprintf(buf, "%v", i)
 	}
+	return buf.Len() - pos
 }
 
 // wrapWithBegin ensures that the given s-expression is written with (begin).
 func wrapWithBegin(expr interface{}) interface{} {
-	if pair, is_pair := expr.(Pair); is_pair && pair.Len() > 0 {
-		if sym, is_sym := pair.First().(Symbol); !is_sym || !atomsEqual(sym, beginSym) {
-			return Cons(beginSym, pair)
+	if seq, is_seq := expr.(Sequence); is_seq && seq.Len() > 0 {
+		if sym, is_sym := seq.First().(Symbol); !is_sym || !atomsEqual(sym, beginSym) {
+			if vec, is_vec := seq.(Vector); is_vec {
+				result := make([]interface{}, 0)
+				result = append(result, beginSym)
+				for pos := 0; pos < vec.Len(); pos++ {
+					result = append(result, vec.Get(pos))
+				}
+				return NewVector(result)
+			} else {
+				return Cons(beginSym, seq)
+			}
 		}
 	} else {
 		return Cons(beginSym, expr)
@@ -129,10 +140,10 @@ func wrapWithBegin(expr interface{}) interface{} {
 type Parser interface {
 	// Parse will return a collection of Scheme objects parsed from the given
 	// string, returning an error if the lexing or parsing fails.
-	Parse(expr string) (Pair, LispError)
+	Parse(expr string) (Sequence, LispError)
 	// ParseFile reads the named file as a Scheme program, returning the
 	// parsed results, or an error if anything went wrong.
-	ParseFile(filename string) (Pair, LispError)
+	ParseFile(filename string) (Sequence, LispError)
 	// Expand takes the parsed results and performs some basic validation
 	// and expands the results into the canoncial form.
 	Expand(x interface{}) (interface{}, LispError)
@@ -159,7 +170,7 @@ func NewParser() Parser {
 }
 
 // Parse is the default implementation the Parse() method of Parser.
-func (p *parserImpl) Parse(expr string) (Pair, LispError) {
+func (p *parserImpl) Parse(expr string) (Sequence, LispError) {
 	var err error
 	if p.foldcase {
 		expr = "#!fold-case\n" + expr
@@ -169,7 +180,7 @@ func (p *parserImpl) Parse(expr string) (Pair, LispError) {
 		return nil, NewLispError(ELEXER, err.Error())
 	}
 	defer drainLexer(p.tokens)
-	results := NewPairJoiner()
+	results := NewPairBuilder()
 	for {
 		t, ok := <-p.tokens
 		if !ok || t.typ == tokenEOF {
@@ -185,7 +196,7 @@ func (p *parserImpl) Parse(expr string) (Pair, LispError) {
 }
 
 // ParseFile is the default implementation the ParseFile() method of Parser.
-func (p *parserImpl) ParseFile(filename string) (Pair, LispError) {
+func (p *parserImpl) ParseFile(filename string) (Sequence, LispError) {
 	bytes, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return nil, NewLispError(EIO, err.Error())
@@ -345,7 +356,7 @@ func resolveForwardRefs(datum interface{}) (interface{}, LispError) {
 		return pair, nil
 	}
 	examineVector := func(vec Vector) (interface{}, LispError) {
-		for ii := vec.Length() - 1; ii >= 0; ii-- {
+		for ii := vec.Len() - 1; ii >= 0; ii-- {
 			val, err := examineThing(vec.Get(ii))
 			if err != nil {
 				return nil, err
@@ -629,7 +640,7 @@ func ator(text string) (int64, int64, LispError) {
 
 // expandListSafely calls expand() on each element of the given list and
 // returns any error that occurs.
-func (p *parserImpl) expandListSafely(list Pair, toplevel bool) (val Pair, err LispError) {
+func (p *parserImpl) expandListSafely(seq Sequence, toplevel bool) (val Sequence, err LispError) {
 	expandWithPanic := func(x interface{}) interface{} {
 		val, err := p.expand(x, toplevel)
 		if err != nil {
@@ -643,7 +654,7 @@ func (p *parserImpl) expandListSafely(list Pair, toplevel bool) (val Pair, err L
 			err = e.(LispError)
 		}
 	}()
-	return list.Map(expandWithPanic), nil
+	return seq.Map(expandWithPanic), nil
 }
 
 // Walk the tree of parser tokens, making optimizations and obvious
@@ -653,79 +664,79 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 	if x == nil {
 		return nil, NewLispError(ESYNTAX, "empty input")
 	}
-	pair, ispair := x.(Pair)
-	if !ispair {
+	seq, is_seq := x.(Sequence)
+	if !is_seq {
 		return x, nil
 	}
-	token := pair.First()
-	for pair.Len() == 1 {
-		// Check if thing inside is another pair, in which case we
-		// extract it and pretend the enclosing pair did not exist.
-		if np, ok := token.(Pair); ok {
-			pair = np
-			token = pair.First()
+	first := seq.First()
+	for seq.Len() == 1 {
+		// Check if thing inside is another sequence, in which case we
+		// extract it and pretend the enclosing sequence did not exist.
+		if ns, ok := first.(Sequence); ok {
+			seq = ns
+			first = seq.First()
 		} else {
 			break
 		}
 	}
-	if sym, issym := token.(Symbol); issym {
+	if sym, issym := first.(Symbol); issym {
 		if atomsEqual(sym, quoteSym) {
-			if pair.Len() != 2 {
-				return nil, NewLispErrorl(ESYNTAX, pair, "quote requires datum")
+			if seq.Len() != 2 {
+				return nil, NewLispErrorl(ESYNTAX, seq, "quote requires datum")
 			}
-			return pair, nil
+			return seq, nil
 
 		} else if atomsEqual(sym, ifSym) {
-			if pair.Len() == 3 {
+			if seq.Len() == 3 {
 				// (if t c) => (if t c ())
-				pair.Append(theEmptyList)
+				seq = SequenceAppend(seq, theEmptyList)
 			}
-			if pair.Len() != 4 {
-				return nil, NewLispErrorl(ESYNTAX, pair, "if too many/few arguments")
+			if seq.Len() != 4 {
+				return nil, NewLispErrorl(ESYNTAX, seq, "if too many/few arguments")
 			}
-			return p.expandListSafely(pair, false)
+			return p.expandListSafely(seq, false)
 
 		} else if atomsEqual(sym, setSym) {
-			if pair.Len() != 3 {
-				return nil, NewLispErrorl(ESYNTAX, pair, "set requires 2 arguments")
+			if seq.Len() != 3 {
+				return nil, NewLispErrorl(ESYNTAX, seq, "set requires 2 arguments")
 			}
-			name := pair.Second()
+			name := seq.Second()
 			// (set! non-var exp) => Error
 			if _, ok := name.(Symbol); !ok {
 				return nil, NewLispErrorl(ESYNTAX, name, "can only set! a symbol")
 			}
-			val, err := p.expand(pair.Third(), false)
+			val, err := p.expand(seq.Third(), false)
 			if err != nil {
 				return nil, err
 			}
 			return NewList(setSym, name, val), nil
 
 		} else if atomsEqual(sym, defineSym) || atomsEqual(sym, definesyntaxSym) {
-			if pair.Len() < 3 {
-				return nil, NewLispErrorl(ESYNTAX, pair, "define/define-syntax require 2+ arguments")
+			if seq.Len() < 3 {
+				return nil, NewLispErrorl(ESYNTAX, seq, "define/define-syntax require 2+ arguments")
 			}
-			v := pair.Second()
-			body := Cdr(Cdr(pair))
+			v := seq.Second()
+			body := Cdr(Cdr(seq))
 			if list, islist := v.(Pair); islist && list.Len() > 0 {
 				// (define (f args) body) => (define f (lambda (args) body))
 				f, args := list.First(), list.Rest()
 				lambda := NewList(lambdaSym, args)
 				lambda.Join(body)
-				pair = NewList(sym, f, lambda)
-				return p.expandListSafely(pair, false)
+				seq = NewList(sym, f, lambda)
+				return p.expandListSafely(seq, false)
 			} else {
 				// (define non-var/list exp) => Error
 				sym2, issym := v.(Symbol)
 				if !issym {
 					return nil, NewLispErrorl(ESYNTAX, v, "can define only a symbol")
 				}
-				val, err := p.expand(pair.Third(), false)
+				val, err := p.expand(seq.Third(), false)
 				if err != nil {
 					return nil, err
 				}
 				if atomsEqual(sym, definesyntaxSym) {
 					if !toplevel {
-						return nil, NewLispErrorl(ESYNTAX, pair,
+						return nil, NewLispErrorl(ESYNTAX, seq,
 							"define-syntax only allowed at top level")
 					}
 					proc, err := Eval(val, theReportEnvironment)
@@ -734,7 +745,7 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 					}
 					closure, isproc := proc.(Closure)
 					if !isproc {
-						return nil, NewLispErrorl(EARGUMENT, pair,
+						return nil, NewLispErrorl(EARGUMENT, seq,
 							"macro must be a procedure")
 					}
 					// (define-syntax v proc)
@@ -746,14 +757,14 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			}
 
 		} else if atomsEqual(sym, beginSym) {
-			if pair.Len() == 1 {
+			if seq.Len() == 1 {
 				// (begin) => None
 				return nil, nil
 			}
-			return p.expandListSafely(pair, toplevel)
+			return p.expandListSafely(seq, toplevel)
 
 		} else if atomsEqual(sym, includeSym) {
-			return p.expandInclude(pair, toplevel)
+			return p.expandInclude(seq, toplevel)
 
 		} else if atomsEqual(sym, includeCaseSym) {
 			save_case := p.foldcase
@@ -761,20 +772,20 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			defer func() {
 				p.foldcase = save_case
 			}()
-			return p.expandInclude(pair, toplevel)
+			return p.expandInclude(seq, toplevel)
 
 		} else if atomsEqual(sym, lambdaSym) {
 			// (lambda (x) e1 e2) => (lambda (x) (begin e1 e2))
-			if pair.Len() < 3 {
-				return nil, NewLispErrorl(ESYNTAX, pair, "lambda requires 2+ arguments")
+			if seq.Len() < 3 {
+				return nil, NewLispErrorl(ESYNTAX, seq, "lambda requires 2+ arguments")
 			}
-			vars := pair.Second()
-			body := Cxr("cddr", pair)
+			vars := seq.Second()
+			body := Cxr("cddr", seq)
 			vlist, islist := vars.(Pair)
 			_, issym := vars.(Symbol)
 			if islist {
 				// verify that all list elements are symbols
-				iter := NewPairIterator(vlist)
+				iter := vlist.Iterator()
 				for iter.HasNext() {
 					elem := iter.Next()
 					if _, issym := elem.(Symbol); !issym {
@@ -784,7 +795,7 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			} else if issym {
 				vlist = NewPair(vars)
 			} else {
-				return nil, NewLispErrorl(ESYNTAX, pair, "lambda arguments must be a list or a symbol")
+				return nil, NewLispErrorl(ESYNTAX, seq, "lambda arguments must be a list or a symbol")
 			}
 			body = wrapWithBegin(body)
 			body, err := p.expand(body, false)
@@ -795,14 +806,14 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 
 		} else if atomsEqual(sym, quasiquoteSym) {
 			// `x => expand quasiquote of x
-			if pair.Len() != 2 {
-				return nil, NewLispErrorl(ESYNTAX, pair, "quasiquote (`) require 2 arguments")
+			if seq.Len() != 2 {
+				return nil, NewLispErrorl(ESYNTAX, seq, "quasiquote (`) require 2 arguments")
 			}
-			return expandQuasiquote(pair.Second())
+			return expandQuasiquote(seq.Second())
 
 		} else if _, ok := macroTable[sym]; ok {
 			// (m arg...)
-			if pair, ispair := pair.Rest().(Pair); !ispair {
+			if pair, ispair := seq.Rest().(Pair); !ispair {
 				pair = NewPair(pair)
 			}
 			return nil, nil
@@ -816,14 +827,14 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 	}
 
 	// if we reached this point, it must be a procedure call
-	return p.expandListSafely(pair, false)
+	return p.expandListSafely(seq, false)
 }
 
 // expandInclude processes the (include ...) expression by reading the
 // named files into the parsed syntax tree.
-func (p *parserImpl) expandInclude(pair Pair, toplevel bool) (Pair, LispError) {
-	if pair.Len() < 2 {
-		return nil, NewLispErrorl(EARGUMENT, pair, "include requires filenames")
+func (p *parserImpl) expandInclude(seq Sequence, toplevel bool) (Pair, LispError) {
+	if seq.Len() < 2 {
+		return nil, NewLispErrorl(EARGUMENT, seq, "include requires filenames")
 	}
 	// temporarily modify this parser's context
 	save_name := p.name
@@ -833,7 +844,7 @@ func (p *parserImpl) expandInclude(pair Pair, toplevel bool) (Pair, LispError) {
 		p.include = save_include
 	}()
 	results := NewPair(beginSym)
-	iter := NewPairIterator(pair)
+	iter := seq.Iterator()
 	// ignore the 'include' symbol we've already parsed
 	iter.Next()
 	for iter.HasNext() {
@@ -844,57 +855,62 @@ func (p *parserImpl) expandInclude(pair Pair, toplevel bool) (Pair, LispError) {
 			if err != nil {
 				return nil, err
 			}
-			inc, err = p.expandListSafely(inc, true)
+			exp, err := p.expandListSafely(inc, true)
 			if err != nil {
 				return nil, err
 			}
-			results.Join(inc)
+			results.Join(exp)
 		} else {
-			return nil, NewLispErrorl(EARGUMENT, pair, "include expects string arguments")
+			return nil, NewLispErrorl(EARGUMENT, seq, "include expects string arguments")
 		}
 	}
 	return results, nil
 }
 
-// expandQuasiquote processes the quotes, expanding the quoted elements.
+// expandQuasiquote processes the quasi-quotation marks, expanding them
+// into a form suitable for evaluation.
 func expandQuasiquote(x interface{}) (interface{}, LispError) {
 	// Expand `x => 'x; `,x => x; `(,@x y) => (append x y)
-	pair, ispair := x.(Pair)
-	if !ispair || pair.Len() == 0 {
+	//
+	// TODO: for vectors, may need to avoid building up the quoted expression
+	//       using (cons) and (append) since those result in a list of pairs
+	//
+	seq, is_seq := x.(Sequence)
+	if !is_seq || seq.Len() == 0 {
 		return NewList(quoteSym, x), nil
 	}
-	token := pair.First()
+	token := seq.First()
 	sym, issym := token.(Symbol)
 	if issym && atomsEqual(sym, unquotesplicingSym) {
-		return nil, NewLispErrorl(ESYNTAX, pair, "can't splice here")
+		return nil, NewLispErrorl(ESYNTAX, seq, "can't splice here")
 	}
 	if issym && atomsEqual(sym, unquoteSym) {
-		if pair.Len() != 2 {
-			return nil, NewLispErrorl(ESYNTAX, pair, "unquote requires 1 argument")
+		if seq.Len() != 2 {
+			return nil, NewLispErrorl(ESYNTAX, seq, "unquote requires 1 argument")
 		}
-		return pair.Second(), nil
+		return seq.Second(), nil
 	}
-	if npair, ispair := token.(Pair); ispair && npair.Len() > 0 {
-		if sym, issym := npair.First().(Symbol); issym && atomsEqual(sym, unquotesplicingSym) {
-			if npair.Len() != 2 {
-				return nil, NewLispErrorl(ESYNTAX, pair, "unquote splicing requires 1 argument")
+	if nseq, is_seq := token.(Sequence); is_seq && nseq.Len() > 0 {
+		if sym, issym := nseq.First().(Symbol); issym && atomsEqual(sym, unquotesplicingSym) {
+			if nseq.Len() != 2 {
+				return nil, NewLispErrorl(ESYNTAX, seq, "unquote splicing requires 1 argument")
 			}
-			expr, err := expandQuasiquote(pair.Rest())
+			expr, err := expandQuasiquote(seq.Rest())
 			if err != nil {
 				return nil, err
 			}
-			return NewList(appendSym, npair.Second(), expr), nil
+			return NewList(appendSym, nseq.Second(), expr), nil
 		}
 	}
-	fexpr, err := expandQuasiquote(pair.First())
+	fexpr, err := expandQuasiquote(seq.First())
 	if err != nil {
 		return nil, err
 	}
-	rexpr, err := expandQuasiquote(pair.Rest())
+	rexpr, err := expandQuasiquote(seq.Rest())
 	if err != nil {
 		return nil, err
 	}
-	return NewList(consSym, fexpr, rexpr), nil
+	return NewSequence(seq, consSym, fexpr, rexpr), nil
 }
 
 // WireStripper removes the location information from a locatable element

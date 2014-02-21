@@ -88,7 +88,7 @@ func NewByteClosure(body CodeObject, env Environment, vm VirtualMachine) Closure
 	return &byteClosure{body, env, vm}
 }
 
-func (bc *byteClosure) Bind(values Pair) (Environment, LispError) {
+func (bc *byteClosure) Bind(values Sequence) (Environment, LispError) {
 	return BindArguments(bc.env, bc.body.Arguments(), values)
 }
 

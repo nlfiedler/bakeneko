@@ -15,33 +15,20 @@ import (
 // be assembled to form arbitrary tree structures, or more commonly, linked
 // lists.
 type Pair interface {
+	Sequence
 	// ObjectId returns the unique identifier for this object.
 	ObjectId() uintptr
-	// First returns the car of the pair.
-	First() interface{}
-	// Second returns the first non-Pair thing in cdr.
-	Second() interface{}
-	// Third returns the second non-Pair thing in cdr.
-	Third() interface{}
-	// Rest returns the cdr of the Pair.
-	Rest() interface{}
-	// Len returns the number of things in the list composed of Pairs.
-	Len() int
-	// String returns the string representation of the pair.
-	String() string
 	// Reverse returns the chain of Pairs in reverse order.
-	Reverse() Pair
-	// Map calls function for each thing in the chained pairs.
-	Map(f func(interface{}) interface{}) Pair
+	Reverse() Pair // TODO: move to Sequence?
 	// Append adds the given item to the pair, forming a list. The element
 	// to which the new value was added is returned, allowing the caller
 	// to chain one append operation onto the next to form a chain.
-	Append(a interface{}) Pair
+	Append(a interface{}) Pair // TODO: move to Sequence?
 	// Join finds the first available slot in the chained Pairs
 	// and attaches the given thing there.
-	Join(a interface{})
+	Join(a interface{}) // TODO: move to Sequence?
 	// ToSlice constructs a Go slice containing the values in the list of pairs.
-	ToSlice() []interface{}
+	ToSlice() []interface{} // TODO: move to Sequence?
 	// setFirst replaces the car of the pair with a.
 	setFirst(a interface{})
 	// setRest replaces the cdr of the pair with a.
@@ -75,11 +62,11 @@ func Cons(a, b interface{}) Pair {
 	return &pair{a, b}
 }
 
-// Car returns the first element in a list.
+// Car returns the first element in a sequence.
 func Car(a interface{}) interface{} {
 	if a == theEmptyList {
 		return nil
-	} else if p, ok := a.(Pair); ok {
+	} else if p, ok := a.(Sequence); ok {
 		return p.First()
 	} else {
 		return nil
@@ -87,11 +74,11 @@ func Car(a interface{}) interface{} {
 	panic("unreachable code")
 }
 
-// Cdr returns the second element in a list.
+// Cdr returns the second element in a sequence.
 func Cdr(a interface{}) interface{} {
 	if a == theEmptyList {
 		return nil
-	} else if p, ok := a.(Pair); ok {
+	} else if p, ok := a.(Sequence); ok {
 		if p.Rest() == theEmptyList {
 			return nil
 		}
@@ -239,7 +226,7 @@ func (p *pair) Reverse() Pair {
 	var result Pair = theEmptyList
 	var penultimate Pair = theEmptyList
 	var first interface{} = nil
-	iter := NewPairIterator(p)
+	iter := p.Iterator()
 	for iter.HasNext() {
 		elem := iter.Next()
 		result = Cons(elem, result)
@@ -256,8 +243,8 @@ func (p *pair) Reverse() Pair {
 	return result
 }
 
-// Len finds the length of the pair, which may be greater than two if the pair
-// is part of a list of items.
+// Len finds the length of the pair, which may be greater than two if
+// the pair is part of a list of items.
 func (p *pair) Len() int {
 	length := 0
 	pairs_seen := make(map[uintptr]bool)
@@ -284,9 +271,9 @@ func (p *pair) Len() int {
 
 // Map calls function f on each element of the pair, returning a new pair
 // constructed from the values returned by f().
-func (p *pair) Map(funk func(interface{}) interface{}) Pair {
-	joiner := NewPairJoiner()
-	iter := NewPairIterator(p)
+func (p *pair) Map(funk func(interface{}) interface{}) Sequence {
+	joiner := NewPairBuilder()
+	iter := p.Iterator()
 	for iter.HasNext() {
 		// TODO: what about improper lists?
 		joiner.Append(funk(iter.Next()))
@@ -312,20 +299,30 @@ func (p *pair) ToSlice() []interface{} {
 	return args
 }
 
+func (p *pair) Iterator() Iterator {
+	return &PairIterator{p, true}
+}
+
 // String returns the string form of the pair.
 func (p *pair) String() string {
 	buf := new(bytes.Buffer)
 	buf.WriteString("(")
 	var r Pair = p
 	for p != nil {
-		stringifyBuffer(r.First(), buf)
+		written := stringifyBuffer(r.First(), buf)
 		if r.Rest() == theEmptyList {
 			p = nil
 		} else if rr, ok := r.Rest().(Pair); ok {
-			buf.WriteString(" ")
+			if written > 0 {
+				buf.WriteString(" ")
+			}
 			r = rr
 		} else {
-			buf.WriteString(" . ")
+			if written > 0 {
+				buf.WriteString(" . ")
+			} else {
+				buf.WriteString(". ")
+			}
 			stringifyBuffer(r.Rest(), buf)
 			p = nil
 		}
@@ -380,7 +377,7 @@ func (e EmptyList) Reverse() Pair {
 }
 
 // Map always returns the empty list without calling the function.
-func (e EmptyList) Map(f func(interface{}) interface{}) Pair {
+func (e EmptyList) Map(f func(interface{}) interface{}) Sequence {
 	return theEmptyList
 }
 
@@ -400,6 +397,10 @@ func (e EmptyList) ToSlice() []interface{} {
 	return nil
 }
 
+func (e EmptyList) Iterator() Iterator {
+	return &PairIterator{nil, true}
+}
+
 // setFirst does nothing on an empty list. EmptyList is empty.
 func (e EmptyList) setFirst(a interface{}) {
 }
@@ -416,15 +417,6 @@ var theEmptyList EmptyList = EmptyList(0)
 type PairIterator struct {
 	curr   Pair // curr is the Pair currently under consideration
 	proper bool // if true, list was proper (e.g. (a b c))
-}
-
-// NewPairIterator constructs an iterator for the given Pair.
-func NewPairIterator(pair Pair) *PairIterator {
-	// assume the list is proper
-	if pair == theEmptyList {
-		return &PairIterator{nil, true}
-	}
-	return &PairIterator{pair, true}
 }
 
 // HasNext indicates if there is another value in the Pair chain.
@@ -462,21 +454,21 @@ func (i *PairIterator) Next() interface{} {
 	return result
 }
 
-// PairJoiner permits easily building a list by appending objects to the
+// PairBuilder permits easily building a list by appending objects to the
 // joiner, in order, and then requesting the completed list when finished.
-type PairJoiner struct {
+type PairBuilder struct {
 	head Pair // points to the beginning of the list
 	tail Pair // the last element, used for efficiently appending
 }
 
-// NewPairJoiner constructs an empty PairJoiner for building a list.
-func NewPairJoiner() *PairJoiner {
-	return &PairJoiner{theEmptyList, theEmptyList}
+// NewPairBuilder constructs an empty PairBuilder for building a list.
+func NewPairBuilder() *PairBuilder {
+	return &PairBuilder{theEmptyList, theEmptyList}
 }
 
 // Append adds the given element to the end of the list managed by this
-// PairJoiner instance.
-func (pj *PairJoiner) Append(elem interface{}) *PairJoiner {
+// PairBuilder instance.
+func (pj *PairBuilder) Append(elem interface{}) *PairBuilder {
 	if pj.head == theEmptyList {
 		pj.head = NewPair(elem)
 		pj.tail = pj.head
@@ -487,8 +479,8 @@ func (pj *PairJoiner) Append(elem interface{}) *PairJoiner {
 }
 
 // Join adds the given element to the end of the list managed by this
-// PairJoiner instance in an improper fashion, forming an improper list.
-func (pj *PairJoiner) Join(elem interface{}) *PairJoiner {
+// PairBuilder instance in an improper fashion, forming an improper list.
+func (pj *PairBuilder) Join(elem interface{}) *PairBuilder {
 	if pj.head == theEmptyList {
 		pj.head = NewPair(elem)
 		pj.tail = pj.head
@@ -498,7 +490,7 @@ func (pj *PairJoiner) Join(elem interface{}) *PairJoiner {
 	return pj
 }
 
-// List returns the head of the list constructed by this PairJoiner.
-func (pj *PairJoiner) List() Pair {
+// List returns the head of the list constructed by this PairBuilder.
+func (pj *PairBuilder) List() Pair {
 	return pj.head
 }

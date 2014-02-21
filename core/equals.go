@@ -26,12 +26,12 @@ func builtinEqv(name string, args []interface{}) (interface{}, LispError) {
 	vec1, is_vec1 := args[0].(Vector)
 	vec2, is_vec2 := args[1].(Vector)
 	if is_vec1 && is_vec2 {
-		return BooleanFromBool(vec1.Length() == 0 && vec2.Length() == 0), nil
+		return BooleanFromBool(vec1.Len() == 0 && vec2.Len() == 0), nil
 	}
 	bv1, is_bv1 := args[0].(ByteVector)
 	bv2, is_bv2 := args[1].(ByteVector)
 	if is_bv1 && is_bv2 {
-		return BooleanFromBool(bv1.Length() == 0 && bv2.Length() == 0), nil
+		return BooleanFromBool(bv1.Len() == 0 && bv2.Len() == 0), nil
 	}
 	pair1, is_pair1 := args[0].(Pair)
 	pair2, is_pair2 := args[1].(Pair)
@@ -56,13 +56,13 @@ func builtinEqv(name string, args []interface{}) (interface{}, LispError) {
 func compareByteVectors(bv1, bv2 ByteVector) bool {
 	// byte vectors cannot have nested structures, so comparing the length
 	// is a valid shortcut
-	if bv1.Length() != bv2.Length() {
+	if bv1.Len() != bv2.Len() {
 		return false
 	}
 	id1 := bv1.ObjectId()
 	id2 := bv2.ObjectId()
 	if id1 != id2 {
-		for ii := bv1.Length() - 1; ii >= 0; ii-- {
+		for ii := bv1.Len() - 1; ii >= 0; ii-- {
 			if bv1.Get(ii) != bv2.Get(ii) {
 				return false
 			}
@@ -95,10 +95,10 @@ func sequenceComparator(thing1, thing2 interface{}) bool {
 		id2 := vec2.ObjectId()
 		if id1 != id2 {
 			var length int = 0
-			if vec1.Length() > vec2.Length() {
-				length = vec1.Length()
+			if vec1.Len() > vec2.Len() {
+				length = vec1.Len()
 			} else {
-				length = vec2.Length()
+				length = vec2.Len()
 			}
 			for ii := 0; ii < length; ii++ {
 				if !compareThings(vec1.Get(ii), vec2.Get(ii)) {
@@ -118,8 +118,8 @@ func sequenceComparator(thing1, thing2 interface{}) bool {
 		len1 := pair1.Len()
 		len2 := pair2.Len()
 		if len1 > len2 {
-			iter1 := NewPairIterator(pair1)
-			iter2 := NewPairIterator(pair2)
+			iter1 := pair1.Iterator()
+			iter2 := pair2.Iterator()
 			for ii := 0; ii < len1; ii++ {
 				p1 := iter1.Next()
 				p2 := iter2.Next()
