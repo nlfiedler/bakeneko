@@ -839,9 +839,3 @@ func DecodeCode(in io.Reader) (code CodeObject, err error) {
 	err = code.decode(decoder)
 	return
 }
-
-// TODO: byte code verifier
-//    a. ensure branch offsets within bounds
-//    b. ensure symbol indices within bounds
-//    c. ensure constant indices within bounds
-//    d. validate nested code objects (be careful to avoid infinite loops!)

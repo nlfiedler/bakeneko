@@ -42,6 +42,7 @@ var unquoteSym = NewSymbol("unquote")
 var unquotesplicingSym = NewSymbol("unquote-splicing")
 var appendSym = NewSymbol("append")
 var consSym = NewSymbol("cons")
+var listToVectorSym = NewSymbol("list->vector")
 
 // None represents the result of a line comment, or other results of parsing
 // that resolve to nothing.
@@ -867,50 +868,71 @@ func (p *parserImpl) expandInclude(seq Sequence, toplevel bool) (Pair, LispError
 	return results, nil
 }
 
-// expandQuasiquote processes the quasi-quotation marks, expanding them
-// into a form suitable for evaluation.
+// expandQuasiquote processes the (quasi-)quotation expression contained
+// within an object (atom, pair, or vector), expanding them into a form
+// suitable for evaluation.
 func expandQuasiquote(x interface{}) (interface{}, LispError) {
 	// Expand `x => 'x; `,x => x; `(,@x y) => (append x y)
-	//
-	// TODO: for vectors, may need to avoid building up the quoted expression
-	//       using (cons) and (append) since those result in a list of pairs
-	//
-	seq, is_seq := x.(Sequence)
-	if !is_seq || seq.Len() == 0 {
+	switch seq := x.(type) {
+	case Pair:
+		return expandQuasiPair(seq)
+	case Vector:
+		// convert to a list, expand quasi quotes, wrap in list->vector
+		builder := NewPairBuilder()
+		limit := seq.Len()
+		for pos := 0; pos < limit; pos++ {
+			builder.Append(seq.Get(pos))
+		}
+		list := builder.List()
+		result, err := expandQuasiPair(list)
+		if err != nil {
+			return nil, err
+		}
+		return NewList(listToVectorSym, result), nil
+	default:
 		return NewList(quoteSym, x), nil
 	}
-	token := seq.First()
+}
+
+// expandQuasiPair processes the (quasi-)quotation expression contained
+// within a chained pair, expanding them into a form suitable for
+// evaluation.
+func expandQuasiPair(pair Pair) (interface{}, LispError) {
+	if pair.Len() == 0 {
+		return NewList(quoteSym, pair), nil
+	}
+	token := pair.First()
 	sym, issym := token.(Symbol)
 	if issym && atomsEqual(sym, unquotesplicingSym) {
-		return nil, NewLispErrorl(ESYNTAX, seq, "can't splice here")
+		return nil, NewLispErrorl(ESYNTAX, pair, "can't splice here")
 	}
 	if issym && atomsEqual(sym, unquoteSym) {
-		if seq.Len() != 2 {
-			return nil, NewLispErrorl(ESYNTAX, seq, "unquote requires 1 argument")
+		if pair.Len() != 2 {
+			return nil, NewLispErrorl(ESYNTAX, pair, "unquote requires 1 argument")
 		}
-		return seq.Second(), nil
+		return pair.Second(), nil
 	}
 	if nseq, is_seq := token.(Sequence); is_seq && nseq.Len() > 0 {
 		if sym, issym := nseq.First().(Symbol); issym && atomsEqual(sym, unquotesplicingSym) {
 			if nseq.Len() != 2 {
-				return nil, NewLispErrorl(ESYNTAX, seq, "unquote splicing requires 1 argument")
+				return nil, NewLispErrorl(ESYNTAX, pair, "unquote splicing requires 1 argument")
 			}
-			expr, err := expandQuasiquote(seq.Rest())
+			expr, err := expandQuasiquote(pair.Rest())
 			if err != nil {
 				return nil, err
 			}
 			return NewList(appendSym, nseq.Second(), expr), nil
 		}
 	}
-	fexpr, err := expandQuasiquote(seq.First())
+	fexpr, err := expandQuasiquote(pair.First())
 	if err != nil {
 		return nil, err
 	}
-	rexpr, err := expandQuasiquote(seq.Rest())
+	rexpr, err := expandQuasiquote(pair.Rest())
 	if err != nil {
 		return nil, err
 	}
-	return NewSequence(seq, consSym, fexpr, rexpr), nil
+	return NewList(consSym, fexpr, rexpr), nil
 }
 
 // WireStripper removes the location information from a locatable element

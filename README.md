@@ -27,7 +27,6 @@ dependencies.
 
 - Macro expansion
 - Derived expressions: case, let, do, etc
-- Quasi-quoting
 - Many standard procedures
 - Defining and using libraries
 - REPL

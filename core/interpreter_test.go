@@ -455,8 +455,7 @@ func (s *InterpreterSuite) TestInterpreterQuasiquote(c *gc.C) {
 	inputs["`(a ,(+ 1 2) ,@(map abs '(4 -5 6)) b)"] = "(a 3 4 5 6 b)"
 	inputs["`(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] = "(10 5 2 4 3 8)"
 	inputs["`((foo ,(- 10 3)) ,@(cdr '(c)) . ,(car '(cons)))"] = "((foo 7) . cons)"
-	// TODO: issue 23 vector quasi-quoting
-	// inputs["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] = "#(10 5 2 4 3 8)"
+	inputs["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] = "#(10 5 2 4 3 8)"
 	checkInterpret(c, inputs)
 }
 

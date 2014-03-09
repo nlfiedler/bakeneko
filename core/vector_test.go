@@ -99,3 +99,44 @@ func (s *VectorSuite) TestVectorIteratorNil(c *gc.C) {
 	c.Check(iter.IsProper(), gc.Equals, true)
 	c.Check(iter.Next(), gc.IsNil)
 }
+
+func (s *VectorSuite) TestListToVector(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs["(list->vector '())"] = "#()"
+	inputs["(list->vector '(1))"] = "#(1)"
+	inputs["(list->vector '(1 2))"] = "#(1 2)"
+	inputs["(list->vector '(1 2 3))"] = "#(1 2 3)"
+	inputs["(list->vector '(1 2 3 4))"] = "#(1 2 3 4)"
+	inputs[`(list->vector '(#\a "abc" '(12 24 48)))`] = `#(#\a "abc" (quote (12 24 48)))`
+	checkInterpret(c, inputs)
+	// test error cases
+	errors := make(map[string]string)
+	errors["(list->vector 1)"] = ".* expects a list, not 1"
+	errors[`(list->vector "abc")`] = `.* expects a list, not "abc"`
+	checkInterpretError(c, errors)
+}
+
+func (s *VectorSuite) TestVectorToList(c *gc.C) {
+	inputs := make(map[string]string)
+	inputs["(vector->list '#())"] = "()"
+	inputs["(vector->list '#(1))"] = "(1)"
+	inputs["(vector->list '#(1 2))"] = "(1 2)"
+	inputs["(vector->list '#(1 2 3))"] = "(1 2 3)"
+	inputs["(vector->list '#(1 2 3 4))"] = "(1 2 3 4)"
+	inputs["(vector->list '#(1 2 3 4 5 6 7 8 9 10) 5)"] = "(6 7 8 9 10)"
+	inputs["(vector->list '#(1 2 3 4 5 6 7 8 9 10) 3 7)"] = "(4 5 6 7)"
+	checkInterpret(c, inputs)
+	// test error cases
+	errors := make(map[string]string)
+	errors["(vector->list 1)"] = ".* expects a vector, not 1"
+	errors[`(vector->list "abc")`] = `.* expects a vector, not "abc"`
+	errors["(vector->list '#(1 2 3 4) #\\a)"] = ".* expects a number, .*"
+	errors["(vector->list '#(1 2 3 4) 1 #\\a)"] = ".* expects a number, .*"
+	errors["(vector->list '#(1 2 3 4) -2)"] = ".* index out of bounds .*"
+	errors["(vector->list '#(1 2 3 4) 10)"] = ".* index out of bounds .*"
+	errors["(vector->list '#(1 2 3 4) 2 10)"] = ".* index out of bounds .*"
+	errors["(vector->list '#(1 2 3 4) -2 10)"] = ".* index out of bounds .*"
+	errors["(vector->list '#(1 2 3 4) 2 -10)"] = ".* index out of bounds .*"
+	errors["(vector->list '#(1 2 3 4) 10 2)"] = ".* index out of bounds .*"
+	checkInterpretError(c, errors)
+}

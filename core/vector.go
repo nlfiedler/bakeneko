@@ -52,21 +52,6 @@ type Iterator interface {
 	Next() interface{}
 }
 
-// NewSequence constructs an implementation of Sequence that has the same
-// type a the prototype (needs to be one of Pair or Vector as of this
-// writing) and contains the items provided. Lists will always be proper.
-func NewSequence(prototype interface{}, a ...interface{}) Sequence {
-	switch prototype.(type) {
-	case Pair:
-		return NewList(a...)
-	case Vector:
-		return NewVector(a)
-	default:
-		// just use Pair in all other cases
-		return NewList(a...)
-	}
-}
-
 // SequenceAppend adds the given element to the end of the sequence,
 // possibly returning a new sequence.
 func SequenceAppend(seq interface{}, elem interface{}) Sequence {
@@ -89,6 +74,12 @@ type Vector []interface{}
 // will be generated.
 func NewVector(data []interface{}) Vector {
 	return Vector(data)
+}
+
+// NewVectorFromValues is the variadic form of NewVector, receiving any
+// number of arguments and building a Vector from them.
+func NewVectorFromValues(a ...interface{}) Vector {
+	return NewVector(a)
 }
 
 func (v Vector) ObjectId() uintptr {
@@ -195,4 +186,62 @@ func (vi *vectorIterator) Next() (val interface{}) {
 	val = vi.v.Get(vi.p)
 	vi.p++
 	return
+}
+
+// listToVector implements the list->vector procedure.
+func listToVector(name string, args []interface{}) (interface{}, LispError) {
+	if pair, ok := args[0].(Pair); ok {
+		result := make([]interface{}, 0)
+		iter := pair.Iterator()
+		for iter.HasNext() {
+			result = append(result, iter.Next())
+		}
+		return NewVector(result), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a list, not %v", name, args[0])
+}
+
+// extractNumericArg checks if the given argument is a number and returns
+// it as a Number. Otherwise it returns an error.
+func extractNumericArg(name string, arg interface{}) (Number, LispError) {
+	if num, ok := arg.(Number); ok {
+		return num, nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a number, not %v", name, arg)
+}
+
+// vectorToList implements the vector->list procedure.
+func vectorToList(name string, args []interface{}) (interface{}, LispError) {
+	if vec, ok := args[0].(Vector); ok {
+		start := 0
+		end := vec.Len()
+		if len(args) >= 2 {
+			num, err := extractNumericArg(name, args[1])
+			if err != nil {
+				return nil, err
+			}
+			requested := int(num.IntegerValue().ToInteger())
+			if requested < 0 || requested > end {
+				return nil, NewLispErrorf(EARGUMENT, "%s index out of bounds %v", name, args[1])
+			}
+			start = requested
+		}
+		if len(args) == 3 {
+			num, err := extractNumericArg(name, args[2])
+			if err != nil {
+				return nil, err
+			}
+			requested := int(num.IntegerValue().ToInteger())
+			if requested < start || requested > end {
+				return nil, NewLispErrorf(EARGUMENT, "%s index out of bounds %v", name, args[2])
+			}
+			end = requested
+		}
+		builder := NewPairBuilder()
+		for pos := start; pos < end; pos++ {
+			builder.Append(vec.Get(pos))
+		}
+		return builder.List(), nil
+	}
+	return nil, NewLispErrorf(EARGUMENT, "%s expects a vector, not %v", name, args[0])
 }

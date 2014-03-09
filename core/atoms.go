@@ -379,7 +379,6 @@ type characterImpl rune
 // character. Invalid input, such as a short string, will result in the
 // uf8.RuneError character.
 func NewCharacter(val string) Character {
-	// TODO: what about the other special Scheme characters (e.g. #\alarm)?
 	if val == "#\\space" {
 		return characterImpl(' ')
 	} else if val == "#\\newline" {
@@ -423,7 +422,6 @@ func (c characterImpl) ToRune() rune {
 
 // String returns the Scheme representation of the character.
 func (c characterImpl) String() string {
-	// TODO: what about the other special Scheme characters (e.g. #\alarm)?
 	if c == ' ' {
 		return "#\\space"
 	} else if c == '\n' {

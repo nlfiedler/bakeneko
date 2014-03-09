@@ -295,7 +295,7 @@ func (s *ParserSuite) TestExpandQuotes(c *gc.C) {
 	mapping["`(a ,(+ 1 2) ,@(map abs '(4 -5 6)) b)"] =
 		"(cons (quote a) (cons (+ 1 2) (append (map abs (quote (4 -5 6))) (cons (quote b) (quote ())))))"
 	mapping["`#(10 5 ,(sqrt 4) ,@(map sqrt '(16 9)) 8)"] =
-		"#(cons (quote 10) #(cons (quote 5) #(cons (sqrt 4) (append (map sqrt (quote (16 9))) #(cons (quote 8) (quote #()))))))"
+		"(list->vector (cons (quote 10) (cons (quote 5) (cons (sqrt 4) (append (map sqrt (quote (16 9))) (cons (quote 8) (quote ())))))))"
 	verifyExpandMap(mapping, c)
 }
 

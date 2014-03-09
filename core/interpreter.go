@@ -242,6 +242,9 @@ func newNullEnvironment() Environment {
 	builtins = append(builtins, NewBuiltin(builtinAbs, "abs", 1, 1))
 	builtins = append(builtins, NewBuiltin(builtinQuotient, "quotient", 2, 2))
 	builtins = append(builtins, NewBuiltin(builtinSqrt, "sqrt", 1, 1))
+	// vector procedures (R7RS 6.8)
+	builtins = append(builtins, NewBuiltin(listToVector, "list->vector", 1, 1))
+	builtins = append(builtins, NewBuiltin(vectorToList, "vector->list", 1, 3))
 	// control features (R7RS 6.10)
 	// builtins = append(builtins, NewBuiltin(builtinIsProcedure, "procedure?", 1, 1))
 	builtins = append(builtins, NewBuiltin(builtinApply, "apply", 2, -1))
@@ -501,48 +504,48 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				return nil, NewLispErrorf(EARGUMENT, "unbound variable: %s", sym)
 			}
 		}
-		seq, is_seq := expr.(Sequence)
-		if !is_seq {
+		pair, is_pair := expr.(Pair)
+		if !is_pair {
 			// atom
 			return expr, nil
 		}
-		length := seq.Len()
+		length := pair.Len()
 		if length == 0 {
 			// empty list
-			return seq, nil
+			return pair, nil
 		}
-		first := seq.First()
+		first := pair.First()
 		// assume that the first is a primitive lambda until we learn otherwise
 		keyword := true
 		if sym, issym := first.(Symbol); issym {
 			// the primitive lambdas
 			if atomsEqual(sym, quoteSym) {
 				// (quote exp)
-				return seq.Second(), nil
+				return pair.Second(), nil
 			} else if atomsEqual(sym, ifSym) {
 				// (if test conseq alt)
-				test := seq.Second()
+				test := pair.Second()
 				result, err := Eval(test, env)
 				if err != nil {
 					return nil, err
 				}
 				if isTrue(result) {
-					expr = seq.Third()
+					expr = pair.Third()
 				} else {
-					expr = Cxr("cadddr", seq)
+					expr = Cxr("cadddr", pair)
 				}
 			} else if atomsEqual(sym, setSym) {
 				// (set! var exp)
-				return primitiveSet(seq, env)
+				return primitiveSet(pair, env)
 			} else if atomsEqual(sym, defineSym) {
 				// (define var exp)
-				return primitiveDefine(seq, env)
+				return primitiveDefine(pair, env)
 			} else if atomsEqual(sym, lambdaSym) {
 				// (lambda (var*) exp)
-				return primitiveLambda(seq, env)
+				return primitiveLambda(pair, env)
 			} else if atomsEqual(sym, beginSym) {
 				// (begin exp+)
-				exp, err := evalForTail(seq.Rest(), env)
+				exp, err := evalForTail(pair.Rest(), env)
 				if err != nil {
 					return nil, err
 				}
@@ -551,7 +554,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 				val := env.Find(sym)
 				if tr, ok := val.(TailRecursive); ok {
 					// invoke the tail recursive function
-					exp, val, err := tr.Call(length, seq, env)
+					exp, val, err := tr.Call(length, pair, env)
 					if exp != nil {
 						expr = exp
 					} else {
@@ -568,7 +571,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 		if !keyword {
 			// evaluate all of the list elements in order
 			joinr := NewPairBuilder()
-			iter := seq.Iterator()
+			iter := pair.Iterator()
 			for iter.HasNext() {
 				exp := iter.Next()
 				val, err := Eval(exp, env)
@@ -592,7 +595,7 @@ func Eval(expr interface{}, env Environment) (interface{}, LispError) {
 					}
 				} else {
 					return nil, NewLispErrorf(EARGUMENT,
-						"Combination must be a proper list: %v", seq)
+						"Combination must be a proper list: %v", pair)
 				}
 			} else {
 				return nil, NewLispErrorf(ESUPPORT,

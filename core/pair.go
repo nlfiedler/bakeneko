@@ -19,16 +19,16 @@ type Pair interface {
 	// ObjectId returns the unique identifier for this object.
 	ObjectId() uintptr
 	// Reverse returns the chain of Pairs in reverse order.
-	Reverse() Pair // TODO: move to Sequence?
+	Reverse() Pair
 	// Append adds the given item to the pair, forming a list. The element
 	// to which the new value was added is returned, allowing the caller
 	// to chain one append operation onto the next to form a chain.
-	Append(a interface{}) Pair // TODO: move to Sequence?
+	Append(a interface{}) Pair
 	// Join finds the first available slot in the chained Pairs
 	// and attaches the given thing there.
-	Join(a interface{}) // TODO: move to Sequence?
+	Join(a interface{})
 	// ToSlice constructs a Go slice containing the values in the list of pairs.
-	ToSlice() []interface{} // TODO: move to Sequence?
+	ToSlice() []interface{}
 	// setFirst replaces the car of the pair with a.
 	setFirst(a interface{})
 	// setRest replaces the cdr of the pair with a.
@@ -275,7 +275,6 @@ func (p *pair) Map(funk func(interface{}) interface{}) Sequence {
 	joiner := NewPairBuilder()
 	iter := p.Iterator()
 	for iter.HasNext() {
-		// TODO: what about improper lists?
 		joiner.Append(funk(iter.Next()))
 	}
 	return joiner.List()

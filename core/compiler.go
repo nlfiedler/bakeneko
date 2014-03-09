@@ -115,7 +115,6 @@ func (c *compiler) Compile(expr interface{}) LispError {
 	case Symbol:
 		// symbol reference
 		c.AddInstruction(OP_LOADVAR, obj)
-	// TODO: use Sequence instead of Pair?
 	case Pair:
 		// most of the time they're pairs
 		length := obj.Len()
