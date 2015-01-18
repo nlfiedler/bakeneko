@@ -557,6 +557,7 @@ func atoi(text string) (int64, LispError) {
 			return 0, NewLispErrorf(ESYNTAX, "invalid number syntax: %s", text)
 		}
 		if err == strconv.ErrRange {
+			// TODO: should use math/big.Int
 			return 0, NewLispErrorf(ESYNTAX, "number out of range: %s", text)
 		}
 	}

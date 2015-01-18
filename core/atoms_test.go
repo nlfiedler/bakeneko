@@ -314,48 +314,53 @@ func TestVoid(t *testing.T) {
 	}
 }
 
-func TestInteger(t *testing.T) {
+func (s *AtomSuite) TestInteger(c *gc.C) {
 	i := NewInteger(123)
+	c.Check(i, gc.NotNil)
+	c.Check(i.ToInteger(), gc.Equals, int64(123))
 	// test EqualTo()
-	if _, err := i.EqualTo(BooleanTrue); err == nil {
-		t.Error("Integer.EqualTo() wrong type should fail")
-	}
-	if eq, err := i.EqualTo(NewInteger(123)); err != nil || !eq {
-		t.Error("Integer.EqualTo() same value should be true")
-	}
-	if eq, err := i.EqualTo(NewInteger(234)); err != nil || eq {
-		t.Error("Integer.EqualTo() different value should be false")
-	}
+	_, err := i.EqualTo(BooleanTrue)
+	c.Check(err, gc.NotNil, gc.Commentf("Integer.EqualTo() wrong type should fail"))
+	eq, err := i.EqualTo(NewInteger(123))
+	c.Check(err, gc.IsNil)
+	c.Check(eq, gc.Equals, true, gc.Commentf("Integer.EqualTo() same value should be true"))
+	eq, err = i.EqualTo(NewInteger(234))
+	c.Check(err, gc.IsNil)
+	c.Check(eq, gc.Equals, false, gc.Commentf("Integer.EqualTo() different value should be false"))
 	// test CompareTo()
-	if _, err := i.CompareTo(BooleanTrue); err == nil {
-		t.Error("Integer.CompareTo() wrong type should fail")
-	}
-	if cmp, err := i.CompareTo(NewInteger(123)); err != nil || cmp != 0 {
-		t.Error("Integer.CompareTo() same value should be zero")
-	}
-	if cmp, err := i.CompareTo(NewInteger(234)); err != nil || cmp >= 0 {
-		t.Error("Integer.CompareTo() greater value should be negative")
-	}
-	if cmp, err := i.CompareTo(NewInteger(12)); err != nil || cmp <= 0 {
-		t.Error("Integer.CompareTo() lesser value should be positive")
-	}
+	_, err = i.CompareTo(BooleanTrue)
+	c.Check(err, gc.NotNil, gc.Commentf("Integer.CompareTo() wrong type should fail"))
+	cmp, err := i.CompareTo(NewInteger(123))
+	c.Check(err, gc.IsNil)
+	c.Check(cmp, gc.Equals, int8(0), gc.Commentf("Integer.CompareTo() same value should be zero"))
+	cmp, err = i.CompareTo(NewInteger(234))
+	c.Check(err, gc.IsNil)
+	c.Check(cmp < 0, gc.Equals, true, gc.Commentf("Integer.CompareTo() greater value should be negative"))
+	cmp, err = i.CompareTo(NewInteger(12))
+	c.Check(err, gc.IsNil)
+	c.Check(cmp > 0, gc.Equals, true, gc.Commentf("Integer.CompareTo() lesser value should be positive"))
 	// test Add(), Divide(), Eval(), Multiply(), Subtract()
-	if num, ok := i.Add(NewInteger(10)).Eval().(int64); !ok || num != 133 {
-		t.Errorf("Integer.Add(10) yielded wrong result: %v", num)
-	}
-	if num, ok := i.Subtract(NewInteger(10)).Eval().(int64); !ok || num != 113 {
-		t.Errorf("Integer.Subtract(10) yielded wrong result: %v", num)
-	}
-	if num, ok := i.Multiply(NewInteger(10)).Eval().(int64); !ok || num != 1230 {
-		t.Errorf("Integer.Multiply(10) yielded wrong result: %v", num)
-	}
-	if num, ok := i.Divide(NewInteger(10)).Eval().(int64); !ok || num != 12 {
-		t.Errorf("Integer.Divide(10) yielded wrong result: %v", num)
-	}
+	num, ok := i.Add(NewInteger(10)).Eval().(int64)
+	c.Check(ok, gc.Equals, true)
+	c.Check(num, gc.Equals, int64(133), gc.Commentf("Integer.Add(10) yielded wrong result: %v", num))
+	num, ok = i.Subtract(NewInteger(10)).Eval().(int64)
+	c.Check(ok, gc.Equals, true)
+	c.Check(num, gc.Equals, int64(113), gc.Commentf("Integer.Subtract(10) yielded wrong result: %v", num))
+	num, ok = i.Multiply(NewInteger(10)).Eval().(int64)
+	c.Check(ok, gc.Equals, true)
+	c.Check(num, gc.Equals, int64(1230), gc.Commentf("Integer.Multiply(10) yielded wrong result: %v", num))
+	num, ok = i.Divide(NewInteger(10)).Eval().(int64)
+	c.Check(ok, gc.Equals, true)
+	c.Check(num, gc.Equals, int64(12), gc.Commentf("Integer.Divide(10) yielded wrong result: %v", num))
 	// test String()
-	if i.String() != "123" {
-		t.Error("Integer.String() yield wrong result")
-	}
+	c.Check(i.String(), gc.Equals, "123", gc.Commentf("Integer.String() yield wrong result"))
+	// test larger number
+	i = NewInteger(152399025)
+	c.Check(i, gc.NotNil)
+	c.Check(i.ToInteger(), gc.Equals, int64(152399025))
+	num, ok = i.Add(NewInteger(100)).Eval().(int64)
+	c.Check(ok, gc.Equals, true)
+	c.Check(num, gc.Equals, int64(152399125), gc.Commentf("larger number addition failed"))
 }
 
 func TestFloat(t *testing.T) {

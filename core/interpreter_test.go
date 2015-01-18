@@ -29,6 +29,24 @@ var fibonacciRecursiveText string = `(define fibonacci
 
 (fibonacci 100)`
 
+var squareRootSicp string = `(define (average v1 v2) (/ (+ v1 v2) 2))
+
+(define (square n) (* n n))
+
+(define (sqrt n)
+  (define (improve guess)
+    (average guess (/ n guess)))
+  (define (good-enough? guess)
+    (< (abs (- (square guess) n)) 0.0000000001))
+  (define (tryit guess)
+    (if (good-enough? guess)
+      guess
+      (tryit (improve guess))))
+  (tryit 1))
+
+(sqrt 152399025)  ; => 12345
+`
+
 // verifyInterpret takes a map of inputs to expected outputs, running the
 // inputs through the interpreter and checking the output.
 func verifyInterpret(t *testing.T, inputs map[string]string) {
@@ -436,6 +454,16 @@ func (s *InterpreterSuite) TestInterpreterFibRecursive(c *gc.C) {
 		c.Check(result, gc.Equals, NewInteger(3736710778780434371))
 	}
 }
+
+// TODO: builtinDivide() use of BigRat appears to be not working well here
+// func (s *InterpreterSuite) TestInterpreterSqrtRecursive(c *gc.C) {
+// 	result, err := Interpret(squareRootSicp)
+// 	if err != nil {
+// 		c.Errorf("Interpret() failed: %v", err)
+// 	} else {
+// 		c.Check(result, gc.Equals, NewInteger(12345))
+// 	}
+// }
 
 func (s *InterpreterSuite) TestInterpreterTailRecursive(c *gc.C) {
 	inputs := make(map[string]string)

@@ -227,6 +227,7 @@ func TestParseExprNumbers(t *testing.T) {
 	mapping[".1"] = "(0.1)"
 	mapping["6e4"] = "(60000)"
 	mapping["12345"] = "(12345)"
+	mapping["152399025"] = "(152399025)"
 	mapping["2.1"] = "(2.1)"
 	// weird test case, not sure this is correct
 	mapping["0.0.0"] = "(0 0)"
@@ -464,7 +465,7 @@ func (s *ParserSuite) TestErrorLocationBoolean(c *gc.C) {
 }
 
 func (s *ParserSuite) TestErrorLocationInteger(c *gc.C) {
-	input := `(define 123 "abc")`
+	input := `(define 152399025 "abc")`
 	cm := gc.Commentf("location for %q", input)
 	parser := NewParser()
 	pair, err := parser.Parse(input)
@@ -601,4 +602,30 @@ func (s *ParserSuite) TestParserIncludeCase(c *gc.C) {
 			c.Assert(actual, gc.Equals, expected)
 		}
 	}
+}
+
+func (s *ParserSuite) TestParserLargeIntegerAddition(c *gc.C) {
+	input := `(+ 152399025 100)`
+	cm := gc.Commentf("parsing a large integer")
+	parser := NewParser()
+	output, err := parser.Parse(input)
+	c.Assert(err, gc.IsNil, cm)
+	c.Check(output.Len(), gc.Equals, 1, cm)
+	pair, ok := output.First().(Pair)
+	c.Assert(ok, gc.Equals, true, cm)
+	c.Assert(pair, gc.NotNil, cm)
+	c.Check(pair.Len(), gc.Equals, 3, cm)
+	c.Check(pair.First(), gc.FitsTypeOf, NewParsedSymbol("+", 1, 1), cm)
+	c.Check(pair.Second(), gc.FitsTypeOf, NewParsedInteger(int64(152399025), 1, 1), cm)
+	c.Check(pair.Third(), gc.FitsTypeOf, NewParsedInteger(int64(100), 1, 1), cm)
+	expanded, err := parser.Expand(pair)
+	c.Assert(err, gc.IsNil, cm)
+	c.Assert(expanded, gc.NotNil, cm)
+	epair, ok := expanded.(Pair)
+	c.Assert(ok, gc.Equals, true, cm)
+	c.Assert(epair, gc.NotNil, cm)
+	c.Check(epair.Len(), gc.Equals, 3, cm)
+	c.Check(epair.First(), gc.FitsTypeOf, NewParsedSymbol("+", 1, 1), cm)
+	c.Check(epair.Second(), gc.FitsTypeOf, NewParsedInteger(int64(152399025), 1, 1), cm)
+	c.Check(epair.Third(), gc.FitsTypeOf, NewParsedInteger(int64(100), 1, 1), cm)
 }

@@ -244,6 +244,19 @@ func (vms *VirtMachSuite) TestRecursiveFib(c *gc.C) {
 	c.Check(result, gc.Equals, NewInteger(3736710778780434371))
 }
 
+// TODO: builtinDivide() use of BigRat appears to be not working well here
+// func (vms *VirtMachSuite) TestRecursiveSqrt(c *gc.C) {
+// 	name := "TestRecursiveSqrt"
+// 	code, err := CompileString(name, squareRootSicp)
+// 	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
+// 	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
+// 	env := NewEnvironment(theReportEnvironment)
+// 	result, err := EvaluateCode(code, env)
+// 	c.Assert(err, gc.IsNil, gc.Commentf("failed to evaluate code: %s", err))
+// 	c.Assert(result, gc.NotNil, gc.Commentf("lambda failed to yield result"))
+// 	c.Check(result, gc.Equals, NewInteger(12345))
+// }
+
 func (cs *CompilerSuite) TestCompilerLambdaErrors(c *gc.C) {
 	table := make(map[string]string)
 	table[`((lambda x x) 3 4 5 6)`] = ".* too many arguments .*"

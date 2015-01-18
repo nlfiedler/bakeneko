@@ -307,7 +307,8 @@ func reduceSequence(args []interface{}, op string, fn reduceNumbersFn) (interfac
 	for idx := 1; idx < len(args); idx++ {
 		next, is_num := args[idx].(Number)
 		if !is_num {
-			return nil, NewLispErrorf(EARGUMENT, "%s requires numeric arguments", op)
+			return nil, NewLispErrorf(EARGUMENT, "%s requires numeric arguments; got %v (%T)",
+				op, args[idx], args[idx])
 		}
 		curr, err = fn(curr, next)
 		if err != nil {
@@ -427,7 +428,7 @@ func builtinDivide(name string, args []interface{}) (val interface{}, err LispEr
 		// check for a rational result with denominator of 1 and simplify
 		if vr, is_r := val.(Rational); is_r {
 			if vr.BigRat().Denom().Int64() == 1 {
-				val = vr.BigRat().Num().Int64()
+				val = NewInteger(vr.BigRat().Num().Int64())
 			}
 		}
 	}
