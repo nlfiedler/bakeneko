@@ -1,5 +1,5 @@
 //
-// Copyright 2014 Nathan Fiedler. All rights reserved.
+// Copyright 2014-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -72,15 +72,9 @@ func compareCodeObjects(obtained, expected CodeObject, c *gc.C) {
 		// c.Check(obtained.GetConstant(pos), gc.DeepEquals, expected.GetConstant(pos))
 	}
 	// compare arguments
-	oiter := obtained.Arguments().Iterator()
-	eiter := expected.Arguments().Iterator()
-	for oiter.HasNext() && eiter.HasNext() {
-		oelem := stringify(oiter.Next())
-		eelem := stringify(eiter.Next())
-		c.Check(oelem, gc.Equals, eelem)
-	}
-	c.Check(oiter.HasNext(), gc.Equals, false)
-	c.Check(eiter.HasNext(), gc.Equals, false)
+	ob_args := stringify(obtained.Arguments())
+	ex_args := stringify(expected.Arguments())
+	c.Check(ob_args, gc.Equals, ex_args)
 	// compare instructions
 	c.Assert(obtained.CodeLen(), gc.Equals, expected.CodeLen())
 	length = obtained.CodeLen()
@@ -98,7 +92,7 @@ func compareCodeObjects(obtained, expected CodeObject, c *gc.C) {
 }
 
 func (cs *CompilerSuite) TestEncodeLambda(c *gc.C) {
-	expr := parseAndExpandForTest(`(define (test x y) (if #t x y))`, c)
+	expr := parseAndExpandForTest(`(define (test (x y)) (if #t x y))`, c)
 	name := "TestEncodeLambda"
 	expected, lerr := Compile(name, expr)
 	c.Assert(lerr, gc.IsNil, gc.Commentf("failed to compile code: %s", lerr))

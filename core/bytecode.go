@@ -1,5 +1,5 @@
 //
-// Copyright 2014 Nathan Fiedler. All rights reserved.
+// Copyright 2014-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -116,7 +116,7 @@ type CodeObject interface {
 	// been compiled, but prior to producing the final result.
 	setName(name string)
 	// Arguments returns the arguments for the compiled procedure.
-	Arguments() Pair
+	Arguments() interface{}
 	// LineForOffset returns the line number in the original source code
 	// which corresponds to the given byte code offset, primarily used
 	// for error reporting.
@@ -167,7 +167,7 @@ func (blp byteLinePair) String() string {
 // bytecode is the in-memory representation of compiled byte code.
 type bytecode struct {
 	name      string         // name for this code object, typically source file
-	arguments Pair           // procedure arguments
+	arguments interface{}    // procedure arguments
 	byte_code []Instruction  // the byte code instructions
 	constants []interface{}  // table of constant values (typically Atoms)
 	symbols   []Symbol       // table of symbol names
@@ -177,7 +177,7 @@ type bytecode struct {
 // NewCodeObject constructs a new instance of CodeObject given the name,
 // arguments, byte codes, constants, symbols, and mapping of line numbers
 // to byte code offsets.
-func NewCodeObject(name string, args Pair, codes []Instruction, cons []interface{},
+func NewCodeObject(name string, args interface{}, codes []Instruction, cons []interface{},
 	syms []Symbol, lines []byteLinePair) CodeObject {
 	bc := new(bytecode)
 	bc.name = name
@@ -212,7 +212,7 @@ func (bc *bytecode) setName(name string) {
 	bc.name = name
 }
 
-func (bc *bytecode) Arguments() Pair {
+func (bc *bytecode) Arguments() interface{} {
 	return bc.arguments
 }
 
@@ -281,7 +281,7 @@ func (bc *bytecode) encode(encoder *bytecodeEncoder) error {
 		return err
 	}
 	// encode the arguments
-	err = encoder.encodePair(bc.arguments)
+	err = encoder.encodeValue(bc.arguments)
 	if err != nil {
 		return err
 	}
@@ -350,7 +350,7 @@ func (bc *bytecode) decode(decoder *bytecodeDecoder) error {
 		return err
 	}
 	// decode the arguments
-	bc.arguments, err = decoder.decodePair()
+	bc.arguments, err = decoder.decodeValue()
 	if err != nil {
 		return err
 	}

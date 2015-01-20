@@ -1,5 +1,5 @@
 //
-// Copyright 2014 Nathan Fiedler. All rights reserved.
+// Copyright 2014-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -203,7 +203,7 @@ func (vms *VirtMachSuite) TestProcedure(c *gc.C) {
 }
 
 func (vms *VirtMachSuite) TestClosure(c *gc.C) {
-	expr := `(define (f x) (+ 1 2 x)) (f 7)`
+	expr := `(define (f (x)) (+ 1 2 x)) (f 7)`
 	name := "TestClosure"
 	code, err := CompileString(name, expr)
 	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
@@ -217,7 +217,9 @@ func (vms *VirtMachSuite) TestClosure(c *gc.C) {
 }
 
 func (vms *VirtMachSuite) TestLambdaArgs(c *gc.C) {
-	input := `((lambda (x y . z) z) 3 4 5 6)` // => (5 6)  # see R7RS 4.1.4
+	// All cases described in R7RS 4.1.4
+	// improper list, extra values assigned to last name
+	input := `((lambda (x y . z) z) 3 4 5 6)` // => (5 6)
 	name := "TestLambdaArgs"
 	code, err := CompileString(name, input)
 	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
@@ -230,6 +232,44 @@ func (vms *VirtMachSuite) TestLambdaArgs(c *gc.C) {
 	c.Assert(pair.Len(), gc.Equals, 2)
 	checkInteger(pair.First(), 5, c)
 	checkInteger(pair.Second(), 6, c)
+
+	// single argument symbol receives all values
+	input = `((lambda args args) 3 4 5 6)`
+	code, err = CompileString(name, input)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
+	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
+	env = NewEnvironment(theReportEnvironment)
+	result, err = EvaluateCode(code, env)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to evaluate code: %s", err))
+	c.Assert(result, gc.NotNil, gc.Commentf("lambda failed to yield result"))
+	pair = result.(Pair)
+	c.Assert(pair.Len(), gc.Equals, 4)
+	checkInteger(pair.First(), 3, c)
+	checkInteger(pair.Second(), 4, c)
+	checkInteger(pair.Third(), 5, c)
+	checkInteger(Cxr("cadddr", pair), 6, c)
+
+	// proper list with arguments
+	input = `((lambda (x y) (+ x y)) 3 4)`
+	code, err = CompileString(name, input)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
+	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
+	env = NewEnvironment(theReportEnvironment)
+	result, err = EvaluateCode(code, env)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to evaluate code: %s", err))
+	c.Assert(result, gc.NotNil, gc.Commentf("lambda failed to yield result"))
+	checkInteger(result, 7, c)
+
+	// list with one argument receives one value (R7RS 4.1.4)
+	input = `((lambda (x) x) 3)`
+	code, err = CompileString(name, input)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
+	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
+	env = NewEnvironment(theReportEnvironment)
+	result, err = EvaluateCode(code, env)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to evaluate code: %s", err))
+	c.Assert(result, gc.NotNil, gc.Commentf("lambda failed to yield result"))
+	checkInteger(result, 3, c)
 }
 
 func (vms *VirtMachSuite) TestRecursiveFib(c *gc.C) {
@@ -244,22 +284,21 @@ func (vms *VirtMachSuite) TestRecursiveFib(c *gc.C) {
 	c.Check(result, gc.Equals, NewInteger(3736710778780434371))
 }
 
-// TODO: builtinDivide() use of BigRat appears to be not working well here
-// func (vms *VirtMachSuite) TestRecursiveSqrt(c *gc.C) {
-// 	name := "TestRecursiveSqrt"
-// 	code, err := CompileString(name, squareRootSicp)
-// 	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
-// 	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
-// 	env := NewEnvironment(theReportEnvironment)
-// 	result, err := EvaluateCode(code, env)
-// 	c.Assert(err, gc.IsNil, gc.Commentf("failed to evaluate code: %s", err))
-// 	c.Assert(result, gc.NotNil, gc.Commentf("lambda failed to yield result"))
-// 	c.Check(result, gc.Equals, NewInteger(12345))
-// }
+func (vms *VirtMachSuite) TestRecursiveSqrt(c *gc.C) {
+	c.Skip("TODO: builtinDivide() use of BigRat appears going wrong")
+	name := "TestRecursiveSqrt"
+	code, err := CompileString(name, squareRootSicp)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
+	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
+	env := NewEnvironment(theReportEnvironment)
+	result, err := EvaluateCode(code, env)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to evaluate code: %s", err))
+	c.Assert(result, gc.NotNil, gc.Commentf("lambda failed to yield result"))
+	c.Check(result, gc.Equals, NewInteger(12345))
+}
 
 func (cs *CompilerSuite) TestCompilerLambdaErrors(c *gc.C) {
 	table := make(map[string]string)
-	table[`((lambda x x) 3 4 5 6)`] = ".* too many arguments .*"
 	table[`(1 2 3 4)`] = ".* is not applicable.*"
 	virtmachErrorTest(c, table)
 }

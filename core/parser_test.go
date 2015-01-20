@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -272,9 +272,9 @@ func (s *ParserSuite) TestExpand(c *gc.C) {
 	mapping[`(quote abc)`] = `(quote abc)`
 	mapping[`(set! foo (quote bar))`] = `(set! foo (quote bar))`
 	mapping[`(set! foo (if #t (quote bar)))`] = `(set! foo (if #t (quote bar) ()))`
-	mapping[`(define (f args) body)`] = `(define f (lambda (args) (begin body)))`
+	mapping[`(define (f args) body)`] = `(define f (lambda args (begin body)))`
 	mapping["(define-macro foo (lambda args (if #t (quote bar))))"] =
-		"(define-macro foo (lambda (args) (begin (if #t (quote bar) ()))))"
+		"(define-macro foo (lambda args (begin (if #t (quote bar) ()))))"
 	mapping[`(begin (if #t (display "foo")))`] = `(begin (if #t (display "foo") ()))`
 	mapping[`(begin (define foo 123) foo)`] = `(begin (define foo 123) foo)`
 	mapping[`(lambda (x) e1)`] = `(lambda (x) (begin e1))`
@@ -313,7 +313,7 @@ func (s *ParserSuite) TestExpandErrors(c *gc.C) {
 	table["(quote foo bar)"] = ".*quote requires datum.*"
 	table["(lambda foo)"] = ".*lambda requires 2\\+ arguments.*"
 	table[`(lambda ("foo") bar)`] = ".*lambda arguments must be symbols.*"
-	table[`(lambda "foo" bar)`] = ".*lambda arguments must be a list or a symbol.*"
+	table[`(lambda "foo" bar)`] = ".*lambda argument must be a symbol.*"
 	table["(include)"] = ".*include requires filenames.*"
 	table["(include 123)"] = ".*include expects string arguments.*"
 	verifyExpandError(c, table)

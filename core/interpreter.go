@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -364,50 +364,60 @@ func (r *recursiveProc) Call(length int, seq Sequence, env Environment) (interfa
 	return r.recursive(length, seq, env)
 }
 
-// lambda is a function body and its set of parameters.
+// lambda is a function body and its set of parameters. The parameters
+// may be a single symbol, which receives all argument values.
 type lambda struct {
 	body   interface{} // procedure definition
-	params Sequence    // formal parameter list
+	params interface{} // formal parameter list or symbol
 }
 
 // NewLambda constructs a new lambda for the given function body and parameters.
-func NewLambda(body interface{}, params Sequence) *lambda {
+func NewLambda(body interface{}, params interface{}) *lambda {
 	return &lambda{body, params}
 }
 
 // BindArguments binds the argument names to the given values, allowing for
 // extra arguments to be assigned to the last name if the list is improper.
 // Returns the new environment ready for evaluation.
-func BindArguments(env Environment, names Sequence, values Sequence) (Environment, LispError) {
+func BindArguments(env Environment, names interface{}, values Sequence) (Environment, LispError) {
 	result := NewEnvironment(env)
-	// map the symbols in names to the given values, storing in result
-	name_iter := names.Iterator()
-	value_iter := values.Iterator()
-	for name_iter.HasNext() {
-		name := name_iter.Next()
-		sym, ok := name.(Symbol)
-		if !ok {
-			// parser should have handled this already
-			return nil, NewLispErrorf(EARGUMENT, "name %s is not a symbol", name)
-		}
-		if !value_iter.HasNext() {
-			return nil, NewLispErrorf(EARGUMENT, "too few arguments to (lambda %v)", names)
-		}
-		if !name_iter.IsProper() {
-			// join the remaining values into a list and assign to the final argument
-			results := NewPairBuilder()
-			for value_iter.HasNext() {
-				value := value_iter.Next()
-				results.Append(value)
+	if name_sym, issym := names.(Symbol); issym {
+		result.Define(name_sym, SequenceToList(values))
+	} else if name_seq, isseq := names.(Sequence); isseq {
+		// map the symbols in names to the given values, storing in result
+		name_iter := name_seq.Iterator()
+		value_iter := values.Iterator()
+		for name_iter.HasNext() {
+			name := name_iter.Next()
+			sym, ok := name.(Symbol)
+			if !ok {
+				// parser should have handled this already
+				return nil, NewLispErrorf(EARGUMENT, "name %s is not a symbol", name)
 			}
-			result.Define(sym, results.List())
-		} else {
-			value := value_iter.Next()
-			result.Define(sym, value)
+			if !value_iter.HasNext() {
+				return nil, NewLispErrorf(EARGUMENT, "too few arguments to (lambda %v)", names)
+			}
+			if !name_iter.IsProper() {
+				// join the remaining values into a list and assign to the final argument
+				results := NewPairBuilder()
+				for value_iter.HasNext() {
+					value := value_iter.Next()
+					results.Append(value)
+				}
+				result.Define(sym, results.List())
+			} else {
+				value := value_iter.Next()
+				result.Define(sym, value)
+			}
 		}
-	}
-	if value_iter.HasNext() {
-		return nil, NewLispErrorf(EARGUMENT, "too many arguments to (lambda %v)", names)
+		if value_iter.HasNext() {
+			builder := NewPairBuilder()
+			for value_iter.HasNext() {
+				builder.Append(value_iter.Next())
+			}
+			rest := builder.List()
+			return nil, NewLispErrorf(EARGUMENT, "too many arguments to (lambda %v): %v", names, rest)
+		}
 	}
 	return result, nil
 }
@@ -435,7 +445,7 @@ type closure struct {
 
 // NewClosure constructs a new Closure with the given definition, defining
 // environment, and parameters.
-func NewClosure(body interface{}, params Sequence, env Environment) Closure {
+func NewClosure(body interface{}, params interface{}, env Environment) Closure {
 	lam := NewLambda(body, params)
 	return &closure{lam, env}
 }
@@ -674,10 +684,7 @@ func primitiveDefine(seq Sequence, env Environment) (interface{}, LispError) {
 func primitiveLambda(seq Sequence, env Environment) (interface{}, LispError) {
 	vars := seq.Second()
 	body := seq.Third()
-	if vlist, ok := vars.(Sequence); ok {
-		return NewClosure(body, vlist, env), nil
-	}
-	return nil, NewLispErrorf(EARGUMENT, "lambda arguments wrong type: %v", vars)
+	return NewClosure(body, vars, env), nil
 }
 
 // derivedAnd implements the derived lambda and

@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -402,9 +402,7 @@ func checkInteger(elem interface{}, expected int64, c *gc.C) {
 func (s *InterpreterSuite) TestInterpreterArbitraryArguments(c *gc.C) {
 	input := `((lambda (x y . z) z) 3 4 5 6)` // => (5 6)  # see R7RS 4.1.4
 	result, err := Interpret(input)
-	if err != nil {
-		c.Errorf("Interpret() failed: %v", err)
-	}
+	c.Check(err, gc.IsNil, gc.Commentf("Interpret() failed: %v", err))
 	if pair, is_pair := result.(Pair); is_pair {
 		if pair.Len() != 2 {
 			c.Error("expected lambda to return a list of two")
@@ -415,6 +413,11 @@ func (s *InterpreterSuite) TestInterpreterArbitraryArguments(c *gc.C) {
 	} else {
 		c.Errorf("expected lambda to return a list, got %T", result)
 	}
+	// single argument symbol receives all values (R7RS 4.1.4)
+	input = `((lambda x x) 3 4 5 6)`
+	result, err = Interpret(input)
+	c.Check(err, gc.IsNil, gc.Commentf("Interpret() failed: %v", err))
+	c.Check(stringify(result), gc.Equals, "(3 4 5 6)")
 }
 
 func (s *InterpreterSuite) TestInterpreterProcedures(c *gc.C) {
@@ -434,7 +437,6 @@ func (s *InterpreterSuite) TestInterpreterProcedures(c *gc.C) {
 
 func (s *InterpreterSuite) TestInterpreterLambdaErrors(c *gc.C) {
 	table := make(map[string]string)
-	table[`((lambda x x) 3 4 5 6)`] = ".* too many arguments .*"
 	table[`(1 2 3 4)`] = ".* is not applicable.*"
 	for input, expected := range table {
 		result, err := Interpret(input)
@@ -455,15 +457,15 @@ func (s *InterpreterSuite) TestInterpreterFibRecursive(c *gc.C) {
 	}
 }
 
-// TODO: builtinDivide() use of BigRat appears to be not working well here
-// func (s *InterpreterSuite) TestInterpreterSqrtRecursive(c *gc.C) {
-// 	result, err := Interpret(squareRootSicp)
-// 	if err != nil {
-// 		c.Errorf("Interpret() failed: %v", err)
-// 	} else {
-// 		c.Check(result, gc.Equals, NewInteger(12345))
-// 	}
-// }
+func (s *InterpreterSuite) TestInterpreterSqrtRecursive(c *gc.C) {
+	c.Skip("TODO: builtinDivide() use of BigRat appears going wrong")
+	result, err := Interpret(squareRootSicp)
+	if err != nil {
+		c.Errorf("Interpret() failed: %v", err)
+	} else {
+		c.Check(result, gc.Equals, NewInteger(12345))
+	}
+}
 
 func (s *InterpreterSuite) TestInterpreterTailRecursive(c *gc.C) {
 	inputs := make(map[string]string)

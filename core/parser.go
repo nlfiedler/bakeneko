@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -720,11 +720,12 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			v := seq.Second()
 			body := Cdr(Cdr(seq))
 			if list, islist := v.(Pair); islist && list.Len() > 0 {
-				// (define (f args) body) => (define f (lambda (args) body))
-				f, args := list.First(), list.Rest()
+				// (define (f args) body) => (define f (lambda args body))
+				fun := list.First()
+				args := list.Second()
 				lambda := NewList(lambdaSym, args)
 				lambda.Join(body)
-				seq = NewList(sym, f, lambda)
+				seq = NewList(sym, fun, lambda)
 				return p.expandListSafely(seq, false)
 			} else {
 				// (define non-var/list exp) => Error
@@ -783,9 +784,7 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 			}
 			vars := seq.Second()
 			body := Cxr("cddr", seq)
-			vlist, islist := vars.(Pair)
-			_, issym := vars.(Symbol)
-			if islist {
+			if vlist, islist := vars.(Pair); islist {
 				// verify that all list elements are symbols
 				iter := vlist.Iterator()
 				for iter.HasNext() {
@@ -794,17 +793,16 @@ func (p *parserImpl) expand(x interface{}, toplevel bool) (interface{}, LispErro
 						return nil, NewLispErrorl(ESYNTAX, vars, "lambda arguments must be symbols")
 					}
 				}
-			} else if issym {
-				vlist = NewPair(vars)
-			} else {
-				return nil, NewLispErrorl(ESYNTAX, seq, "lambda arguments must be a list or a symbol")
+			} else if _, issym := vars.(Symbol); !issym {
+				// otherwise the args must be a single symbol
+				return nil, NewLispErrorl(ESYNTAX, seq, "lambda argument must be a symbol")
 			}
 			body = wrapWithBegin(body)
 			body, err := p.expand(body, false)
 			if err != nil {
 				return nil, err
 			}
-			return NewList(lambdaSym, vlist, body), nil
+			return NewList(lambdaSym, vars, body), nil
 
 		} else if atomsEqual(sym, quasiquoteSym) {
 			// `x => expand quasiquote of x

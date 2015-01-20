@@ -1,5 +1,5 @@
 //
-// Copyright 2012-2014 Nathan Fiedler. All rights reserved.
+// Copyright 2012-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -53,6 +53,16 @@ func NewList(a ...interface{}) Pair {
 		result = Cons(a[ii], result)
 	}
 	return result
+}
+
+// SequenceToList converts a sequence to a list of Pairs.
+func SequenceToList(seq Sequence) Pair {
+	iter := seq.Iterator()
+	builder := NewPairBuilder()
+	for iter.HasNext() {
+		builder.Append(iter.Next())
+	}
+	return builder.List()
 }
 
 // Cons constructs a pair to hold item a and b such that they are stored in a

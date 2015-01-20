@@ -1,5 +1,5 @@
 //
-// Copyright 2014 Nathan Fiedler. All rights reserved.
+// Copyright 2014-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -30,7 +30,7 @@ type Compiler interface {
 	Compile(expr interface{}) LispError
 	// Assemble pulls the final result into a cohesive set of instructions
 	// in which all intermediate values have been stripped.
-	Assemble(name string, args Pair) CodeObject
+	Assemble(name string, args interface{}) CodeObject
 }
 
 // compiler is the internal implementation of a Compiler.
@@ -178,15 +178,11 @@ func (c *compiler) Compile(expr interface{}) LispError {
 			} else if atomsEqual(sym, lambdaSym) {
 				// (lambda (var*) exp)
 				vars := obj.Second()
-				if vlist, ok := vars.(Pair); ok {
-					co, err := CompileLambda(vlist, obj.Third())
-					if err != nil {
-						return err
-					}
-					c.AddInstruction(OP_FUNCTION, co)
-				} else {
-					return NewLispErrorf(EARGUMENT, "lambda arguments wrong type: %v", vars)
+				co, err := CompileLambda(vars, obj.Third())
+				if err != nil {
+					return err
 				}
+				c.AddInstruction(OP_FUNCTION, co)
 			} else if atomsEqual(sym, beginSym) {
 				// (begin exp+)
 				iter := obj.Iterator()
@@ -229,7 +225,7 @@ func (c *compiler) Compile(expr interface{}) LispError {
 	return nil
 }
 
-func (c *compiler) Assemble(name string, args Pair) CodeObject {
+func (c *compiler) Assemble(name string, args interface{}) CodeObject {
 	// Compute the label offsets, not counting the labels themselves toward
 	// the final result as they will be pruned.
 	offsets := make(map[uint]uint)
@@ -301,7 +297,7 @@ func Compile(name string, expr interface{}) (CodeObject, LispError) {
 
 // CompileLambda compiles the given expression assuming that it is a
 // lambda expression which accepts the given arguments.
-func CompileLambda(args Pair, expr interface{}) (CodeObject, LispError) {
+func CompileLambda(args interface{}, expr interface{}) (CodeObject, LispError) {
 	compiler := NewCompiler()
 	err := compiler.Compile(expr)
 	if err != nil {

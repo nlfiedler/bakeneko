@@ -1,5 +1,5 @@
 //
-// Copyright 2014 Nathan Fiedler. All rights reserved.
+// Copyright 2014-2015 Nathan Fiedler. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -213,7 +213,7 @@ func (cs *CompilerSuite) TestBegin(c *gc.C) {
 	c.Check(num.ToInteger(), gc.Equals, int64(4))
 }
 
-func (cs *CompilerSuite) TestLambda(c *gc.C) {
+func (cs *CompilerSuite) TestLambdaArgList(c *gc.C) {
 	expr := parseAndExpandForTest(`(lambda (x y) (if #t x y))`, c)
 	name := "TestLambda"
 	code, err := Compile(name, expr)
@@ -226,13 +226,43 @@ func (cs *CompilerSuite) TestLambda(c *gc.C) {
 	c.Check(code.GetInstruction(0).Code(), gc.Equals, OP_FUNCTION)
 	c.Check(code.GetInstruction(0).Argument(), gc.Equals, uint(0))
 	fun := code.GetConstant(0).(CodeObject)
-	c.Check(fun.Arguments().Len(), gc.Equals, 2)
-	c.Check(stringify(fun.Arguments().First()), gc.Equals, "x")
-	c.Check(stringify(fun.Arguments().Second()), gc.Equals, "y")
+	c.Check(stringify(fun.Arguments()), gc.Equals, "(x y)")
+}
+
+func (cs *CompilerSuite) TestLambdaArgsImproper(c *gc.C) {
+	expr := parseAndExpandForTest(`(lambda (x . y) (if #t x y))`, c)
+	name := "TestLambda"
+	code, err := Compile(name, expr)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
+	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
+	c.Check(code.Name(), gc.Equals, name)
+	c.Assert(code.CodeLen(), gc.Equals, uint(1))
+	c.Assert(code.SymbolLen(), gc.Equals, uint(0))
+	c.Assert(code.ConstantLen(), gc.Equals, uint(1))
+	c.Check(code.GetInstruction(0).Code(), gc.Equals, OP_FUNCTION)
+	c.Check(code.GetInstruction(0).Argument(), gc.Equals, uint(0))
+	fun := code.GetConstant(0).(CodeObject)
+	c.Check(stringify(fun.Arguments()), gc.Equals, "(x . y)")
+}
+
+func (cs *CompilerSuite) TestLambdaArgSymbol(c *gc.C) {
+	expr := parseAndExpandForTest(`(lambda x (if #t x ()))`, c)
+	name := "TestLambda"
+	code, err := Compile(name, expr)
+	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
+	c.Assert(code, gc.NotNil, gc.Commentf("failed to produce code"))
+	c.Check(code.Name(), gc.Equals, name)
+	c.Assert(code.CodeLen(), gc.Equals, uint(1))
+	c.Assert(code.SymbolLen(), gc.Equals, uint(0))
+	c.Assert(code.ConstantLen(), gc.Equals, uint(1))
+	c.Check(code.GetInstruction(0).Code(), gc.Equals, OP_FUNCTION)
+	c.Check(code.GetInstruction(0).Argument(), gc.Equals, uint(0))
+	fun := code.GetConstant(0).(CodeObject)
+	c.Check(stringify(fun.Arguments()), gc.Equals, "x")
 }
 
 func (cs *CompilerSuite) TestDefLambda(c *gc.C) {
-	expr := parseAndExpandForTest(`(define (test x y) (if #t x y))`, c)
+	expr := parseAndExpandForTest(`(define (test (x y)) (if #t x y))`, c)
 	name := "TestDefLambda"
 	code, err := Compile(name, expr)
 	c.Assert(err, gc.IsNil, gc.Commentf("failed to compile code: %s", err))
@@ -248,9 +278,7 @@ func (cs *CompilerSuite) TestDefLambda(c *gc.C) {
 	c.Check(code.GetInstruction(1).Argument(), gc.Equals, uint(0))
 	fun := code.GetConstant(0).(CodeObject)
 	c.Check(fun.Name(), gc.Equals, "test")
-	c.Check(fun.Arguments().Len(), gc.Equals, 2)
-	c.Check(stringify(fun.Arguments().First()), gc.Equals, "x")
-	c.Check(stringify(fun.Arguments().Second()), gc.Equals, "y")
+	c.Check(stringify(fun.Arguments()), gc.Equals, "(x y)")
 }
 
 func (cs *CompilerSuite) TestApplication(c *gc.C) {
